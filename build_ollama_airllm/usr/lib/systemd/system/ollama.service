@@ -1,0 +1,22 @@
+[Unit]
+Description=Ollama Server with AirLLM Integration
+Documentation=https://github.com/ollama/ollama
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ollama
+EnvironmentFile=/etc/default/ollama
+ExecStart=/usr/bin/ollama serve
+Restart=always
+RestartSec=3
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/run/media/piotro/CACHE/airllm /var/lib/ollama
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
