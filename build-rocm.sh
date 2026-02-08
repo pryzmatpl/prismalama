@@ -1,29 +1,57 @@
 #!/bin/bash
-# Simple build script for ollama-airllm package
-
 set -e
 
-BUILD_DIR="build_ollama_airllm"
+BUILD_DIR="build_ollama_airllm_rocm"
 PKG_VERSION="v0.4.1.r5053.4b15df6b"
-PKG_NAME="ollama-airllm"
+PKG_NAME="ollama-airllm-rocm"
 PKG_FILE="${PKG_NAME}-${PKG_VERSION}-1-x86_64.pkg.tar.zst"
 
-echo "Building ${PKG_NAME}..."
+echo "Building ${PKG_NAME} with ROCm support..."
+
+# Check for ROCm/HIP
+if ! command -v hipcc &> /dev/null; then
+    echo "ERROR: hipcc not found. Please install ROCm first."
+    exit 1
+fi
+
+# Detect GPU architecture
+echo "Detecting GPU architecture..."
+ROCM_ARCH=$(rocm_agent_enumerator 2>/dev/null | head -1)
+if [ -z "$ROCM_ARCH" ]; then
+    echo "WARNING: Could not detect ROCm architecture, using gfx1100"
+    ROCM_ARCH="gfx1100"
+fi
+echo "Using ROCm architecture: $ROCM_ARCH"
 
 # Create build directory
 mkdir -p "$BUILD_DIR"
 
-# Clone mlx-c headers
-echo "Cloning mlx-c headers..."
-git clone --depth 1 --branch "$(cat MLX_VERSION)" https://github.com/ml-explore/mlx-c.git build/_deps/mlx-c-src
+# Build ggml backend with ROCm using cmake
+echo "Building ggml backend with ROCm support..."
+rm -rf build
+mkdir -p build
+cd build
+
+export HIP_PATH="$(hipconfig -R)"
+export HIPCXX="$(hipconfig -l)/clang"
+export AMDGPU_TARGETS="$ROCM_ARCH"
+
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DMLX_ENGINE=OFF \
+    -DLLAMA_CURL=ON \
+    -DCMAKE_INSTALL_PREFIX=$(pwd)/../"$BUILD_DIR"/usr
+
+cmake --build . --config Release -j$(nproc)
+
+cd ..
 
 # Build ollama binary
 echo "Building ollama binary..."
 export GOFLAGS="-trimpath -buildmode=pie"
 export CGO_ENABLED=1
-export CGO_CFLAGS="-I$(pwd)/build/_deps/mlx-c-src"
 export LDFLAGS="-w -s -X=github.com/ollama/ollama/version.Version=${PKG_VERSION}"
-go build -tags="" -o "$BUILD_DIR/ollama" -ldflags="-w -s -X=github.com/ollama/ollama/version.Version=${PKG_VERSION} -DMLX_ENGINE=OFF -DGGML_HIP=ON" .
+go build -tags="" -o "$BUILD_DIR/ollama" -ldflags="-w -s -X=github.com/ollama/ollama/version.Version=${PKG_VERSION}" .
 
 # Create package structure
 echo "Creating package structure..."
@@ -40,10 +68,15 @@ echo "Copying files..."
 cp "$BUILD_DIR/ollama" "$BUILD_DIR/usr/bin/"
 chmod 755 "$BUILD_DIR/usr/bin/ollama"
 
+# Copy ROCm libraries from build
+if [ -d "build/lib/ollama" ]; then
+    cp -r build/lib/ollama/* "$BUILD_DIR/usr/lib/ollama/" 2>/dev/null || true
+fi
+
 # Create systemd service
 cat > "$BUILD_DIR/usr/lib/systemd/system/ollama.service" << 'EOF'
 [Unit]
-Description=Ollama Server with AirLLM Integration
+Description=Ollama Server with AirLLM Integration (ROCm)
 Documentation=https://github.com/ollama/ollama
 After=network.target
 Wants=network-online.target
@@ -71,26 +104,28 @@ cat > "$BUILD_DIR/usr/lib/sysusers.d/ollama.conf" << 'EOF'
 u ollama - "Ollama service user" -
 EOF
 
-# Create environment config
+# Create environment config with ROCm settings
 cat > "$BUILD_DIR/etc/default/ollama" << 'EOF'
 export OLLAMA_MODELS="/run/media/piotro/CACHE/airllm"
+export HSA_OVERRIDE_GFX_VERSION=11.0.0
 EOF
 
- # Copy AirLLM
- cp -r airllm-clean/air_llm "$BUILD_DIR/usr/share/ollama/airllm"
+# Copy AirLLM
+if [ -d "airllm-clean/air_llm" ]; then
+    cp -r airllm-clean/air_llm "$BUILD_DIR/usr/share/ollama/airllm"
+fi
 
 # Copy license
 cp LICENSE "$BUILD_DIR/usr/share/licenses/$PKG_NAME/"
 
-
 # Create install script
-cat > "$BUILD_DIR/ollama-airllm.install" << 'EOF'
+cat > "$BUILD_DIR/ollama-airllm-rocm.install" << 'EOF'
 post_install() {
   systemd-sysusers ollama.conf
   chown -R ollama:ollama /run/media/piotro/CACHE/airllm 2>/dev/null || true
   
   echo ""
-  echo "Ollama with AirLLM integration has been installed!"
+  echo "Ollama with AirLLM and ROCm integration has been installed!"
   echo ""
   echo "Models directory: /run/media/piotro/CACHE/airllm"
   echo ""
@@ -104,6 +139,8 @@ post_install() {
   echo ""
   echo "AirLLM integration is available at: /usr/share/ollama/airllm"
   echo ""
+  echo "ROCm GPU acceleration is enabled."
+  echo ""
 }
 
 post_upgrade() {
@@ -115,11 +152,12 @@ pre_remove() {
 }
 EOF
 
-  # Create package
-  echo "Creating package: $PKG_FILE"
-  cd "$BUILD_DIR"
-  cp ../PKGBUILD .
-  LANG=C makepkg -C -c -f -g -s --packagelist
+# Create package
+echo "Creating package: $PKG_FILE"
+cd "$BUILD_DIR"
+cp ../PKGBUILD .
+sed -i 's/pkgname=ollama-airllm/pkgname=ollama-airllm-rocm/' PKGBUILD
+LANG=C makepkg -C -c -f -g -s --packagelist
 
 echo "Package created: $PKG_FILE"
 echo ""
