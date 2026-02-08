@@ -110,7 +110,7 @@ EOF
 
 # Create environment config with ROCm settings
 cat > "$BUILD_DIR/etc/default/ollama" << 'EOF'
-export OLLAMA_MODELS="/run/media/piotro/CACHE/airllm"
+export OLLAMA_MODELS="/var/lib/ollama"
 export HSA_OVERRIDE_GFX_VERSION=11.0.0
 EOF
 

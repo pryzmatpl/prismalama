@@ -18,9 +18,6 @@ package() {
   cp -r usr "$pkgdir/"
   cp -r etc "$pkgdir/" 2>/dev/null || true
   
-  # Create run directory placeholder
-  install -dm755 "$pkgdir/run/media/piotro/CACHE/airllm"
-  
   # Install license
   install -Dm644 usr/share/licenses/ollama-airllm-rocm/LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
   
