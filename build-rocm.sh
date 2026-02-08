@@ -40,6 +40,9 @@ cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
     -DMLX_ENGINE=OFF \
     -DLLAMA_CURL=ON \
+    -DLLAMA_HIPBLAS=ON \
+    -DLLAMA_CUDA=OFF \
+    -DCMAKE_HIP_COMPILER_ROCM_ROOT="$HIP_PATH" \
     -DCMAKE_INSTALL_PREFIX=$(pwd)/../"$BUILD_DIR"/usr
 
 cmake --build . --config Release -j$(nproc)
@@ -56,6 +59,7 @@ go build -tags="" -o "$BUILD_DIR/ollama" -ldflags="-w -s -X=github.com/ollama/ol
 # Create package structure
 echo "Creating package structure..."
 mkdir -p "$BUILD_DIR/usr/bin"
+mkdir -p "$BUILD_DIR/usr/lib/ollama"
 mkdir -p "$BUILD_DIR/usr/lib/systemd/system"
 mkdir -p "$BUILD_DIR/usr/lib/sysusers.d"
 mkdir -p "$BUILD_DIR/etc/default"
@@ -157,8 +161,17 @@ echo "Creating package: $PKG_FILE"
 cd "$BUILD_DIR"
 cp ../PKGBUILD .
 sed -i 's/pkgname=ollama-airllm/pkgname=ollama-airllm-rocm/' PKGBUILD
-LANG=C makepkg -C -c -f -g -s --packagelist
 
+# Create .SRCINFO for makepkg
+makepkg --printsrcinfo > .SRCINFO
+
+# Actually build the package (remove --packagelist flag)
+LANG=C makepkg -f
+
+# Move package to parent directory
+mv *.pkg.tar.zst ../ 2>/dev/null || true
+
+cd ..
 echo "Package created: $PKG_FILE"
 echo ""
 echo "To install:"
