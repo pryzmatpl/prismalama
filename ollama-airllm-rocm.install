@@ -1,0 +1,88 @@
+post_install() {
+    systemd-sysusers ollama.conf
+    
+    # Create model directories with proper permissions
+    if [ ! -d "/run/media/piotro/CACHE1/airllm" ]; then
+        install -dm755 -o ollama -g ollama /run/media/piotro/CACHE1/airllm 2>/dev/null || {
+            echo "Warning: Could not create /run/media/piotro/CACHE1/airllm"
+            mkdir -p /run/media/piotro/CACHE1/airllm 2>/dev/null || true
+        }
+    fi
+    
+    if [ ! -d "/run/media/piotro/CACHE/airllm" ]; then
+        install -dm755 -o ollama -g ollama /run/media/piotro/CACHE/airllm 2>/dev/null || true
+    fi
+    
+    if [ ! -d "/var/lib/ollama" ]; then
+        install -dm755 -o ollama -g ollama /var/lib/ollama 2>/dev/null || true
+    fi
+    
+    # Set ownership on existing directories
+    chown -R ollama:ollama /run/media/piotro/CACHE1/airllm 2>/dev/null || true
+    chown -R ollama:ollama /run/media/piotro/CACHE/airllm 2>/dev/null || true
+    chown -R ollama:ollama /var/lib/ollama 2>/dev/null || true
+    
+    # Reload systemd
+    systemctl daemon-reload 2>/dev/null || true
+    
+    echo ""
+    echo "=========================================="
+    echo "Ollama with AirLLM and ROCm installed!"
+    echo "=========================================="
+    echo ""
+    echo "GPU: AMD RX 7900 XTX (gfx1100)"
+    echo "Models directory: /run/media/piotro/CACHE1/airllm"
+    echo ""
+    echo "AirLLM Features:"
+    echo "  - Automatic offloading when VRAM is insufficient"
+    echo "  - Layer-by-layer inference for large models"
+    echo "  - 4-bit compression by default"
+    echo "  - Supports safetensors and GGUF formats"
+    echo ""
+    echo "Quick Start:"
+    echo "  sudo systemctl start ollama    # Start service"
+    echo "  sudo systemctl enable ollama   # Enable on boot"
+    echo "  ollama list                    # List models"
+    echo "  ollama run llama3.2            # Run a model"
+    echo ""
+    echo "Configuration: /etc/default/ollama"
+    echo "Logs: sudo journalctl -u ollama -f"
+    echo ""
+    echo "For opencode integration:"
+    echo "  Set OLLAMA_HOST=127.0.0.1:11434 in opencode config"
+    echo "  or use: export OLLAMA_MODELS=/run/media/piotro/CACHE1/airllm"
+    echo ""
+    echo "Large model offloading happens automatically when:"
+    echo "  - Model exceeds available VRAM"
+    echo "  - Model is in safetensors format"
+    echo "  - AIRLLM_FORCE=1 is set"
+    echo ""
+}
+
+post_upgrade() {
+    post_install
+    
+    # Restart service if running
+    if systemctl is-active --quiet ollama 2>/dev/null; then
+        echo "Restarting ollama service..."
+        systemctl restart ollama 2>/dev/null || true
+    fi
+}
+
+pre_remove() {
+    systemctl disable --now ollama 2>/dev/null || true
+}
+
+post_remove() {
+    echo ""
+    echo "Ollama has been removed."
+    echo ""
+    echo "Note: Model data in /run/media/piotro/CACHE1/airllm has been preserved."
+    echo "      Remove manually if no longer needed."
+    echo ""
+    echo "To completely remove:"
+    echo "  sudo rm -rf /run/media/piotro/CACHE1/airllm"
+    echo "  sudo rm -rf /var/lib/ollama"
+    echo "  sudo userdel ollama 2>/dev/null || true"
+    echo ""
+}

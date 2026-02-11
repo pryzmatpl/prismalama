@@ -1,0 +1,287 @@
+diff --git a/llm/llm.go b/llm/llm.go
+index 123456..789abc 100644
+--- a/llm/llm.go
++++ b/llm/llm.go
+@@ -45,6 +45,15 @@ func NewServer(modelPath string, model api.ModelInfo, adapters, projectors []str
+ 		port = rand.Intn(65535-49152) + 49152 // #nosec G404
+ 	}
+ 
++	// Check for AirLLM mode - either explicit or auto-detected
++	if shouldUseAirLLM(modelPath) {
++		slog.Info("Using AirLLM runner for large model support")
++		return newAirLLMServer(modelPath, port)
++	}
++
+ 	estimate, err := model.Predictor.GetEstimate()
+ 	if err != nil {
+ 		return nil, err
+@@ -80,3 +89,37 @@ func NewServer(modelPath string, model api.ModelInfo, adapters, projectors []str
+ 
+ 	return s, nil
+ }
++
++// shouldUseAirLLM determines if AirLLM should be used for this model
++func shouldUseAirLLM(modelPath string) bool {
++	// Check explicit environment variable
++	if os.Getenv("AIRLLM_FORCE") == "1" || os.Getenv("USE_AIRLLM") == "1" {
++		return true
++	}
++
++	// Auto-detect based on model format
++	return isAirLLMCompatibleModel(modelPath)
++}
++
++// isAirLLMCompatibleModel checks if model is in AirLLM-compatible format
++func isAirLLMCompatibleModel(modelPath string) bool {
++	// Check for safetensors format
++	if _, err := os.Stat(filepath.Join(modelPath, "model.safetensors")); err == nil {
++		return true
++	}
++	if _, err := os.Stat(filepath.Join(modelPath, "model.safetensors.index.json")); err == nil {
++		return true
++	}
++	
++	// Check for PyTorch format with index
++	if _, err := os.Stat(filepath.Join(modelPath, "pytorch_model.bin.index.json")); err == nil {
++		return true
++	}
++	
++	// Check directory name patterns
++	base := filepath.Base(modelPath)
++	if strings.Contains(strings.ToLower(base), "glm") ||
++	   strings.Contains(strings.ToLower(base), "qwen") ||
++	   strings.Contains(strings.ToLower(base), "airllm") {
++		return true
++	}
++	
++	return false
++}
+diff --git a/llm/airllm_server.go b/llm/airllm_server.go
+new file mode 100644
+index 000000..789abc
+--- /dev/null
++++ b/llm/airllm_server.go
+@@ -0,0 +1,170 @@
++package llm
++
++import (
++	"encoding/json"
++	"errors"
++	"fmt"
++	"log/slog"
++	"net/http"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strconv"
++	"strings"
++	"sync"
++	"time"
++
++	"github.com/ollama/ollama/api"
++)
++
++// AirLLMServer wraps the AirLLM Python runner
+type AirLLMServer struct {
++	modelPath  string
++	port       int
++	cmd        *exec.Cmd
++	status     ServerStatus
++	mu         sync.Mutex
++	ready      sync.WaitGroup
++	httpClient *http.Client
++	baseURL    string
++}
++
++// newAirLLMServer creates a new AirLLM server instance
++func newAirLLMServer(modelPath string, port int) (*AirLLMServer, error) {
++	s := &AirLLMServer{
++		modelPath: modelPath,
++		port:      port,
++		status:    ServerStatusLoadingModel,
++		httpClient: &http.Client{
++			Timeout: 0, // No timeout for streaming
++		},
++		baseURL: fmt.Sprintf("http://127.0.0.1:%d", port),
++	}
++	
++	if err := s.start(); err != nil {
++		return nil, err
++	}
++	
++	return s, nil
++}
++
++// start launches the AirLLM Python runner
++func (s *AirLLMServer) start() error {
++	runnerPath := findAirLLMRunner()
++	if runnerPath == "" {
++		return errors.New("airllm_runner.py not found")
++	}
++
++	cmd := exec.Command("python3", runnerPath,
++		"--model", s.modelPath,
++		"--port", strconv.Itoa(s.port),
++	)
++
++	// Set up environment
++	cmd.Env = append(os.Environ(),
++		"AIRLLM_COMPRESSION="+os.Getenv("AIRLLM_COMPRESSION"),
++		"PYTHONPATH=/usr/share/ollama/airllm:/usr/share/ollama/airllm/air_llm",
++	)
++
++	cmd.Stdout = os.Stderr
++	cmd.Stderr = os.Stderr
++
++	s.cmd = cmd
++	slog.Info("Starting AirLLM runner", "port", s.port)
++	
++	if err := cmd.Start(); err != nil {
++		return fmt.Errorf("failed to start AirLLM runner: %w", err)
++	}
++
++	// Wait for server to be ready
++	return s.waitForReady()
++}
++
++// waitForReady waits for the AirLLM server to be ready
++func (s *AirLLMServer) waitForReady() error {
++	for i := 0; i < 60; i++ {
++		resp, err := s.httpClient.Get(s.baseURL + "/health")
++		if err == nil {
++			resp.Body.Close()
++			if resp.StatusCode == http.StatusOK {
++				s.mu.Lock()
++				s.status = ServerStatusReady
++				s.mu.Unlock()
++				slog.Info("AirLLM runner is ready")
++				return nil
++			}
++		}
++		time.Sleep(500 * time.Millisecond)
++	}
++	return errors.New("timeout waiting for AirLLM runner")
++}
++
++// findAirLLMRunner locates the AirLLM runner script
++func findAirLLMRunner() string {
++	candidates := []string{
++		"/usr/share/ollama/airllm_runner.py",
++		"/usr/local/share/ollama/airllm_runner.py",
++		filepath.Join(filepath.Dir(os.Args[0]), "airllm_runner.py"),
++	}
++
++	for _, p := range candidates {
++		if _, err := os.Stat(p); err == nil {
++			return p
++		}
++	}
++	return ""
++}
++
++// Ping implements the Server interface
++func (s *AirLLMServer) Ping(ctx context.Context) error {
++	s.mu.Lock()
++	status := s.status
++	s.mu.Unlock()
++	
++	if status != ServerStatusReady {
++		return errors.New("server not ready")
++	}
++	return nil
++}
++
++// Completion implements the Server interface
++func (s *AirLLMServer) Completion(ctx context.Context, req CompletionRequest, fn func(CompletionResponse)) error {
++	s.mu.Lock()
++	status := s.status
++	s.mu.Unlock()
++	
++	if status != ServerStatusReady {
++		return errors.New("server not ready")
++	}
++
++	// Forward request to AirLLM server
++	jsonReq, err := json.Marshal(req)
++	if err != nil {
++		return err
++	}
++
++	resp, err := s.httpClient.Post(
++		s.baseURL+"/completion",
++		"application/json",
++		strings.NewReader(string(jsonReq)),
++	)
++	if err != nil {
++		return err
++	}
++	defer resp.Body.Close()
++
++	// Stream responses
++	decoder := json.NewDecoder(resp.Body)
++	for {
++		var cr CompletionResponse
++		if err := decoder.Decode(&cr); err != nil {
++			break
++		}
++		fn(cr)
++		if cr.Done {
++			break
++		}
++	}
++
++	return nil
++}
++
++// Close shuts down the AirLLM server
++func (s *AirLLMServer) Close() error {
++	if s.cmd != nil && s.cmd.Process != nil {
++		s.cmd.Process.Kill()
++	}
++	return nil
++}
++
++// Status returns the current server status
++func (s *AirLLMServer) Status() ServerStatus {
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	return s.status
++}
+diff --git a/runner/runner.go b/runner/runner.go
+index 123456..789abc 100644
+--- a/runner/runner.go
++++ b/runner/runner.go
+@@ -5,6 +5,7 @@ import (
+ 
+ 	"github.com/ollama/ollama/runner/llamarunner"
+ 	"github.com/ollama/ollama/runner/ollamarunner"
++	"github.com/ollama/ollama/runner/airllmrunner"
+ )
+ 
+ type Backend int
+@@ -13,6 +14,7 @@ const (
+ 	BackendInvalid Backend = iota
+ 	BackendLLama
+ 	BackendOllama
++	BackendAirLLM
+ )
+ 
+ func New(backend Backend) func(args []string) error {
+@@ -22,6 +24,8 @@ func New(backend Backend) func(args []string) error {
+ 		return llamarunner.Execute
+ 	case BackendOllama:
+ 		return ollamarunner.Execute
++	case BackendAirLLM:
++		return airllmrunner.Execute
+ 	default:
+ 		return nil
+ 	}
+@@ -34,6 +38,8 @@ func BackendFromString(s string) Backend {
+ 		return BackendLLama
+ 	case "ollama":
+ 		return BackendOllama
++	case "airllm":
++		return BackendAirLLM
+ 	default:
+ 		return BackendInvalid
+ 	}
