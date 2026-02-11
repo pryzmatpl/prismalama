@@ -118,9 +118,35 @@ prepare_sources() {
     mkdir -p "$SRC_DIR"
     
     # Clone Ollama if not present
-    if [ ! -d "$SRC_DIR/ollama" ]; then
-        log_info "Cloning Ollama repository (v${PKG_VERSION})..."
-        git clone --depth 1 --branch "v${PKG_VERSION}" https://github.com/ollama/ollama.git "$SRC_DIR/ollama"
+    # First check if workspace root has ollama with CMakeLists.txt (newer version)
+    if [ -f "${SCRIPT_DIR}/CMakeLists.txt" ] && [ -d "${SCRIPT_DIR}/llama" ]; then
+        if [ ! -e "$SRC_DIR/ollama" ]; then
+            log_info "Using workspace root ollama source (has CMakeLists.txt)"
+            mkdir -p "$SRC_DIR"
+            ln -sf "${SCRIPT_DIR}" "$SRC_DIR/ollama"
+            log_info "Created symlink to workspace root"
+        elif [ -d "$SRC_DIR/ollama" ] && [ ! -L "$SRC_DIR/ollama" ] && [ ! -f "$SRC_DIR/ollama/CMakeLists.txt" ]; then
+            # Directory exists but doesn't have CMakeLists.txt - remove and create symlink
+            log_info "Removing incomplete ollama directory and creating symlink to workspace root"
+            rm -rf "$SRC_DIR/ollama"
+            ln -sf "${SCRIPT_DIR}" "$SRC_DIR/ollama"
+            log_info "Created symlink to workspace root"
+        elif [ -L "$SRC_DIR/ollama" ]; then
+            log_info "Symlink to workspace root already exists"
+        fi
+    elif [ ! -d "$SRC_DIR/ollama" ]; then
+        log_info "Cloning Ollama repository..."
+        # Clone without depth limit to get full history
+        git clone https://github.com/ollama/ollama.git "$SRC_DIR/ollama"
+        cd "$SRC_DIR/ollama"
+        # Try to checkout the tag, but verify CMakeLists.txt exists
+        if git checkout "v${PKG_VERSION}" 2>/dev/null && [ -f "CMakeLists.txt" ]; then
+            log_info "Checked out v${PKG_VERSION} with CMakeLists.txt"
+        else
+            log_warn "v${PKG_VERSION} doesn't have CMakeLists.txt, using latest main branch"
+            git checkout main 2>/dev/null || git checkout master 2>/dev/null || git checkout origin/main 2>/dev/null
+        fi
+        cd "$SCRIPT_DIR"
     else
         log_info "Ollama source already exists"
     fi
@@ -133,31 +159,110 @@ prepare_sources() {
         log_info "AirLLM source already exists"
     fi
     
-    # Initialize submodules
-    cd "$SRC_DIR/ollama"
-    if [ ! -f ".submodules_initialized" ]; then
-        log_info "Initializing git submodules..."
-        git submodule update --init --recursive
-        touch .submodules_initialized
+    # Ensure we have CMakeLists.txt
+    # Resolve symlink if it's a symlink (workspace root)
+    if [ -L "$SRC_DIR/ollama" ]; then
+        OLLAMA_SRC=$(readlink -f "$SRC_DIR/ollama")
+        log_info "Using workspace root via symlink: $OLLAMA_SRC"
+        # Try to initialize submodules, but ignore errors for missing ones (like airllm)
+        cd "$OLLAMA_SRC"
+        if [ ! -f ".submodules_initialized" ] && [ -f ".gitmodules" ]; then
+            log_info "Initializing git submodules in workspace root..."
+            # Initialize only existing submodules, ignore missing ones
+            git submodule update --init --recursive 2>&1 | grep -v "Nie znaleziono adresu\|not found\|fatal:" || true
+            touch .submodules_initialized
+        fi
+        cd "$SCRIPT_DIR"
+    else
+        OLLAMA_SRC="$SRC_DIR/ollama"
+        cd "$OLLAMA_SRC"
+        
+        # Try to checkout the tag
+        if git show "v${PKG_VERSION}:CMakeLists.txt" >/dev/null 2>&1; then
+            log_info "Tag v${PKG_VERSION} has CMakeLists.txt, checking out..."
+            git checkout "v${PKG_VERSION}" 2>/dev/null || git checkout "tags/v${PKG_VERSION}" 2>/dev/null
+        else
+            log_warn "Tag v${PKG_VERSION} does not have CMakeLists.txt, using main branch"
+            git fetch origin main 2>/dev/null || true
+            git checkout main 2>/dev/null || git checkout origin/main 2>/dev/null
+        fi
+        
+        if [ ! -f ".submodules_initialized" ]; then
+            log_info "Initializing git submodules..."
+            # Initialize submodules, but ignore errors for missing ones (like airllm)
+            git submodule update --init --recursive 2>&1 | grep -v "Nie znaleziono adresu\|not found" || true
+            # Check if critical submodules were initialized
+            if [ -d "ml/backend/ggml/ggml" ] || [ -d "llama" ]; then
+                log_info "Critical submodules initialized"
+            else
+                log_warn "Some submodules may not have initialized, but continuing..."
+            fi
+            touch .submodules_initialized
+        fi
     fi
+    
+    # Verify CMakeLists.txt exists
+    # Resolve symlink if it's a symlink
+    if [ -L "$SRC_DIR/ollama" ]; then
+        OLLAMA_SRC=$(readlink -f "$SRC_DIR/ollama")
+        log_info "Resolved symlink to: $OLLAMA_SRC"
+    elif [ -z "$OLLAMA_SRC" ]; then
+        OLLAMA_SRC="$SRC_DIR/ollama"
+    fi
+    
+    # Check for CMakeLists.txt in the source directory
+    if [ ! -f "$OLLAMA_SRC/CMakeLists.txt" ]; then
+        # If not found and we're using workspace root, it should be there
+        if [ -f "${SCRIPT_DIR}/CMakeLists.txt" ] && [ "$OLLAMA_SRC" = "${SCRIPT_DIR}" ]; then
+            log_info "CMakeLists.txt found in workspace root"
+        else
+            log_error "CMakeLists.txt not found in ollama source directory"
+            log_info "Source: $OLLAMA_SRC"
+            log_info "Workspace root: ${SCRIPT_DIR}"
+            log_info "Symlink: $([ -L "$SRC_DIR/ollama" ] && echo "Yes: $(readlink "$SRC_DIR/ollama")" || echo "No")"
+            log_info "Searching for CMakeLists.txt..."
+            find "$OLLAMA_SRC" -maxdepth 2 -name "CMakeLists.txt" -type f 2>/dev/null | head -5
+            log_error "Cannot proceed without CMakeLists.txt"
+            exit 1
+        fi
+    fi
+    
+    log_info "CMakeLists.txt found at: $OLLAMA_SRC/CMakeLists.txt"
     
     cd "$SCRIPT_DIR"
     
     # Apply AirLLM integration
     log_step "Setting up AirLLM integration..."
     
-    # Create airllmrunner directory and copy files
-    mkdir -p "$SRC_DIR/ollama/runner/airllmrunner"
-    
-    if [ -f "${SCRIPT_DIR}/runner/airllmrunner/runner.go" ]; then
-        cp "${SCRIPT_DIR}/runner/airllmrunner/"*.go "$SRC_DIR/ollama/runner/airllmrunner/"
-        log_info "AirLLM runner Go files copied"
+    # Resolve symlink if needed (OLLAMA_SRC should already be set above)
+    if [ -z "$OLLAMA_SRC" ]; then
+        if [ -L "$SRC_DIR/ollama" ]; then
+            OLLAMA_SRC=$(readlink -f "$SRC_DIR/ollama")
+        else
+            OLLAMA_SRC="$SRC_DIR/ollama"
+        fi
     fi
     
-    if [ -f "${SCRIPT_DIR}/runner/airllmrunner/airllm_runner.py" ]; then
-        mkdir -p "$SRC_DIR/ollama/runner/airllmrunner"
-        cp "${SCRIPT_DIR}/runner/airllmrunner/airllm_runner.py" "$SRC_DIR/ollama/runner/airllmrunner/"
-        log_info "AirLLM runner Python file copied"
+    # Create airllmrunner directory and copy files
+    # Check if source and destination are the same (when using workspace root as symlink)
+    SCRIPT_DIR_RESOLVED=$(readlink -f "${SCRIPT_DIR}")
+    OLLAMA_SRC_RESOLVED=$(readlink -f "$OLLAMA_SRC")
+    
+    if [ "$SCRIPT_DIR_RESOLVED" = "$OLLAMA_SRC_RESOLVED" ]; then
+        log_info "Source and destination are the same (using workspace root), skipping copy"
+    else
+        mkdir -p "$OLLAMA_SRC/runner/airllmrunner"
+        
+        if [ -f "${SCRIPT_DIR}/runner/airllmrunner/runner.go" ]; then
+            cp "${SCRIPT_DIR}/runner/airllmrunner/"*.go "$OLLAMA_SRC/runner/airllmrunner/"
+            log_info "AirLLM runner Go files copied"
+        fi
+        
+        if [ -f "${SCRIPT_DIR}/runner/airllmrunner/airllm_runner.py" ]; then
+            mkdir -p "$OLLAMA_SRC/runner/airllmrunner"
+            cp "${SCRIPT_DIR}/runner/airllmrunner/airllm_runner.py" "$OLLAMA_SRC/runner/airllmrunner/"
+            log_info "AirLLM runner Python file copied"
+        fi
     fi
     
     log_info "Sources prepared"
@@ -167,7 +272,16 @@ prepare_sources() {
 build_ollama() {
     log_step "Building Ollama with ROCm support..."
     
-    cd "$SRC_DIR/ollama"
+    # Resolve symlink if needed
+    if [ -z "$OLLAMA_SRC" ]; then
+        if [ -L "$SRC_DIR/ollama" ]; then
+            OLLAMA_SRC=$(readlink -f "$SRC_DIR/ollama")
+        else
+            OLLAMA_SRC="$SRC_DIR/ollama"
+        fi
+    fi
+    
+    cd "$OLLAMA_SRC"
     
     # Set build environment
     export HIP_PATH="/opt/rocm"
