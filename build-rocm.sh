@@ -96,7 +96,7 @@ RestartSec=3
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/run/media/piotro/CACHE/airllm /var/lib/ollama
+ReadWritePaths=/run/media/piotro/CACHE1/airllm /run/media/piotro/CACHE/airllm /var/lib/ollama
 PrivateTmp=true
 
 [Install]
@@ -110,14 +110,25 @@ EOF
 
 # Create environment config with ROCm settings
 cat > "$BUILD_DIR/etc/default/ollama" << 'EOF'
-export OLLAMA_MODELS="/var/lib/ollama"
+export OLLAMA_MODELS="/run/media/piotro/CACHE1/airllm"
 export HSA_OVERRIDE_GFX_VERSION=11.0.0
+export AIRLLM_COMPRESSION="4bit"
+export PYTHONPATH="/usr/share/ollama/airllm:$PYTHONPATH"
 EOF
 
 # Copy AirLLM
 if [ -d "airllm-clean/air_llm" ]; then
     cp -r airllm-clean/air_llm "$BUILD_DIR/usr/share/ollama/airllm"
 fi
+
+# Also copy from submodule if available
+if [ -d "airllm/air_llm" ]; then
+    cp -r airllm/air_llm/airllm "$BUILD_DIR/usr/share/ollama/airllm/" 2>/dev/null || true
+fi
+
+# Copy AirLLM Python runner
+cp runner/airllmrunner/airllm_runner.py "$BUILD_DIR/usr/share/ollama/"
+chmod 755 "$BUILD_DIR/usr/share/ollama/airllm_runner.py"
 
 # Copy license
 cp LICENSE "$BUILD_DIR/usr/share/licenses/$PKG_NAME/"
@@ -126,12 +137,16 @@ cp LICENSE "$BUILD_DIR/usr/share/licenses/$PKG_NAME/"
 cat > "$BUILD_DIR/ollama-airllm-rocm.install" << 'EOF'
 post_install() {
   systemd-sysusers ollama.conf
+  chown -R ollama:ollama /run/media/piotro/CACHE1/airllm 2>/dev/null || true
   chown -R ollama:ollama /run/media/piotro/CACHE/airllm 2>/dev/null || true
   
   echo ""
   echo "Ollama with AirLLM and ROCm integration has been installed!"
   echo ""
-  echo "Models directory: /run/media/piotro/CACHE/airllm"
+  echo "Models directory: /run/media/piotro/CACHE1/airllm"
+  echo ""
+  echo "AirLLM automatically handles large models by loading layers on-demand."
+  echo "Models with safetensors format (like GLM-4.7) will use AirLLM automatically."
   echo ""
   echo "To start the service:"
   echo "  sudo systemctl start ollama"
@@ -141,9 +156,10 @@ post_install() {
   echo ""
   echo "Configuration file: /etc/default/ollama"
   echo ""
-  echo "AirLLM integration is available at: /usr/share/ollama/airllm"
+  echo "AirLLM Python package: /usr/share/ollama/airllm"
+  echo "AirLLM Runner: /usr/share/ollama/airllm_runner.py"
   echo ""
-  echo "ROCm GPU acceleration is enabled."
+  echo "ROCm GPU acceleration is enabled for gfx1100 (7900 XTX)."
   echo ""
 }
 

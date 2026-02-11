@@ -95,22 +95,27 @@ install(TARGETS ggml-base ${CPU_VARIANTS}
     FRAMEWORK DESTINATION ${OLLAMA_INSTALL_DIR} COMPONENT CPU
 )
 
-check_language(CUDA)
-if(CMAKE_CUDA_COMPILER)
-    if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24" AND NOT CMAKE_CUDA_ARCHITECTURES)
-        set(CMAKE_CUDA_ARCHITECTURES "native")
-    endif()
+option(LLAMA_CUDA "Enable CUDA backend" OFF)
+if(LLAMA_CUDA)
+    check_language(CUDA)
+    if(CMAKE_CUDA_COMPILER)
+        if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24" AND NOT CMAKE_CUDA_ARCHITECTURES)
+            set(CMAKE_CUDA_ARCHITECTURES "native")
+        endif()
 
-    find_package(CUDAToolkit)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ml/backend/ggml/ggml/src/ggml-cuda)
-    install(TARGETS ggml-cuda
-        RUNTIME_DEPENDENCIES
-            DIRECTORIES ${CUDAToolkit_BIN_DIR} ${CUDAToolkit_BIN_DIR}/x64 ${CUDAToolkit_LIBRARY_DIR}
-            PRE_INCLUDE_REGEXES cublas cublasLt cudart
-            PRE_EXCLUDE_REGEXES ".*"
-        RUNTIME DESTINATION ${OLLAMA_INSTALL_DIR} COMPONENT CUDA
-        LIBRARY DESTINATION ${OLLAMA_INSTALL_DIR} COMPONENT CUDA
-    )
+        find_package(CUDAToolkit)
+        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ml/backend/ggml/ggml/src/ggml-cuda)
+        install(TARGETS ggml-cuda
+            RUNTIME_DEPENDENCIES
+                DIRECTORIES ${CUDAToolkit_BIN_DIR} ${CUDAToolkit_BIN_DIR}/x64 ${CUDAToolkit_LIBRARY_DIR}
+                PRE_INCLUDE_REGEXES cublas cublasLt cudart
+                PRE_EXCLUDE_REGEXES ".*"
+            RUNTIME DESTINATION ${OLLAMA_INSTALL_DIR} COMPONENT CUDA
+            LIBRARY DESTINATION ${OLLAMA_INSTALL_DIR} COMPONENT CUDA
+        )
+    else()
+        message(WARNING "CUDA compiler not found, CUDA backend disabled")
+    endif()
 endif()
 
 set(WINDOWS_AMDGPU_TARGETS_EXCLUDE_REGEX "^gfx(908|90a|1200|1201):xnack[+-]$"
@@ -118,49 +123,54 @@ set(WINDOWS_AMDGPU_TARGETS_EXCLUDE_REGEX "^gfx(908|90a|1200|1201):xnack[+-]$"
     "Regular expression describing AMDGPU_TARGETS not supported on Windows. Override to force building these targets. Default \"^gfx(908|90a|1200|1201):xnack[+-]$\"."
 )
 
-check_language(HIP)
-if(CMAKE_HIP_COMPILER)
-    set(HIP_PLATFORM "amd")
+option(LLAMA_HIPBLAS "Enable HIP/ROCm backend" OFF)
+if(LLAMA_HIPBLAS)
+    check_language(HIP)
+    if(CMAKE_HIP_COMPILER)
+        set(HIP_PLATFORM "amd")
 
-    if(NOT AMDGPU_TARGETS)
-        find_package(hip REQUIRED)
-        list(FILTER AMDGPU_TARGETS INCLUDE REGEX "^gfx(94[012]|101[02]|1030|110[012]|120[01])$")
-    endif()
-
-    if(WIN32 AND WINDOWS_AMDGPU_TARGETS_EXCLUDE_REGEX)
-        list(FILTER AMDGPU_TARGETS EXCLUDE REGEX ${WINDOWS_AMDGPU_TARGETS_EXCLUDE_REGEX})
-    endif()
-
-    if(AMDGPU_TARGETS)
-        find_package(hip REQUIRED)
-        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ml/backend/ggml/ggml/src/ggml-hip)
-
-        if (WIN32)
-            target_compile_definitions(ggml-hip PRIVATE GGML_CUDA_NO_PEER_COPY)
+        if(NOT AMDGPU_TARGETS)
+            find_package(hip REQUIRED)
+            list(FILTER AMDGPU_TARGETS INCLUDE REGEX "^gfx(94[012]|101[02]|1030|110[012]|120[01])$")
         endif()
 
-        target_compile_definitions(ggml-hip PRIVATE GGML_HIP_NO_VMM)
+        if(WIN32 AND WINDOWS_AMDGPU_TARGETS_EXCLUDE_REGEX)
+            list(FILTER AMDGPU_TARGETS EXCLUDE REGEX ${WINDOWS_AMDGPU_TARGETS_EXCLUDE_REGEX})
+        endif()
 
-        install(TARGETS ggml-hip
-            RUNTIME_DEPENDENCY_SET rocm
-            RUNTIME DESTINATION ${OLLAMA_INSTALL_DIR} COMPONENT HIP
-            LIBRARY DESTINATION ${OLLAMA_INSTALL_DIR} COMPONENT HIP
-        )
-        install(RUNTIME_DEPENDENCY_SET rocm
-                DIRECTORIES ${HIP_BIN_INSTALL_DIR} ${HIP_LIB_INSTALL_DIR}
-                PRE_INCLUDE_REGEXES hipblas rocblas amdhip64 rocsolver amd_comgr hsa-runtime64 rocsparse tinfo rocprofiler-register drm drm_amdgpu numa elf
-                PRE_EXCLUDE_REGEXES ".*"
-                POST_EXCLUDE_REGEXES "system32"
-            RUNTIME DESTINATION ${OLLAMA_INSTALL_DIR} COMPONENT HIP
-            LIBRARY DESTINATION ${OLLAMA_INSTALL_DIR} COMPONENT HIP
-        )
+        if(AMDGPU_TARGETS)
+            find_package(hip REQUIRED)
+            add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ml/backend/ggml/ggml/src/ggml-hip)
 
-        foreach(HIP_LIB_BIN_INSTALL_DIR IN ITEMS ${HIP_BIN_INSTALL_DIR} ${HIP_LIB_INSTALL_DIR})
-            if(EXISTS ${HIP_LIB_BIN_INSTALL_DIR}/rocblas)
-                install(DIRECTORY ${HIP_LIB_BIN_INSTALL_DIR}/rocblas DESTINATION ${OLLAMA_INSTALL_DIR} COMPONENT HIP)
-                break()
+            if (WIN32)
+                target_compile_definitions(ggml-hip PRIVATE GGML_CUDA_NO_PEER_COPY)
             endif()
-        endforeach()
+
+            target_compile_definitions(ggml-hip PRIVATE GGML_HIP_NO_VMM)
+
+            install(TARGETS ggml-hip
+                RUNTIME_DEPENDENCY_SET rocm
+                RUNTIME DESTINATION ${OLLAMA_INSTALL_DIR} COMPONENT HIP
+                LIBRARY DESTINATION ${OLLAMA_INSTALL_DIR} COMPONENT HIP
+            )
+            install(RUNTIME_DEPENDENCY_SET rocm
+                    DIRECTORIES ${HIP_BIN_INSTALL_DIR} ${HIP_LIB_INSTALL_DIR}
+                    PRE_INCLUDE_REGEXES hipblas rocblas amdhip64 rocsolver amd_comgr hsa-runtime64 rocsparse tinfo rocprofiler-register drm drm_amdgpu numa elf
+                    PRE_EXCLUDE_REGEXES ".*"
+                    POST_EXCLUDE_REGEXES "system32"
+                RUNTIME DESTINATION ${OLLAMA_INSTALL_DIR} COMPONENT HIP
+                LIBRARY DESTINATION ${OLLAMA_INSTALL_DIR} COMPONENT HIP
+            )
+
+            foreach(HIP_LIB_BIN_INSTALL_DIR IN ITEMS ${HIP_BIN_INSTALL_DIR} ${HIP_LIB_INSTALL_DIR})
+                if(EXISTS ${HIP_LIB_BIN_INSTALL_DIR}/rocblas)
+                    install(DIRECTORY ${HIP_LIB_BIN_INSTALL_DIR}/rocblas DESTINATION ${OLLAMA_INSTALL_DIR} COMPONENT HIP)
+                    break()
+                endif()
+            endforeach()
+        endif()
+    else()
+        message(WARNING "HIP compiler not found, HIP/ROCm backend disabled")
     endif()
 endif()
 
