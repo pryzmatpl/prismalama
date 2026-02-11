@@ -237,18 +237,17 @@ EOF
 u ollama - "Ollama service user" -
 EOF
 
-    # Create environment config
+    # Create environment config (without 'export' - systemd EnvironmentFile expects key=value)
     cat > "${pkgdir}/etc/default/ollama" << 'EOF'
-# Ollama configuration for ROCm with AirLLM
-export OLLAMA_MODELS="${OLLAMA_MODELS:-${HOME}/.ollama/models}"
-export OLLAMA_HOST="127.0.0.1:11434"
-export HSA_OVERRIDE_GFX_VERSION=11.0.0
-export AIRLLM_COMPRESSION="4bit"
-export AIRLLM_DEVICE="cuda:0"
-export PYTHONPATH="/usr/share/ollama/airllm:/usr/share/ollama/airllm/air_llm:${PYTHONPATH}"
+OLLAMA_MODELS="${OLLAMA_MODELS:-${HOME}/.ollama/models}"
+OLLAMA_HOST="127.0.0.1:11434"
+HSA_OVERRIDE_GFX_VERSION=11.0.0
+AIRLLM_COMPRESSION="4bit"
+AIRLLM_DEVICE="cuda:0"
+PYTHONPATH="/usr/share/ollama/airllm:/usr/share/ollama/airllm/air_llm:${PYTHONPATH}"
 
 # ROCm specific
-export HIP_VISIBLE_DEVICES=0
+HIP_VISIBLE_DEVICES=0
 EOF
 
     # Install license

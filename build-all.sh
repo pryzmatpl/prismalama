@@ -432,7 +432,7 @@ RestartSec=3
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/run/media/piotro/CACHE1/airllm /run/media/piotro/CACHE/airllm /var/lib/ollama /tmp
+ReadWritePaths=/run/media/piotro/CACHE/airllm /var/lib/ollama /tmp
 PrivateTmp=true
 
 [Install]
@@ -444,18 +444,17 @@ EOF
 u ollama - "Ollama service user" -
 EOF
 
-    # Install environment config
+    # Install environment config (without 'export' - systemd EnvironmentFile expects key=value)
     cat > "$PKG_DIR/etc/default/ollama" << 'EOF'
-# Ollama configuration for ROCm with AirLLM
-export OLLAMA_MODELS="/run/media/piotro/CACHE1/airllm"
-export OLLAMA_HOST="127.0.0.1:11434"
-export HSA_OVERRIDE_GFX_VERSION=11.0.0
-export AIRLLM_COMPRESSION="4bit"
-export AIRLLM_DEVICE="cuda:0"
-export PYTHONPATH="/usr/share/ollama/airllm:/usr/share/ollama/airllm/air_llm:${PYTHONPATH}"
+OLLAMA_MODELS="/run/media/piotro/CACHE/airllm"
+OLLAMA_HOST="127.0.0.1:11434"
+HSA_OVERRIDE_GFX_VERSION=11.0.0
+AIRLLM_COMPRESSION="4bit"
+AIRLLM_DEVICE="cuda:0"
+PYTHONPATH="/usr/share/ollama/airllm:/usr/share/ollama/airllm/air_llm:${PYTHONPATH}"
 
 # ROCm specific
-export HIP_VISIBLE_DEVICES=0
+HIP_VISIBLE_DEVICES=0
 EOF
 
     # Install license
@@ -582,7 +581,7 @@ install_local() {
         sudo systemctl daemon-reload
         
         # Create directories
-        sudo install -dm755 -o ollama -g ollama /run/media/piotro/CACHE1/airllm 2>/dev/null || true
+        sudo install -dm755 -o ollama -g ollama /run/media/piotro/CACHE/airllm 2>/dev/null || true
         sudo install -dm755 -o ollama -g ollama /var/lib/ollama 2>/dev/null || true
     fi
     
