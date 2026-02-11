@@ -180,6 +180,16 @@ func (st safetensor) WriteTo(w io.Writer) (int64, error) {
 		}
 
 		f32s = bfloat16.DecodeFloat32(u8s)
+	case "U32":
+		u32s := make([]uint32, st.size/4)
+		if err = binary.Read(br, binary.LittleEndian, u32s); err != nil {
+			return 0, err
+		}
+
+		f32s = make([]float32, len(u32s))
+		for i := range u32s {
+			f32s[i] = float32(u32s[i])
+		}
 	default:
 		return 0, fmt.Errorf("unknown data type: %s", st.dtype)
 	}

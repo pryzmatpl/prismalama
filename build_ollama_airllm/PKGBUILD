@@ -91,25 +91,11 @@ EOF
 u ollama - "Ollama service user" -
 EOF
   
-  # Create environment config
+  # Create environment config (without 'export' - systemd EnvironmentFile expects key=value)
   cat > "$srcdir/ollama-airllm.conf" << 'EOF'
-# Ollama AirLLM Configuration
-# Set models directory to AirLLM path
-export OLLAMA_MODELS="/run/media/piotro/CACHE/airllm"
-
-# Ollama host configuration
-# export OLLAMA_HOST="127.0.0.1:11434"
-
-# GPU configuration (uncomment as needed)
-# export CUDA_VISIBLE_DEVICES="0"
-# export HIP_VISIBLE_DEVICES="0"
-# export OLLAMA_VULKAN="1"
-
-# Performance tuning
-# export OLLAMA_NUM_PARALLEL="4"
-# export OLLAMA_MAX_LOADED_MODELS="3"
-# export OLLAMA_MAX_QUEUE="512"
-# export OLLAMA_KEEP_ALIVE="5m"
+OLLAMA_MODELS="/run/media/piotro/CACHE/airllm"
+AIRLLM_COMPRESSION="4bit"
+PYTHONPATH="/usr/share/ollama/airllm:$PYTHONPATH"
 EOF
   
   # Create systemd service
