@@ -1,0 +1,28 @@
+post_install() {
+  systemd-sysusers ollama.conf
+  chown -R ollama:ollama /run/media/piotro/CACHE/airllm 2>/dev/null || true
+  
+  echo ""
+  echo "Ollama with AirLLM integration has been installed!"
+  echo ""
+  echo "Models directory: /run/media/piotro/CACHE/airllm"
+  echo ""
+  echo "To start the service:"
+  echo "  sudo systemctl start ollama"
+  echo ""
+  echo "To enable on boot:"
+  echo "  sudo systemctl enable ollama"
+  echo ""
+  echo "Configuration file: /etc/default/ollama"
+  echo ""
+  echo "AirLLM integration is available at: /usr/share/ollama/airllm"
+  echo ""
+}
+
+post_upgrade() {
+  post_install
+}
+
+pre_remove() {
+  systemctl disable --now ollama 2>/dev/null || true
+}

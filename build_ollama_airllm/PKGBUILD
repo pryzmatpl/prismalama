@@ -1,0 +1,162 @@
+pkgname=ollama-airllm
+_pkgname=ollama
+pkgver=v0.4.1.r5053.4b15df6b
+pkgrel=1
+pkgdesc="Ollama with AirLLM integration - Run large models on limited GPU memory"
+arch=('x86_64' 'aarch64')
+url="https://github.com/ollama/ollama"
+license=('MIT')
+depends=('glibc' 'zlib' 'gcc-libs')
+makedepends=('go' 'cmake' 'git' 'python' 'ninja')
+optdepends=('cuda: NVIDIA GPU support'
+            'rocm: AMD GPU support'
+            'vulkan-driver: Vulkan GPU support')
+provides=('ollama')
+conflicts=('ollama')
+options=(!lto !debug)
+
+source=("file://$(pwd)")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$srcdir/prismalama"
+  
+  # No MLX preparation needed
+}
+
+pkgver() {
+  cd "$srcdir/prismalama"
+  local version=$(cat MLX_VERSION 2>/dev/null || echo "0.0.0")
+  local commit=$(git rev-parse --short HEAD)
+  local revision=$(git rev-list --count HEAD)
+  echo "${version}.r${revision}.${commit}"
+}
+
+build() {
+  cd "$srcdir/prismalama"
+  
+  # Set build flags for AirLLM integration
+  export GOFLAGS="-trimpath -buildmode=pie"
+  export CGO_ENABLED=0
+  export LDFLAGS="-w -s -X=github.com/ollama/ollama/version.Version=${pkgver}"
+  
+  # Build ollama binary excluding llama package
+  cd "$srcdir/prismalama"
+  # Create a temporary build directory
+  mkdir -p build
+  cd build
+  # Copy necessary files
+  cp -r ../cmd ../internal ../server ../version ../go.mod ../go.sum ../api ../auth ../convert ../discover ../envconfig ../format ../fs ../llm ../logutil ../manifest ../middleware ../ml ../model ../parser ../progress ../readline ../runner ../template ../thinking ../tokenizer ../tools ../types ../x ../CONTRIBUTING.md ../LICENSE ../README.md ../SECURITY.md .
+  # Build the binary
+  go build -tags='' -o ollama -ldflags="-w -s -X=github.com/ollama/ollama/version.Version=${pkgver}" ./cmd
+}
+
+package() {
+  cd "$srcdir/prismalama"
+  
+  # Create install script
+  cat > "$srcdir/ollama-airllm.install" << 'EOF'
+post_install() {
+  systemd-sysusers ollama.conf
+  chown -R ollama:ollama /run/media/piotro/CACHE/airllm 2>/dev/null || true
+  
+  echo ""
+  echo "Ollama with AirLLM integration has been installed!"
+  echo ""
+  echo "Models directory: /run/media/piotro/CACHE/airllm"
+  echo ""
+  echo "To start the service:"
+  echo "  sudo systemctl start ollama"
+  echo ""
+  echo "To enable on boot:"
+  echo "  sudo systemctl enable ollama"
+  echo ""
+  echo "Configuration file: /etc/default/ollama"
+  echo ""
+  echo "AirLLM integration is available at: /usr/share/ollama/airllm"
+  echo ""
+}
+
+post_upgrade() {
+  post_install
+}
+
+pre_remove() {
+  systemctl disable --now ollama 2>/dev/null || true
+}
+EOF
+  
+  # Create sysusers config
+  cat > "$srcdir/ollama-airllm.sysusers" << 'EOF'
+u ollama - "Ollama service user" -
+EOF
+  
+  # Create environment config
+  cat > "$srcdir/ollama-airllm.conf" << 'EOF'
+# Ollama AirLLM Configuration
+# Set models directory to AirLLM path
+export OLLAMA_MODELS="/run/media/piotro/CACHE/airllm"
+
+# Ollama host configuration
+# export OLLAMA_HOST="127.0.0.1:11434"
+
+# GPU configuration (uncomment as needed)
+# export CUDA_VISIBLE_DEVICES="0"
+# export HIP_VISIBLE_DEVICES="0"
+# export OLLAMA_VULKAN="1"
+
+# Performance tuning
+# export OLLAMA_NUM_PARALLEL="4"
+# export OLLAMA_MAX_LOADED_MODELS="3"
+# export OLLAMA_MAX_QUEUE="512"
+# export OLLAMA_KEEP_ALIVE="5m"
+EOF
+  
+  # Create systemd service
+  cat > "$srcdir/ollama-airllm.service" << 'EOF'
+[Unit]
+Description=Ollama Server with AirLLM Integration
+Documentation=https://github.com/ollama/ollama
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ollama
+EnvironmentFile=/etc/default/ollama
+ExecStart=/usr/bin/ollama serve
+Restart=always
+RestartSec=3
+
+# Security
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/run/media/piotro/CACHE/airllm /var/lib/ollama
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  
+  # Install binary
+  install -Dm755 ollama "$pkgdir/usr/bin/ollama"
+  
+  # Install systemd service
+  install -Dm644 "$srcdir/ollama-airllm.service" "$pkgdir/usr/lib/systemd/system/ollama.service"
+  
+  # Install sysusers config
+  install -Dm644 "$srcdir/ollama-airllm.sysusers" "$pkgdir/usr/lib/sysusers.d/ollama.conf"
+  
+  # Install environment config
+  install -Dm644 "$srcdir/ollama-airllm.conf" "$pkgdir/etc/default/ollama"
+  
+  # Create models directory
+  install -dm755 "$pkgdir/run/media/piotro/CACHE/airllm"
+  
+  # Copy AirLLM Python package
+  cp -r airllm "$pkgdir/usr/share/ollama/airllm"
+  
+  # Install license
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
