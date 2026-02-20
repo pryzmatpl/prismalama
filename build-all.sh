@@ -432,7 +432,7 @@ RestartSec=3
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/run/media/piotro/CACHE/airllm /var/lib/ollama /tmp
+ReadWritePaths=/sda2/airllm /var/lib/ollama /tmp
 PrivateTmp=true
 
 [Install]
@@ -446,7 +446,7 @@ EOF
 
     # Install environment config (without 'export' - systemd EnvironmentFile expects key=value)
     cat > "$PKG_DIR/etc/default/ollama" << 'EOF'
-OLLAMA_MODELS="/run/media/piotro/CACHE/airllm"
+OLLAMA_MODELS="/sda2/airllm"
 OLLAMA_HOST="127.0.0.1:11434"
 HSA_OVERRIDE_GFX_VERSION=11.0.0
 AIRLLM_COMPRESSION="4bit"
@@ -581,7 +581,7 @@ install_local() {
         sudo systemctl daemon-reload
         
         # Create directories
-        sudo install -dm755 -o ollama -g ollama /run/media/piotro/CACHE/airllm 2>/dev/null || true
+        sudo install -dm755 -o ollama -g ollama /sda2/airllm 2>/dev/null || true
         sudo install -dm755 -o ollama -g ollama /var/lib/ollama 2>/dev/null || true
     fi
     

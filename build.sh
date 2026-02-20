@@ -32,7 +32,7 @@ mkdir -p "$BUILD_DIR/usr/lib/systemd/system"
 mkdir -p "$BUILD_DIR/usr/lib/sysusers.d"
 mkdir -p "$BUILD_DIR/etc/default"
 mkdir -p "$BUILD_DIR/usr/share/ollama"
-mkdir -p "$BUILD_DIR/run/media/piotro/CACHE/airllm"
+mkdir -p "$BUILD_DIR/sda2/airllm"
 mkdir -p "$BUILD_DIR/usr/share/licenses/$PKG_NAME"
 
 # Copy files
@@ -59,7 +59,7 @@ RestartSec=3
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/run/media/piotro/CACHE/airllm /var/lib/ollama
+ReadWritePaths=/sda2/airllm /var/lib/ollama
 PrivateTmp=true
 
 [Install]
@@ -73,7 +73,7 @@ EOF
 
 # Create environment config
 cat > "$BUILD_DIR/etc/default/ollama" << 'EOF'
-export OLLAMA_MODELS="/run/media/piotro/CACHE/airllm"
+export OLLAMA_MODELS="/sda2/airllm"
 EOF
 
  # Copy AirLLM
@@ -87,12 +87,12 @@ cp LICENSE "$BUILD_DIR/usr/share/licenses/$PKG_NAME/"
 cat > "$BUILD_DIR/ollama-airllm.install" << 'EOF'
 post_install() {
   systemd-sysusers ollama.conf
-  chown -R ollama:ollama /run/media/piotro/CACHE/airllm 2>/dev/null || true
+  chown -R ollama:ollama /sda2/airllm 2>/dev/null || true
   
   echo ""
   echo "Ollama with AirLLM integration has been installed!"
   echo ""
-  echo "Models directory: /run/media/piotro/CACHE/airllm"
+  echo "Models directory: /sda2/airllm"
   echo ""
   echo "To start the service:"
   echo "  sudo systemctl start ollama"
