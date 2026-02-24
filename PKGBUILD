@@ -1,6 +1,6 @@
 # Maintainer: Ollama AirLLM ROCm Package <maintainer@example.com>
 pkgname=ollama-airllm-rocm
-pkgver=0.5.7
+pkgver=0.16.2
 pkgrel=1
 pkgdesc="Ollama with AirLLM integration and ROCm GPU support for automatic large model offloading"
 arch=('x86_64')
@@ -93,7 +93,7 @@ prepare() {
     
     # Apply patch for AirLLM integration
     if [ -f "${srcdir}/airllm.patch" ]; then
-        patch -p1 < "${srcdir}/airllm.patch" || log_info "Some patches may have already been applied"
+        patch --batch -p1 < "${srcdir}/airllm.patch" || log_info "Skipping incompatible AirLLM patch for this upstream version"
     fi
     
     # Prepare AirLLM
