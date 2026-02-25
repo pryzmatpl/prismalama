@@ -556,10 +556,10 @@ EOF
     
     # Create the package tarball
     if command -v zstd &> /dev/null; then
-        tar -cf - . | zstd -19 -T0 > "${SCRIPT_DIR}/${PKG_FILE}"
+        tar -cf - --transform 's,^\./,,' . | zstd -19 -T0 > "${SCRIPT_DIR}/${PKG_FILE}"
         log_info "Package created with zstd compression: ${PKG_FILE}"
     else
-        tar -czf "${SCRIPT_DIR}/${PKG_FILE%.zst}.gz" .
+        tar -czf "${SCRIPT_DIR}/${PKG_FILE%.zst}.gz" --transform 's,^\./,,' .
         log_warn "Package created with gzip (zstd not available): ${PKG_FILE%.zst}.gz"
     fi
     
