@@ -521,18 +521,40 @@ EOF
     
     cd "$BUILD_DIR"
     
-    # Create .MTREE
+    # Create .PKGINFO and .MTREE inside package root
+    cd pkg
+    PKG_SIZE=$(du -sb . | awk '{print $1}')
+    BUILD_DATE=$(date +%s)
+    PACKAGER_NAME=${PACKAGER:-"Unknown Packager"}
+
+    cat > .PKGINFO << EOF
+pkgname = ${PKG_NAME}
+pkgbase = ${PKG_NAME}
+pkgver = ${PKG_VERSION}-${PKG_REL}
+pkgdesc = Ollama with AirLLM and ROCm support
+url = https://github.com/ollama/ollama
+builddate = ${BUILD_DATE}
+packager = ${PACKAGER_NAME}
+size = ${PKG_SIZE}
+arch = x86_64
+license = MIT
+depend = glibc
+depend = zlib
+depend = gcc-libs
+depend = rocm-hip-sdk
+depend = python
+depend = python-pytorch-rocm
+depend = python-numpy
+depend = python-safetensors
+EOF
+
     if command -v bsdtar &> /dev/null; then
-        # Create package with proper metadata
-        cd pkg
-        bsdtar -czf ../.MTREE --format=mtree \
+        bsdtar --format=mtree \
             --options='!all,use-set,type,uid,gid,mode,time,size,md5,sha256,link' \
-            . 2>/dev/null || true
-        cd ..
+            -cf - . > .MTREE 2>/dev/null || true
     fi
     
     # Create the package tarball
-    cd pkg
     if command -v zstd &> /dev/null; then
         tar -cf - . | zstd -19 -T0 > "${SCRIPT_DIR}/${PKG_FILE}"
         log_info "Package created with zstd compression: ${PKG_FILE}"
