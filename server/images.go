@@ -365,7 +365,34 @@ func GetModel(name string) (*Model, error) {
 		}
 	}
 
+	applyDefaultParserRenderer(m)
+
 	return m, nil
+}
+
+func applyDefaultParserRenderer(m *Model) {
+	if m == nil {
+		return
+	}
+
+	if m.Config.Parser != "" && m.Config.Renderer != "" {
+		return
+	}
+
+	family := strings.ToLower(m.Config.ModelFamily)
+	if family == "" && len(m.Config.ModelFamilies) > 0 {
+		family = strings.ToLower(m.Config.ModelFamilies[0])
+	}
+
+	switch {
+	case family == "qwen3" || strings.HasPrefix(family, "qwen3.5") || strings.HasPrefix(family, "qwen3_5") || strings.HasPrefix(family, "qwen3-5"):
+		if m.Config.Parser == "" {
+			m.Config.Parser = "qwen3-coder"
+		}
+		if m.Config.Renderer == "" {
+			m.Config.Renderer = "qwen3-coder"
+		}
+	}
 }
 
 func CopyModel(src, dst model.Name) error {
