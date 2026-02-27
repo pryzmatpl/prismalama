@@ -1,17 +1,37 @@
+# Build artifacts
+build/
+build_ollama_airllm/
+build_ollama_airllm_rocm/
+*.pkg.tar.zst
+ollama-bin
+ollama-test
+
+# Temporary files
+*.log
+*.tmp
 .DS_Store
-.vscode
-.env
-.venv
-.swp
-dist
-build
-.cache
-.gocache
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Go
 *.exe
-.idea
-test_data
-*.crt
-__debug_bin*
-llama/build
-llama/vendor
-/ollama
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+
+# Submodules initialized flag
+.submodules_initialized
