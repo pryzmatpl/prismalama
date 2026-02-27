@@ -61,7 +61,9 @@ Wants=network-online.target
 Type=simple
 User=ollama
 EnvironmentFile=/etc/default/ollama
-ExecStart=/usr/bin/ollama serve --cache-type-k q8_0 --cache-type-v q8_0 -np 1
+ExecStart=/usr/bin/ollama serve
+Environment="OLLAMA_KV_CACHE_TYPE=q8_0"
+Environment="OLLAMA_NUM_PARALLEL=1"
 Restart=always
 RestartSec=3
 
