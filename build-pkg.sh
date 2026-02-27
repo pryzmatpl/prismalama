@@ -91,10 +91,14 @@ prepare_sources() {
         git clone --depth 1 https://github.com/lyogavin/AirLLM.git src/airllm
     fi
     
-    # Initialize submodules
-    cd src/ollama
-    git submodule update --init --recursive
-    cd "$SCRIPT_DIR"
+    # Initialize submodules (skip if src/ollama is a symlink to current repo)
+    if [ ! -L "src/ollama" ]; then
+        cd src/ollama
+        git submodule update --init --recursive
+        cd "$SCRIPT_DIR"
+    else
+        log_info "src/ollama is a symlink, skipping submodule initialization"
+    fi
     
     log_info "Sources prepared"
 }
