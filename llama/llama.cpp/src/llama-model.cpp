@@ -1089,6 +1089,7 @@ void llama_model::load_hparams(llama_model_loader & ml) {
                 }
             } break;
         case LLM_ARCH_QWEN3MOE:
+        case LLM_ARCH_QWEN35MOE:
             {
                 ml.get_key(LLM_KV_EXPERT_FEED_FORWARD_LENGTH,        hparams.n_ff_exp, false);
 
@@ -3511,6 +3512,7 @@ bool llama_model::load_tensors(llama_model_loader & ml) {
                     }
                 } break;
             case LLM_ARCH_QWEN3MOE:
+            case LLM_ARCH_QWEN35MOE:
             case LLM_ARCH_QWEN3VLMOE:
             case LLM_ARCH_RND1:
                 {
@@ -7346,6 +7348,7 @@ ggml_cgraph * llama_model::build_graph(const llm_graph_params & params) const {
                 llm = std::make_unique<llm_build_qwen3>(*this, params);
             } break;
         case LLM_ARCH_QWEN3MOE:
+        case LLM_ARCH_QWEN35MOE:
             {
                 llm = std::make_unique<llm_build_qwen3moe>(*this, params);
             } break;
@@ -7872,6 +7875,7 @@ llama_rope_type llama_model_rope_type(const llama_model * model) {
         case LLM_ARCH_QWEN2MOE:
         case LLM_ARCH_QWEN3:
         case LLM_ARCH_QWEN3MOE:
+        case LLM_ARCH_QWEN35MOE:
         case LLM_ARCH_LLADA_MOE:
         case LLM_ARCH_RND1:
         case LLM_ARCH_OLMO2:
