@@ -175,7 +175,7 @@ EOF
 echo "Creating package: $PKG_FILE"
 cd "$BUILD_DIR"
 cp ../PKGBUILD .
-sed -i 's/pkgname=ollama-airllm/pkgname=ollama-airllm-rocm/' PKGBUILD
+sed -i 's/^pkgname=ollama-airllm$/pkgname=ollama-airllm-rocm/' PKGBUILD
 
 # Prepare source directory for makepkg - copy current repo as "ollama" source
 mkdir -p src
