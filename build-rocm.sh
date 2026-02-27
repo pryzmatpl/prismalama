@@ -177,11 +177,16 @@ cd "$BUILD_DIR"
 cp ../PKGBUILD .
 sed -i 's/pkgname=ollama-airllm/pkgname=ollama-airllm-rocm/' PKGBUILD
 
+# Prepare source directory for makepkg - copy current repo as "ollama" source
+mkdir -p src
+cp -r .. src/ollama 2>/dev/null || true
+rm -rf src/ollama/build_ollama_airllm* src/ollama/build src/ollama/*.pkg.tar.zst 2>/dev/null || true
+
 # Create .SRCINFO for makepkg
 makepkg --printsrcinfo > .SRCINFO
 
-# Actually build the package (remove --packagelist flag)
-LANG=C makepkg -f
+# Build the package using existing sources (skip download/extract)
+LANG=C makepkg -ef
 
 # Move package to parent directory
 mv *.pkg.tar.zst ../ 2>/dev/null || true

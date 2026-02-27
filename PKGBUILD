@@ -42,16 +42,15 @@ conflicts=('ollama' 'ollama-rocm' 'ollama-cuda')
 options=(!strip !debug)
 install=ollama-airllm-rocm.install
 
-# Sources
+# Sources - using local files since we're building from the repo
 source=(
-    "git+https://github.com/ollama/ollama.git#tag=v${pkgver}"
-    "airllm::git+https://github.com/lyogavin/AirLLM.git"
+    "ollama"
     "ollama-airllm-rocm.install"
     "airllm_runner.py"
     "airllm.patch"
 )
 
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 # ROCm architecture - auto-detected or set manually
 _rocm_arch='gfx1100'
