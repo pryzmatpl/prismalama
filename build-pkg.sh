@@ -236,7 +236,7 @@ OLLAMA_HOST="127.0.0.1:11434"
 HSA_OVERRIDE_GFX_VERSION=11.0.0
 AIRLLM_COMPRESSION="4bit"
 AIRLLM_DEVICE="cuda:0"
-PYTHONPATH="/usr/share/ollama/airllm:/usr/share/ollama/airllm/air_llm:\$PYTHONPATH"
+PYTHONPATH="/usr/share/ollama/airllm:/usr/share/ollama/airllm/air_llm"
 
 # ROCm specific
 HIP_VISIBLE_DEVICES=0

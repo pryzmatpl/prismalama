@@ -462,7 +462,7 @@ HSA_OVERRIDE_GFX_VERSION=11.0.0
     AIRLLM_COMPRESSION="4bit"
     AIRLLM_DEVICE="cuda:0"
     AIRLLM_VENV="/usr/lib/ollama/airllm-venv"
-PYTHONPATH="/usr/share/ollama/airllm:/usr/share/ollama/airllm/air_llm:${PYTHONPATH}"
+PYTHONPATH="/usr/share/ollama/airllm:/usr/share/ollama/airllm/air_llm"
 
 # ROCm specific
 HIP_VISIBLE_DEVICES=0
