@@ -32,6 +32,7 @@ ollama-test
 
 # Dependency directories
 vendor/
+ollama/
 
 # Submodules initialized flag
 .submodules_initialized
