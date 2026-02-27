@@ -5,8 +5,16 @@ set -e
 
 BUILD_DIR="build_ollama_airllm"
 PKG_VERSION="v0.4.1.r5053.4b15df6b"
-PKG_NAME="ollama-airllm"
-PKG_FILE="${PKG_NAME}-${PKG_VERSION}-1-x86_64.pkg.tar.zst"
+PKG_NAME="ollama-airllm-rocm"
+PKG_REL="1"
+
+if [ -f PKGBUILD ]; then
+    PKG_NAME=$(awk -F= '/^pkgname=/{print $2; exit}' PKGBUILD)
+    PKG_VERSION=$(awk -F= '/^pkgver=/{print $2; exit}' PKGBUILD)
+    PKG_REL=$(awk -F= '/^pkgrel=/{print $2; exit}' PKGBUILD)
+fi
+
+PKG_FILE="${PKG_NAME}-${PKG_VERSION}-${PKG_REL}-x86_64.pkg.tar.zst"
 
 echo "Building ${PKG_NAME}..."
 
@@ -24,7 +32,7 @@ export CGO_ENABLED=1
 export CGO_CFLAGS="-I$(pwd)/build/_deps/mlx-c-src"
 export CGO_CPPFLAGS="-DMLX_ENGINE=OFF -DGGML_HIP=ON"
 export LDFLAGS="-w -s -X=github.com/ollama/ollama/version.Version=${PKG_VERSION}"
-go build -tags="" -o "$BUILD_DIR/ollama" -ldflags="-w -s -X=github.com/ollama/ollama/version.Version=${PKG_VERSION}" .
+go build -tags="" -o "$BUILD_DIR/ollama-bin" -ldflags="-w -s -X=github.com/ollama/ollama/version.Version=${PKG_VERSION}" .
 
 # Create package structure
 echo "Creating package structure..."
@@ -38,7 +46,7 @@ mkdir -p "$BUILD_DIR/usr/share/licenses/$PKG_NAME"
 
 # Copy files
 echo "Copying files..."
-cp "$BUILD_DIR/ollama" "$BUILD_DIR/usr/bin/"
+cp "$BUILD_DIR/ollama-bin" "$BUILD_DIR/usr/bin/ollama"
 chmod 755 "$BUILD_DIR/usr/bin/ollama"
 
 # Create systemd service
@@ -53,7 +61,7 @@ Wants=network-online.target
 Type=simple
 User=ollama
 EnvironmentFile=/etc/default/ollama
-ExecStart=/usr/bin/ollama serve
+ExecStart=/usr/bin/ollama serve --cache-type-k q8_0 --cache-type-v q8_0 -np 1
 Restart=always
 RestartSec=3
 
@@ -85,7 +93,7 @@ cp LICENSE "$BUILD_DIR/usr/share/licenses/$PKG_NAME/"
 
 
 # Create install script
-cat > "$BUILD_DIR/ollama-airllm.install" << 'EOF'
+cat > "$BUILD_DIR/${PKG_NAME}.install" << 'EOF'
 post_install() {
   systemd-sysusers ollama.conf
   chown -R ollama:ollama /sda2/airllm 2>/dev/null || true
@@ -116,11 +124,33 @@ pre_remove() {
 }
 EOF
 
-  # Create package
+# Create package
   echo "Creating package: $PKG_FILE"
   cd "$BUILD_DIR"
   cp ../PKGBUILD .
-  LANG=C makepkg -C -c -f -g -s --packagelist
+  if [ -f "../airllm_runner.py" ]; then
+    cp ../airllm_runner.py .
+  fi
+  if [ -f "../airllm.patch" ]; then
+    cp ../airllm.patch .
+  fi
+  rm -rf "$BUILD_DIR/ollama" "$BUILD_DIR/src" "$BUILD_DIR/pkg"
+
+  ROOT_DIR="$(pwd)/.."
+  LOCAL_SOURCES="source=(\"ollama::file://${ROOT_DIR}/src/ollama\" \"airllm::file://${ROOT_DIR}/src/airllm\" \"ollama-airllm-rocm.install\" \"airllm_runner.py\" \"airllm.patch\")"
+  LOCAL_SUMS="sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')"
+  awk -v src="$LOCAL_SOURCES" -v sums="$LOCAL_SUMS" '
+    BEGIN {skip=0; skip2=0}
+    /^source=\(/ {print src; skip=1; next}
+    skip && /^\)/ {skip=0; next}
+    skip {next}
+    /^sha256sums=\(/ {print sums; skip2=1; next}
+    skip2 && /^\)/ {skip2=0; next}
+    skip2 {next}
+    {print}
+  ' PKGBUILD > PKGBUILD.local
+
+  LANG=C makepkg -C -c -f -s -p PKGBUILD.local
 
 echo "Package created: $PKG_FILE"
 echo ""

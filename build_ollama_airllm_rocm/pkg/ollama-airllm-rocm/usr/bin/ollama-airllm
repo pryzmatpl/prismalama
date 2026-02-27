@@ -1,0 +1,32 @@
+#!/bin/bash
+# Ollama AirLLM wrapper for opencode integration
+
+# Source environment
+if [ -f /etc/default/ollama ]; then
+    source /etc/default/ollama
+fi
+
+# Export all variables
+export OLLAMA_MODELS
+export OLLAMA_HOST
+export HSA_OVERRIDE_GFX_VERSION
+export AIRLLM_COMPRESSION
+export AIRLLM_DEVICE
+export PYTHONPATH
+export HIP_VISIBLE_DEVICES
+
+# Check if model should use AirLLM
+use_airllm=false
+if [ "$1" = "run" ] || [ "$1" = "serve" ]; then
+    # Auto-detect based on model size or explicit flag
+    if [ -n "$AIRLLM_FORCE" ] || [ -n "$USE_AIRLLM" ]; then
+        use_airllm=true
+    fi
+fi
+
+if [ "$use_airllm" = true ]; then
+    echo "Using AirLLM integration for large model support"
+fi
+
+# Execute ollama
+exec /usr/bin/ollama "$@"

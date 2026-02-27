@@ -203,7 +203,7 @@ Wants=network-online.target
 Type=simple
 User=ollama
 EnvironmentFile=/etc/default/ollama
-ExecStart=/usr/bin/ollama serve
+ExecStart=/usr/bin/ollama serve --cache-type-k q8_0 --cache-type-v q8_0 -np 1
 Restart=always
 RestartSec=3
 

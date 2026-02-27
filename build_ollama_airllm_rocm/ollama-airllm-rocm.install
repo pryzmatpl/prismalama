@@ -1,0 +1,34 @@
+post_install() {
+  systemd-sysusers ollama.conf
+  chown -R ollama:ollama /sda2/airllm 2>/dev/null || true
+  
+  echo ""
+  echo "Ollama with AirLLM and ROCm integration has been installed!"
+  echo ""
+  echo "Models directory: /sda2/airllm"
+  echo ""
+  echo "AirLLM automatically handles large models by loading layers on-demand."
+  echo "Models with safetensors format (like GLM-4.7) will use AirLLM automatically."
+  echo ""
+  echo "To start the service:"
+  echo "  sudo systemctl start ollama"
+  echo ""
+  echo "To enable on boot:"
+  echo "  sudo systemctl enable ollama"
+  echo ""
+  echo "Configuration file: /etc/default/ollama"
+  echo ""
+  echo "AirLLM Python package: /usr/share/ollama/airllm"
+  echo "AirLLM Runner: /usr/share/ollama/airllm_runner.py"
+  echo ""
+  echo "ROCm GPU acceleration is enabled for gfx1100 (7900 XTX)."
+  echo ""
+}
+
+post_upgrade() {
+  post_install
+}
+
+pre_remove() {
+  systemctl disable --now ollama 2>/dev/null || true
+}

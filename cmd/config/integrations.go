@@ -115,7 +115,17 @@ func selectModels(ctx context.Context, name, current string) ([]string, error) {
 
 	var existing []modelInfo
 	for _, m := range models.Models {
-		existing = append(existing, modelInfo{Name: m.Name, Remote: m.RemoteModel != ""})
+		info := modelInfo{Name: m.Name, Remote: m.RemoteModel != ""}
+		// Check capabilities via Show API to determine tool support
+		if showResp, err := client.Show(ctx, &api.ShowRequest{Model: m.Name}); err == nil {
+			for _, cap := range showResp.Capabilities {
+				if cap == "tools" {
+					info.ToolCapable = true
+					break
+				}
+			}
+		}
+		existing = append(existing, info)
 	}
 
 	var preChecked []string
