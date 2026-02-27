@@ -1,7 +1,7 @@
 # Maintainer: Ollama AirLLM ROCm Package <maintainer@example.com>
 pkgname=ollama-airllm-rocm
 pkgver=0.16.2
-pkgrel=1
+pkgrel=3
 pkgdesc="Ollama with AirLLM integration and ROCm GPU support for automatic large model offloading"
 arch=('x86_64')
 url="https://github.com/ollama/ollama"
@@ -16,10 +16,6 @@ depends=(
     'python'
     'python-pytorch-rocm'
     'python-numpy'
-    'python-safetensors'
-    'python-huggingface-hub'
-    'python-transformers'
-    'python-accelerate'
     'python-typing_extensions'
 )
 
@@ -35,6 +31,10 @@ optdepends=(
     'cuda: NVIDIA GPU support'
     'python-sentencepiece: Tokenizer support'
     'python-protobuf: Protocol buffer support'
+    'python-huggingface-hub: AirLLM model hub support'
+    'python-safetensors: AirLLM safetensors support (AUR/manual)'
+    'python-transformers: AirLLM transformers support (AUR/manual)'
+    'python-accelerate: AirLLM accelerate support (AUR/manual)'
 )
 
 provides=('ollama')

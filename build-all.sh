@@ -404,6 +404,16 @@ create_package_structure() {
     # Install AirLLM
     cp -r "$BUILD_DIR/airllm" "$PKG_DIR/usr/share/ollama/"
     log_info "AirLLM installed"
+
+    # Bundle AirLLM Python dependencies
+    log_step "Bundling AirLLM Python dependencies..."
+    AIRLLM_VENV="$PKG_DIR/usr/lib/ollama/airllm-venv"
+    python3 -m venv --system-site-packages "$AIRLLM_VENV"
+    "$AIRLLM_VENV/bin/pip" install --no-cache-dir --upgrade pip setuptools wheel
+    "$AIRLLM_VENV/bin/pip" install --no-cache-dir --prefer-binary \
+        safetensors transformers accelerate huggingface-hub sentencepiece \
+        tokenizers protobuf packaging regex requests tqdm pyyaml filelock
+    log_info "AirLLM Python bundle complete"
     
     # Install AirLLM runner
     if [ -f "$SRC_DIR/ollama/runner/airllmrunner/airllm_runner.py" ]; then
@@ -424,7 +434,7 @@ Wants=network-online.target
 Type=simple
 User=ollama
 EnvironmentFile=/etc/default/ollama
-ExecStart=/usr/bin/ollama serve
+    ExecStart=/usr/bin/ollama-airllm serve
 Restart=always
 RestartSec=3
 
@@ -449,8 +459,9 @@ EOF
 OLLAMA_MODELS="/sda2/airllm"
 OLLAMA_HOST="127.0.0.1:11434"
 HSA_OVERRIDE_GFX_VERSION=11.0.0
-AIRLLM_COMPRESSION="4bit"
-AIRLLM_DEVICE="cuda:0"
+    AIRLLM_COMPRESSION="4bit"
+    AIRLLM_DEVICE="cuda:0"
+    AIRLLM_VENV="/usr/lib/ollama/airllm-venv"
 PYTHONPATH="/usr/share/ollama/airllm:/usr/share/ollama/airllm/air_llm:${PYTHONPATH}"
 
 # ROCm specific
@@ -467,6 +478,12 @@ EOF
 
 if [ -f /etc/default/ollama ]; then
     source /etc/default/ollama
+fi
+
+VENV_DIR=${AIRLLM_VENV:-/usr/lib/ollama/airllm-venv}
+if [ -d "$VENV_DIR" ]; then
+    export VIRTUAL_ENV="$VENV_DIR"
+    export PATH="$VENV_DIR/bin:$PATH"
 fi
 
 export OLLAMA_MODELS
@@ -510,7 +527,6 @@ pkgbase = ${PKG_NAME}
 	depends = python
 	depends = python-pytorch-rocm
 	depends = python-numpy
-	depends = python-safetensors
 	source = PKGBUILD
 
 pkgname = ${PKG_NAME}
@@ -545,7 +561,6 @@ depend = rocm-hip-sdk
 depend = python
 depend = python-pytorch-rocm
 depend = python-numpy
-depend = python-safetensors
 EOF
 
     if command -v bsdtar &> /dev/null; then
