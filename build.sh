@@ -22,8 +22,9 @@ echo "Building ollama binary..."
 export GOFLAGS="-trimpath -buildmode=pie"
 export CGO_ENABLED=1
 export CGO_CFLAGS="-I$(pwd)/build/_deps/mlx-c-src"
+export CGO_CPPFLAGS="-DMLX_ENGINE=OFF -DGGML_HIP=ON"
 export LDFLAGS="-w -s -X=github.com/ollama/ollama/version.Version=${PKG_VERSION}"
-go build -tags="" -o "$BUILD_DIR/ollama" -ldflags="-w -s -X=github.com/ollama/ollama/version.Version=${PKG_VERSION} -DMLX_ENGINE=OFF -DGGML_HIP=ON" .
+go build -tags="" -o "$BUILD_DIR/ollama" -ldflags="-w -s -X=github.com/ollama/ollama/version.Version=${PKG_VERSION}" .
 
 # Create package structure
 echo "Creating package structure..."
