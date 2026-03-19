@@ -1,0 +1,30 @@
+FROM /sda2/airllm/kimi-k2.5/Kimi-K2.5-Q4_K_M-00001-of-00013.gguf
+
+# Kimi K2.5 Model - 579GB with AirLLM Integration
+# Architecture: Large-scale MoE (Mixture of Experts)
+# Optimized for low-memory inference via AirLLM layer offloading
+
+PARAMETER num_ctx 32768
+PARAMETER num_batch 1
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER top_k 40
+PARAMETER repeat_penalty 1.1
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|im_start|>"
+
+# AirLLM-specific parameters for Potato machine optimization
+PARAMETER num_gpu 0
+PARAMETER num_thread 16
+PARAMETER use_mmap false
+PARAMETER use_mlock false
+
+# System prompt for Kimi
+SYSTEM """You are Kimi, a large language model developed by Moonshot AI. You are helpful, harmless, and honest. You excel at long-context understanding and can process up to 256,000 tokens. You are currently running with AirLLM compression for efficient inference on consumer hardware."""
+
+TEMPLATE """<|im_start|>system
+{{ .System }}<|im_end|>
+<|im_start|>user
+{{ .Prompt }}<|im_end|>
+<|im_start|>assistant
+"""

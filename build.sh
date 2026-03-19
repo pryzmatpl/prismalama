@@ -21,15 +21,21 @@ echo "Building ${PKG_NAME}..."
 # Create build directory
 mkdir -p "$BUILD_DIR"
 
-# Clone mlx-c headers
-echo "Cloning mlx-c headers..."
-git clone --depth 1 --branch "$(cat MLX_VERSION)" https://github.com/ml-explore/mlx-c.git build/_deps/mlx-c-src
+# Use local mlx-c headers when available (offline)
+MLX_C_PATH="${MLX_C_PATH:-$(pwd)/build/_deps/mlx-c-src}"
+if [ -d "$MLX_C_PATH" ]; then
+    echo "Using local mlx-c headers at: $MLX_C_PATH"
+    MLX_CFLAGS="-I$MLX_C_PATH"
+else
+    echo "Warning: mlx-c headers not found at $MLX_C_PATH; building without MLX headers"
+    MLX_CFLAGS=""
+fi
 
 # Build ollama binary
 echo "Building ollama binary..."
 export GOFLAGS="-trimpath -buildmode=pie"
 export CGO_ENABLED=1
-export CGO_CFLAGS="-I$(pwd)/build/_deps/mlx-c-src"
+export CGO_CFLAGS="$MLX_CFLAGS"
 export CGO_CPPFLAGS="-DMLX_ENGINE=OFF -DGGML_HIP=ON"
 export LDFLAGS="-w -s -X=github.com/ollama/ollama/version.Version=${PKG_VERSION}"
 go build -tags="" -o "$BUILD_DIR/ollama-bin" -ldflags="-w -s -X=github.com/ollama/ollama/version.Version=${PKG_VERSION}" .

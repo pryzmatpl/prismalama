@@ -1,0 +1,7 @@
+FROM /nvme3/models/GLM-4.7-Flash-4bit
+
+PARAMETER num_ctx 4096
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+
+SYSTEM You are GLM-4.7-Flash, a helpful AI assistant.

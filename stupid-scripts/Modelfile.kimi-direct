@@ -1,0 +1,24 @@
+FROM /nvme3/AI Models/Kimi
+
+# Kimi K2.5 Model
+# Located at: /nvme3/AI Models/Kimi/
+# Format: GGUF multi-file (13 shards)
+# Total Size: 579GB
+
+PARAMETER num_ctx 8192
+PARAMETER num_batch 1
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER top_k 40
+PARAMETER repeat_penalty 1.1
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|im_start|>"
+
+SYSTEM """You are Kimi, a large language model developed by Moonshot AI. You are helpful, harmless, and honest. You excel at long-context understanding and can process up to 256,000 tokens."""
+
+TEMPLATE """<|im_start|>system
+{{ .System }}<|im_end|>
+<|im_start|>user
+{{ .Prompt }}<|im_end|>
+<|im_start|>assistant
+"""

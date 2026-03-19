@@ -2,10 +2,10 @@ post_install() {
     systemd-sysusers ollama.conf
     
     # Create model directories with proper permissions
-    if [ ! -d "/run/media/piotro/CACHE/airllm" ]; then
-        install -dm755 -o ollama -g ollama /run/media/piotro/CACHE/airllm 2>/dev/null || {
-            echo "Warning: Could not create /run/media/piotro/CACHE/airllm"
-            mkdir -p /run/media/piotro/CACHE/airllm 2>/dev/null || true
+    if [ ! -d "/sda2/airllm" ]; then
+        install -dm755 -o ollama -g ollama /sda2/airllm 2>/dev/null || {
+            echo "Warning: Could not create /sda2/airllm"
+            mkdir -p /sda2/airllm 2>/dev/null || true
         }
     fi
     
@@ -14,7 +14,7 @@ post_install() {
     fi
     
     # Set ownership on existing directories
-    chown -R ollama:ollama /run/media/piotro/CACHE/airllm 2>/dev/null || true
+    chown -R ollama:ollama /sda2/airllm 2>/dev/null || true
     chown -R ollama:ollama /var/lib/ollama 2>/dev/null || true
     
     # Reload systemd
@@ -26,7 +26,7 @@ post_install() {
     echo "=========================================="
     echo ""
     echo "GPU: AMD RX 7900 XTX (gfx1100)"
-    echo "Models directory: /run/media/piotro/CACHE/airllm"
+    echo "Models directory: /sda2/airllm"
     echo ""
     echo "AirLLM Features:"
     echo "  - Automatic offloading when VRAM is insufficient"
@@ -45,7 +45,7 @@ post_install() {
     echo ""
     echo "For opencode integration:"
     echo "  Set OLLAMA_HOST=127.0.0.1:11434 in opencode config"
-    echo "  or use: export OLLAMA_MODELS=/run/media/piotro/CACHE/airllm"
+    echo "  or use: export OLLAMA_MODELS=/sda2/airllm"
     echo ""
     echo "Large model offloading happens automatically when:"
     echo "  - Model exceeds available VRAM"
@@ -72,11 +72,11 @@ post_remove() {
     echo ""
     echo "Ollama has been removed."
     echo ""
-    echo "Note: Model data in /run/media/piotro/CACHE/airllm has been preserved."
+    echo "Note: Model data in /sda2/airllm has been preserved."
     echo "      Remove manually if no longer needed."
     echo ""
     echo "To completely remove:"
-    echo "  sudo rm -rf /run/media/piotro/CACHE/airllm"
+    echo "  sudo rm -rf /sda2/airllm"
     echo "  sudo rm -rf /var/lib/ollama"
     echo "  sudo userdel ollama 2>/dev/null || true"
     echo ""

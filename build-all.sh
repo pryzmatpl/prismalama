@@ -297,8 +297,14 @@ build_ollama() {
     
     # Build ggml with ROCm
     log_info "Configuring ggml with ROCm..."
+
+    # Set ROCM paths
+    export PKG_CONFIG_PATH="/opt/rocm/lib/pkgconfig:$PKG_CONFIG_PATH"
+    export LD_LIBRARY_PATH="/opt/rocm/lib:$LD_LIBRARY_PATH"
+    export ROCM_PATH="/opt/rocm"
+
     cd build
-    
+
     cmake .. \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr \

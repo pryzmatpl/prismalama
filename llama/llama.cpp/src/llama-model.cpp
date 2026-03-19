@@ -1072,7 +1072,21 @@ void llama_model::load_hparams(llama_model_loader & ml) {
                     case 28: type = hparams.n_embd == 1024 ? LLM_TYPE_0_6B : LLM_TYPE_1_7B; break;
                     case 36: type = hparams.n_embd == 2560 ? LLM_TYPE_4B : LLM_TYPE_8B; break;
                     case 40: type = LLM_TYPE_14B; break;
-                    case 64: type = LLM_TYPE_32B; break;
+
+                    default: type = LLM_TYPE_UNKNOWN;
+                }
+            } break;
+        case LLM_ARCH_QWEN35:
+            {
+                ml.get_key(LLM_KV_POOLING_TYPE, hparams.pooling_type, false);
+                ml.get_key(LLM_KV_ATTENTION_LAYERNORM_RMS_EPS, hparams.f_norm_rms_eps);
+                switch (hparams.n_layer) {
+                    case 24: type = LLM_TYPE_0_5B; break; // Qwen3.5-0.5B
+                    case 32: type = LLM_TYPE_1B; break;
+                    case 40: type = LLM_TYPE_3B; break;
+                    case 48: type = LLM_TYPE_7B; break;
+                    case 56: type = LLM_TYPE_14B; break;
+                    case 64: type = LLM_TYPE_32B; break; // Qwen3.5-27B has 64 layers
                     default: type = LLM_TYPE_UNKNOWN;
                 }
             } break;
@@ -7346,6 +7360,10 @@ ggml_cgraph * llama_model::build_graph(const llm_graph_params & params) const {
         case LLM_ARCH_QWEN3:
             {
                 llm = std::make_unique<llm_build_qwen3>(*this, params);
+            } break;
+        case LLM_ARCH_QWEN35:
+            {
+                llm = std::make_unique<llm_build_qwen35>(*this, params);
             } break;
         case LLM_ARCH_QWEN3MOE:
         case LLM_ARCH_QWEN35MOE:

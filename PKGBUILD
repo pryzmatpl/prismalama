@@ -42,31 +42,39 @@ conflicts=('ollama' 'ollama-rocm' 'ollama-cuda')
 options=(!strip !debug)
 install=ollama-airllm-rocm.install
 
-# Sources - using local files since we're building from the repo
-source=(
-    "ollama"
+# Sources - build from Ollama GitHub
+source=()
     "ollama-airllm-rocm.install"
     "airllm_runner.py"
     "airllm.patch"
 )
 
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP')
+sha256sums=()
 
 # ROCm architecture - auto-detected or set manually
 _rocm_arch='gfx1100'
 
 prepare() {
-    cd "${srcdir}"
-    
+    cd ../..  # Go to /sda2/prismalama which is the git repo
+
+    # Set ROCM paths for CMake to find HIP
+    export PKG_CONFIG_PATH="/opt/rocm/lib/pkgconfig:$PKG_CONFIG_PATH"
+    export LD_LIBRARY_PATH="/opt/rocm/lib:$LD_LIBRARY_PATH"
+    export ROCM_PATH="/opt/rocm"
+
     log_info() {
         echo "==> $1"
     }
-    
+
     log_info "Preparing sources..."
     
-    # Initialize Ollama submodules
+    # Initialize Ollama submodules (offline by default)
     cd ollama
-    git submodule update --init --recursive
+    if [ -n "$OLLAMA_ONLINE" ]; then
+        git submodule update --init --recursive
+    else
+        log_info "Skipping submodule update (offline mode)"
+    fi
     
     # Detect ROCm architecture if not set
     if command -v rocm_agent_enumerator &> /dev/null; then
@@ -226,7 +234,7 @@ RestartSec=3
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/ollama /tmp
+ReadWritePaths=/sda2/airllm /var/lib/ollama /tmp
 PrivateTmp=true
 
 [Install]
