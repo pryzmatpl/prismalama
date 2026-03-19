@@ -2,7 +2,10 @@
 build/
 build_ollama_airllm/
 build_ollama_airllm_rocm/
+pkg/
+src/
 *.pkg.tar.zst
+*.tar.zst
 ollama-bin
 ollama-test
 
