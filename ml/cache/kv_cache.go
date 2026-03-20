@@ -126,8 +126,6 @@ func (p *PrefixCache) Clear() {
 
 	p.prefixIndex = make(map[uint64]map[int]CacheLocation)
 	p.accessOrder = list.New()
-	p.hits = 0
-	p.misses = 0
 }
 
 type SparseAttention struct {

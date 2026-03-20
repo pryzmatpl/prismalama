@@ -145,8 +145,9 @@ func (l *LRUCache) remove(item *cacheItem) {
 
 func (l *LRUCache) evictOldest() {
 	if l.tail != nil {
+		oldest := l.tail
 		l.remove(l.tail)
-		delete(l.items, l.tail.key)
+		delete(l.items, oldest.key)
 		l.size--
 	}
 }
