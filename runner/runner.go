@@ -16,6 +16,10 @@ func isAirLLMModel(modelPath string) bool {
 		return false
 	}
 
+	if os.Getenv("OLLAMA_MULTI_GGUF") == "1" {
+		return true
+	}
+
 	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
 		return false
 	}
@@ -38,6 +42,11 @@ func isAirLLMModel(modelPath string) bool {
 			strings.Contains(content, "transformers") {
 			return true
 		}
+	}
+
+	ggufFiles, _ := filepath.Glob(filepath.Join(modelPath, "*-00001-of-*.gguf"))
+	if len(ggufFiles) > 0 {
+		return true
 	}
 
 	envFlag := os.Getenv("OLLAMA_USE_AIRLLM")

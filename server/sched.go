@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"sort"
@@ -433,8 +434,24 @@ func (s *Scheduler) load(req *LlmRequest, f *ggml.GGML, systemInfo ml.SystemInfo
 	llama := s.activeLoading
 
 	if llama == nil {
+		modelPath := req.model.ModelPath
+		if len(req.model.ModelPaths) > 1 {
+			for _, p := range req.model.ModelPaths {
+				if strings.Contains(p, "-00001-of-") {
+					modelPath = p
+					break
+				}
+			}
+		}
+		if strings.Contains(modelPath, "/blobs/sha256-") {
+			dir := filepath.Dir(modelPath)
+			files, _ := filepath.Glob(filepath.Join(dir, "..", "..", "models", "*", "*-00001-of-*.gguf"))
+			if len(files) > 0 {
+				modelPath = files[0]
+			}
+		}
 		var err error
-		llama, err = s.newServerFn(systemInfo, gpus, req.model.ModelPath, f, req.model.AdapterPaths, req.model.ProjectorPaths, req.opts, numParallel)
+		llama, err = s.newServerFn(systemInfo, gpus, modelPath, f, req.model.AdapterPaths, req.model.ProjectorPaths, req.opts, numParallel)
 		if err != nil {
 			// some older models are not compatible with newer versions of llama.cpp
 			// show a generalized compatibility error until there is a better way to

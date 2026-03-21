@@ -342,6 +342,8 @@ func StartRunner(ollamaEngine bool, modelPath string, gpuLibs []string, out io.W
 		port = rand.Intn(65535-49152) + 49152 // get a random port in the ephemeral range
 	}
 	params := []string{"runner"}
+	// For now, use llama runner - AirLLM doesn't support GGUF files
+	// Multi-GGUF handling will be done in llama runner directly
 	if ollamaEngine {
 		params = append(params, "--ollama-engine")
 	}

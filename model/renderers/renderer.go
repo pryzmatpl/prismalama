@@ -87,7 +87,11 @@ func rendererForName(name string) Renderer {
 	case "lfm2":
 		return &LFM2Renderer{IsThinking: false}
 	case "lfm2-thinking":
-		return &LFM2Renderer{IsThinking: true}
+		renderer := &LFM2Renderer{IsThinking: true}
+		return renderer
+	case "minimax-m2":
+		renderer := &MiniMaxRenderer{}
+		return renderer
 	default:
 		return nil
 	}

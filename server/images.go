@@ -67,6 +67,7 @@ type Model struct {
 	Digest         string
 	Options        map[string]any
 	Messages       []api.Message
+	ModelPaths     []string
 
 	Template *template.Template
 }
@@ -308,6 +309,11 @@ func GetModel(name string) (*Model, error) {
 		switch layer.MediaType {
 		case "application/vnd.ollama.image.model":
 			m.ModelPath = filename
+			if layer.From != "" {
+				m.ModelPaths = append(m.ModelPaths, layer.From)
+			} else {
+				m.ModelPaths = append(m.ModelPaths, filename)
+			}
 			m.ParentModel = layer.From
 		case "application/vnd.ollama.image.embed":
 			// Deprecated in versions  > 0.1.2
