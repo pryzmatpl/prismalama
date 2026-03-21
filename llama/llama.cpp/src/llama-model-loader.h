@@ -70,6 +70,7 @@ struct llama_model_loader {
     size_t   n_bytes    = 0;
 
     bool use_mmap = false;
+    bool use_streaming = false;  // Enable on-demand tensor loading
     bool check_tensors;
     bool no_alloc;
 

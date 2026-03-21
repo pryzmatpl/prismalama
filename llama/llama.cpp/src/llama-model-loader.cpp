@@ -716,6 +716,7 @@ llama_model_loader::llama_model_loader(
     }
 
     this->use_mmap = use_mmap;
+    this->use_streaming = false;  // Default disabled
     this->check_tensors = check_tensors;
     this->no_alloc = no_alloc;
 }
