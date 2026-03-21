@@ -7742,6 +7742,9 @@ llama_model_params llama_model_default_params() {
         /*.use_extra_bufts             =*/ true,
         /*.no_host                     =*/ false,
         /*.no_alloc                    =*/ false,
+        /*.use_weight_streaming        =*/ false,
+        /*.max_layers_in_gpu           =*/ 0,
+        /*.layer_cache_size            =*/ 4,
     };
 
     return result;

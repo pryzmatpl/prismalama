@@ -74,6 +74,10 @@ struct llama_model_loader {
     bool check_tensors;
     bool no_alloc;
 
+    // Weight streaming configuration
+    int32_t max_layers_in_gpu = 0;
+    int32_t layer_cache_size = 4;
+
     llama_files files;
     llama_ftype ftype;
     llama_fver  fver;
@@ -158,6 +162,12 @@ struct llama_model_loader {
 
     // for backwards compatibility, does not support ggml-backend
     void load_data_for(struct ggml_tensor * cur) const;
+
+    // Weight streaming helper functions
+    int get_layer_from_tensor(const char * name) const;
+    bool should_load_tensor(const char * name) const;
+    void set_streaming_config(int32_t max_layers, int32_t cache_size);
+    bool is_streaming_enabled() const { return use_streaming; }
 
     // Returns false if cancelled by progress_callback
     bool load_all_data(

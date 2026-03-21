@@ -760,6 +760,13 @@ static int llama_model_load(const std::string & fname, std::vector<std::string> 
     try {
         llama_model_loader ml(fname, splits, params.use_mmap, params.check_tensors, params.no_alloc, params.kv_overrides, params.tensor_buft_overrides);
 
+        // Enable weight streaming if requested
+        if (params.use_weight_streaming) {
+            ml.set_streaming_config(params.max_layers_in_gpu, params.layer_cache_size);
+            LLAMA_LOG_INFO("%s: weight streaming enabled, max_layers_in_gpu=%d, cache_size=%d\n", 
+                __func__, params.max_layers_in_gpu, params.layer_cache_size);
+        }
+
         ml.print_info();
 
         model.hparams.vocab_only = params.vocab_only;

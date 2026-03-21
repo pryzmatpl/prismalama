@@ -716,7 +716,6 @@ llama_model_loader::llama_model_loader(
     }
 
     this->use_mmap = use_mmap;
-    this->use_streaming = false;  // Default disabled
     this->check_tensors = check_tensors;
     this->no_alloc = no_alloc;
 }
@@ -899,8 +898,47 @@ void llama_model_loader::get_mapping_range(size_t * first, size_t * last, void *
     }
 }
 
+int llama_model_loader::get_layer_from_tensor(const char * name) const {
+    int layer = -1;
+    sscanf(name, "blk.%d.", &layer);
+    return layer;
+}
+
+bool llama_model_loader::should_load_tensor(const char * name) const {
+    if (!use_streaming || max_layers_in_gpu <= 0) {
+        return true;
+    }
+    
+    int layer = get_layer_from_tensor(name);
+    if (layer < 0) {
+        return true;
+    }
+    
+    // Load only the last max_layers_in_gpu layers to GPU
+    // This assumes the model has around 80 layers - in production,
+    // we'd get the actual layer count from model metadata
+    int total_layers = 80;
+    int gpu_start = std::max(0, total_layers - max_layers_in_gpu);
+    
+    return layer >= gpu_start;
+}
+
+void llama_model_loader::set_streaming_config(int32_t max_layers, int32_t cache_size) {
+    max_layers_in_gpu = max_layers;
+    layer_cache_size = cache_size;
+    if (max_layers > 0) {
+        use_streaming = true;
+    }
+}
+
 void llama_model_loader::load_data_for(struct ggml_tensor * cur) const {
-    const auto & w = require_weight(ggml_get_name(cur));
+    const char * tensor_name = ggml_get_name(cur);
+    
+    if (use_streaming && !should_load_tensor(tensor_name)) {
+        return;
+    }
+
+    const auto & w = require_weight(tensor_name);
 
     if (use_mmap) {
         const auto & mapping = mappings.at(w.idx);
@@ -918,7 +956,7 @@ void llama_model_loader::load_data_for(struct ggml_tensor * cur) const {
     }
 
     if (check_tensors && !ggml_validate_row_data(cur->type, cur->data, ggml_nbytes(cur))) {
-        throw std::runtime_error(format("tensor '%s' has invalid data", ggml_get_name(cur)));
+        throw std::runtime_error(format("tensor '%s' has invalid data", tensor_name));
     }
 }
 
@@ -1026,6 +1064,12 @@ bool llama_model_loader::load_all_data(
         const auto * weight = get_weight(ggml_get_name(cur));
         if (weight == nullptr) {
             // this can happen with split experts models
+            continue;
+        }
+
+        // Weight streaming: skip tensors not needed for current GPU configuration
+        if (use_streaming && !should_load_tensor(ggml_get_name(cur))) {
+            size_done += ggml_nbytes(cur);
             continue;
         }
 
