@@ -314,6 +314,11 @@ extern "C" {
         bool use_extra_bufts; // use extra buffer types (used for weight repacking)
         bool no_host;         // bypass host buffer allowing extra buffers to be used
         bool no_alloc;        // only load metadata and simulate memory allocations
+
+        // [EXPERIMENTAL] Weight streaming options
+        bool use_weight_streaming;   // enable on-demand layer loading
+        int32_t max_layers_in_gpu;   // max layers to keep in GPU (0 = all)
+        int32_t layer_cache_size;   // number of layers to cache in GPU
     };
 
     // NOTE: changing the default values of parameters marked as [EXPERIMENTAL] may cause crashes or incorrect results in certain configurations
