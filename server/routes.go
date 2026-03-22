@@ -1721,17 +1721,9 @@ func Serve(ln net.Listener) error {
 		totalVRAM += gpu.TotalMemory - envconfig.GpuOverhead()
 	}
 
-	// Set default context based on VRAM tier
-	// Use slightly lower thresholds (47/23 GiB vs. 48/24 GiB) to account for small differences in the exact value
-	switch {
-	case totalVRAM >= 47*format.GibiByte:
-		s.defaultNumCtx = 262144
-	case totalVRAM >= 23*format.GibiByte:
-		s.defaultNumCtx = 32768
-	default:
-		s.defaultNumCtx = 4096
-	}
-	slog.Info("vram-based default context", "total_vram", format.HumanBytes2(totalVRAM), "default_num_ctx", s.defaultNumCtx)
+	// Set default context based on VRAM tier and OLLAMA_MEMORY_POLICY (balanced vs performance).
+	s.defaultNumCtx = defaultNumCtxFromVRAM(totalVRAM)
+	slog.Info("vram-based default context", "total_vram", format.HumanBytes2(totalVRAM), "memory_policy", envconfig.MemoryPolicy(), "default_num_ctx", s.defaultNumCtx)
 
 	err = srvr.Serve(ln)
 	// If server is closed from the signal handler, wait for the ctx to be done

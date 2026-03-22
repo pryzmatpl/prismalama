@@ -88,6 +88,8 @@ func (s *Scheduler) GetRunner(c context.Context, m *Model, opts api.Options, ses
 		opts.NumCtx = 4
 	}
 
+	applyAdaptiveNumCtxForParallel(&opts)
+
 	if m.CheckCapabilities(model.CapabilityVision) == nil {
 		// multimodal models require at least 2048 context
 		opts.NumCtx = max(opts.NumCtx, 2048)

@@ -226,6 +226,24 @@ func TestKeepAlive(t *testing.T) {
 	}
 }
 
+func TestMemoryPolicy(t *testing.T) {
+	cases := map[string]string{
+		"":            "balanced",
+		"balanced":    "balanced",
+		"Balanced":    "balanced",
+		"performance": "performance",
+		"invalid":     "balanced",
+	}
+	for in, want := range cases {
+		t.Run(in, func(t *testing.T) {
+			t.Setenv("OLLAMA_MEMORY_POLICY", in)
+			if got := MemoryPolicy(); got != want {
+				t.Errorf("got %q want %q", got, want)
+			}
+		})
+	}
+}
+
 func TestLoadTimeout(t *testing.T) {
 	defaultTimeout := 5 * time.Minute
 	cases := map[string]time.Duration{
