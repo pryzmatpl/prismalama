@@ -5,7 +5,7 @@
 
 pkgname=prismalama-ollama
 pkgver=0.4.1
-pkgrel=1
+pkgrel=2
 pkgdesc="Prismalama: Ollama-compatible server built from source (ROCm HIP + Vulkan GGML, AirLLM runner, large-model paths)"
 arch=('x86_64')
 url="https://github.com/piotroxp/prismallama.cpp"
@@ -76,10 +76,12 @@ build() {
 package() {
 	cd "${startdir}"
 
-	cmake --install build --prefix "${pkgdir}/usr" --component CPU
-	cmake --install build --prefix "${pkgdir}/usr" --component HIP
+	# CMake install() uses absolute DESTINATION /usr/...; --prefix "${pkgdir}/usr" does not remap those.
+	# Use DESTDIR (Arch/cmake convention) so files land under "${pkgdir}/usr/...".
+	DESTDIR="${pkgdir}" cmake --install build --prefix /usr --component CPU
+	DESTDIR="${pkgdir}" cmake --install build --prefix /usr --component HIP
 	if [[ -f "${startdir}/.prismalama_vulkan" ]] && [[ "$(cat "${startdir}/.prismalama_vulkan")" == "1" ]]; then
-		cmake --install build --prefix "${pkgdir}/usr" --component Vulkan
+		DESTDIR="${pkgdir}" cmake --install build --prefix /usr --component Vulkan
 	fi
 
 	install -Dm755 ollama "${pkgdir}/usr/bin/ollama"
