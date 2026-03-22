@@ -518,6 +518,26 @@ func (f FlashAttentionType) String() string {
 	}
 }
 
+// rocrVisibleDeviceToken picks a value for ROCR_VISIBLE_DEVICES that HIP/ROCr
+// accept. GGML often reports PCI BDF strings (e.g. 0000:0b:00.0); those are
+// not reliably parsed the same way in the runner subprocess as in discovery,
+// which can yield zero HIP devices and a Vulkan fallback. Numeric indices are
+// reliable for the common single-GPU runner.
+func rocrVisibleDeviceToken(d DeviceInfo, listLen int) string {
+	if d.FilterID != "" {
+		if _, err := strconv.Atoi(d.FilterID); err == nil {
+			return d.FilterID
+		}
+	}
+	if _, err := strconv.Atoi(d.ID); err == nil {
+		return d.ID
+	}
+	if listLen == 1 {
+		return "0"
+	}
+	return d.ID
+}
+
 // Given the list of GPUs this instantiation is targeted for,
 // figure out the visible devices environment variables
 // Set mustFilter true to enable filtering of CUDA devices
@@ -526,8 +546,9 @@ func GetVisibleDevicesEnv(l []DeviceInfo, mustFilter bool) map[string]string {
 		return nil
 	}
 	env := map[string]string{}
+	listLen := len(l)
 	for _, d := range l {
-		d.updateVisibleDevicesEnv(env, mustFilter)
+		d.updateVisibleDevicesEnv(env, mustFilter, listLen)
 	}
 	return env
 }
@@ -559,7 +580,7 @@ func (d DeviceInfo) PreferredLibrary(other DeviceInfo) bool {
 	return false
 }
 
-func (d DeviceInfo) updateVisibleDevicesEnv(env map[string]string, mustFilter bool) {
+func (d DeviceInfo) updateVisibleDevicesEnv(env map[string]string, mustFilter bool, listLen int) {
 	var envVar string
 	switch d.Library {
 	case "ROCm":
@@ -583,10 +604,15 @@ func (d DeviceInfo) updateVisibleDevicesEnv(env map[string]string, mustFilter bo
 	if existing {
 		v = v + ","
 	}
-	if d.FilterID != "" {
-		v = v + d.FilterID
-	} else {
-		v = v + d.ID
+	switch d.Library {
+	case "ROCm":
+		v = v + rocrVisibleDeviceToken(d, listLen)
+	default:
+		if d.FilterID != "" {
+			v = v + d.FilterID
+		} else {
+			v = v + d.ID
+		}
 	}
 	env[envVar] = v
 }

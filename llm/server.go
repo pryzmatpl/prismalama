@@ -321,6 +321,21 @@ func NewLlamaServer(systemInfo ml.SystemInfo, gpus []ml.DeviceInfo, modelPath st
 	return &llamaServer{llmServer: s}, nil
 }
 
+func stripEnvKeys(env []string, keys []string) []string {
+	var out []string
+nextVar:
+	for _, e := range env {
+		k, _, _ := strings.Cut(e, "=")
+		for _, key := range keys {
+			if strings.EqualFold(k, key) {
+				continue nextVar
+			}
+		}
+		out = append(out, e)
+	}
+	return out
+}
+
 func StartRunner(ollamaEngine bool, modelPath string, gpuLibs []string, out io.Writer, extraEnvs map[string]string) (cmd *exec.Cmd, port int, err error) {
 	var exe string
 	exe, err = os.Executable()
@@ -431,6 +446,14 @@ func StartRunner(ollamaEngine bool, modelPath string, gpuLibs []string, out io.W
 		if !done {
 			cmd.Env = append(cmd.Env, k+"="+extraEnvs[k])
 		}
+	}
+
+	// ROCm: the scheduler sets ROCR_VISIBLE_DEVICES for the runner. User
+	// HIP_VISIBLE_DEVICES (e.g. from systemd) can interact badly with that
+	// filter and yield zero HIP devices in ggml, forcing Vulkan. Prefer the
+	// scheduler's ROCR selection for the child process.
+	if rocr, ok := extraEnvs["ROCR_VISIBLE_DEVICES"]; ok && rocr != "" {
+		cmd.Env = stripEnvKeys(cmd.Env, []string{"HIP_VISIBLE_DEVICES", "GPU_DEVICE_ORDINAL"})
 	}
 
 	slog.Info("starting runner", "cmd", cmd)
