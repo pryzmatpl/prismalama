@@ -31,6 +31,13 @@ Point models at your disk (default `/nvme3/models`); edit `/etc/default/ollama` 
 
 **When to build:** after each **delivered Prismalama feature** once **integration tests** cover it. Run **`make ship-check`** (integration + `./build-rocm.sh`) or **`make ship-check-fast`** ( **`TestBlueSky` only**, no package). See **`docs/DEVELOPER.md` § Ship gate**. Bump **`pkgrel`** in **`PKGBUILD`** when releasing a new installable snapshot.
 
+### Versioning (pacman vs upstream Ollama)
+
+- **`pkgver` in this `PKGBUILD`** is the **Prismalama package** version (currently `0.4.1`). It does **not** automatically track [upstream Ollama](https://github.com/ollama/ollama) release numbers.
+- If you (or an older recipe) previously installed **`prismalama-ollama` with `pkgver` like `0.18.x`**, pacman compares versions numerically: **`0.4.1 < 0.18.2`**, so a fresh `makepkg` build looks like a **downgrade** even though you built “the latest” from **this** repo.
+- The package sets **`epoch=1`** so installs sort **after** those legacy `0.18.*` builds. The running binary still reports **`0.4.1-rN-prismalama`** via `-ldflags` (see `build()` in `PKGBUILD`).
+- When you intentionally align with an upstream Ollama tag, bump **`pkgver`** (and document it); use **`epoch`** only when pacman ordering needs a reset.
+
 ## Hardware
 
 - AMD GPU with ROCm (override `PRISMALAMA_AMDGPU_TARGETS` before `makepkg` if not `gfx1100`).

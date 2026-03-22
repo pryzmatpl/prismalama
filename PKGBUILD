@@ -2,10 +2,15 @@
 # Build from repository root:  make -f Makefile.sync sync   # optional: refresh vendored llama.cpp/ggml
 #                               makepkg -sf
 # Override GPU ISA (faster link): PRISMALAMA_AMDGPU_TARGETS=gfx1030 makepkg -sf
+#
+# epoch: pkgver here is the Prismalama snapshot (see README-PKGBUILD.md § Versioning). Older installs may have used
+# pkgver aligned with upstream Ollama (e.g. 0.18.x). Without epoch, pacman incorrectly reports a downgrade when
+# going from 0.18.* to 0.4.*. epoch=1 makes current packages sort after those legacy builds.
 
 pkgname=prismalama-ollama
+epoch=1
 pkgver=0.4.1
-pkgrel=3
+pkgrel=4
 pkgdesc="Prismalama: Ollama-compatible server built from source (ROCm HIP + Vulkan GGML, AirLLM runner, large-model paths)"
 arch=('x86_64')
 url="https://github.com/piotroxp/prismallama.cpp"
