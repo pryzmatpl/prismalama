@@ -1,0 +1,47 @@
+//go:build integration
+
+package integration
+
+import (
+	"testing"
+
+	"github.com/ollama/ollama/envconfig"
+)
+
+// TestShipMemoryPolicyEnv locks the Prismalama default: unset OLLAMA_MEMORY_POLICY must
+// mean performance-tier VRAM defaults (snappy small/medium models). Balanced is explicit.
+func TestShipMemoryPolicyEnv(t *testing.T) {
+	cases := []struct {
+		set  string
+		want string
+	}{
+		{"", "performance"},
+		{"balanced", "balanced"},
+		{"performance", "performance"},
+		{"BALANCED", "balanced"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.set, func(t *testing.T) {
+			t.Setenv("OLLAMA_MEMORY_POLICY", tc.set)
+			if g := envconfig.MemoryPolicy(); g != tc.want {
+				t.Fatalf("OLLAMA_MEMORY_POLICY=%q: got %q want %q", tc.set, g, tc.want)
+			}
+		})
+	}
+}
+
+// TestShipAdaptiveMemoryEnv ensures load-time num_ctx adaptation defaults on and can be disabled.
+func TestShipAdaptiveMemoryEnv(t *testing.T) {
+	t.Setenv("OLLAMA_ADAPTIVE_MEMORY", "")
+	if !envconfig.AdaptiveMemory(true) {
+		t.Fatal("unset OLLAMA_ADAPTIVE_MEMORY must default to true (adapt when RAM tight)")
+	}
+	t.Setenv("OLLAMA_ADAPTIVE_MEMORY", "false")
+	if envconfig.AdaptiveMemory(true) {
+		t.Fatal("OLLAMA_ADAPTIVE_MEMORY=false must disable adaptive clamp")
+	}
+	t.Setenv("OLLAMA_ADAPTIVE_MEMORY", "true")
+	if !envconfig.AdaptiveMemory(true) {
+		t.Fatal("OLLAMA_ADAPTIVE_MEMORY=true must enable adaptive clamp")
+	}
+}

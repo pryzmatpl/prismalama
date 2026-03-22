@@ -5,7 +5,7 @@ root="$(cd "$(dirname "${0}")/.." && pwd)"
 cd "${root}"
 
 : "${SHIP_INTEGRATION_TIMEOUT:=15m}"
-: "${SHIP_GO_TEST_EXTRA:=}" # e.g. -run TestBlueSky for a fast path
+: "${SHIP_GO_TEST_EXTRA:=}" # e.g. '-run=TestBlueSky|TestShipMemoryPolicyEnv' (quote; | is special in shell)
 
 echo "== integration (CGO) =="
 # shellcheck disable=SC2086
