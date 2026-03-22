@@ -209,18 +209,20 @@ var (
 )
 
 // MemoryPolicy selects default VRAM→num_ctx heuristics.
-// "balanced" (default): conservative defaults for large models and agent-farm parallelism.
-// "performance": legacy large defaults (max throughput / context when VRAM allows).
+// Empty/unset defaults to "performance" (legacy VRAM tiers: snappy small/medium models).
+// Set OLLAMA_MEMORY_POLICY=balanced for conservative defaults (large-than-VRAM models, agent farms).
 func MemoryPolicy() string {
 	s := strings.ToLower(strings.TrimSpace(Var("OLLAMA_MEMORY_POLICY")))
 	switch s {
-	case "", "balanced":
+	case "":
+		return "performance"
+	case "balanced":
 		return "balanced"
 	case "performance":
 		return "performance"
 	default:
-		slog.Warn("invalid OLLAMA_MEMORY_POLICY, using balanced", "value", s)
-		return "balanced"
+		slog.Warn("invalid OLLAMA_MEMORY_POLICY, using performance", "value", s)
+		return "performance"
 	}
 }
 
@@ -314,7 +316,7 @@ func AsMap() map[string]EnvVar {
 		"OLLAMA_SCHED_SPREAD":      {"OLLAMA_SCHED_SPREAD", SchedSpread(), "Always schedule model across all GPUs"},
 		"OLLAMA_MULTIUSER_CACHE":   {"OLLAMA_MULTIUSER_CACHE", MultiUserCache(), "Optimize prompt caching for multi-user scenarios"},
 		"OLLAMA_CONTEXT_LENGTH":    {"OLLAMA_CONTEXT_LENGTH", ContextLength(), "Context length to use unless otherwise specified (default: 4k/32k/256k based on VRAM)"},
-		"OLLAMA_MEMORY_POLICY":     {"OLLAMA_MEMORY_POLICY", MemoryPolicy(), "balanced (default) or performance — VRAM tier defaults for num_ctx; balanced caps parallel KV"},
+		"OLLAMA_MEMORY_POLICY":     {"OLLAMA_MEMORY_POLICY", MemoryPolicy(), "performance (default) or balanced — VRAM tier num_ctx; balanced caps parallel KV for huge models"},
 		"OLLAMA_NEW_ENGINE":        {"OLLAMA_NEW_ENGINE", NewEngine(), "Enable the new Ollama engine"},
 		"OLLAMA_REMOTES":           {"OLLAMA_REMOTES", Remotes(), "Allowed hosts for remote models (default \"ollama.com\")"},
 

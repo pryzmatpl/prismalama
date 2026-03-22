@@ -228,11 +228,11 @@ func TestKeepAlive(t *testing.T) {
 
 func TestMemoryPolicy(t *testing.T) {
 	cases := map[string]string{
-		"":            "balanced",
+		"":            "performance",
 		"balanced":    "balanced",
 		"Balanced":    "balanced",
 		"performance": "performance",
-		"invalid":     "balanced",
+		"invalid":     "performance",
 	}
 	for in, want := range cases {
 		t.Run(in, func(t *testing.T) {

@@ -8,6 +8,11 @@ import (
 )
 
 func TestDefaultNumCtxFromVRAM(t *testing.T) {
+	t.Setenv("OLLAMA_MEMORY_POLICY", "")
+	if g := defaultNumCtxFromVRAM(24 * format.GibiByte); g != 32768 {
+		t.Fatalf("unset policy uses performance 24GiB tier: got %d want 32768", g)
+	}
+
 	t.Setenv("OLLAMA_MEMORY_POLICY", "balanced")
 	if g := defaultNumCtxFromVRAM(24 * format.GibiByte); g != 8192 {
 		t.Fatalf("balanced 24GiB tier: got %d want 8192", g)

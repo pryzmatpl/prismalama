@@ -8,8 +8,8 @@ import (
 	"github.com/ollama/ollama/format"
 )
 
-// defaultNumCtxFromVRAM maps total detected VRAM to a default num_ctx. Policy is
-// controlled by OLLAMA_MEMORY_POLICY (see envconfig.MemoryPolicy).
+// defaultNumCtxFromVRAM maps total detected VRAM to a default num_ctx.
+// Policy is OLLAMA_MEMORY_POLICY: performance (default) vs balanced (see envconfig.MemoryPolicy).
 func defaultNumCtxFromVRAM(totalVRAM uint64) int {
 	switch envconfig.MemoryPolicy() {
 	case "performance":
