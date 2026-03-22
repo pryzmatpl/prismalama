@@ -4,10 +4,10 @@ This document describes how the repository is wired so humans and automation can
 
 ## Goals (product)
 
-- **Ollama-like UX** for local inference on modest hardware (“potato machine”).
-- **Vulkan** via llama.cpp / GGML for broad GPU support (see `ml/backend/ggml`).
-- **Weight streaming** for models larger than VRAM: PyTorch **AirLLM** streams Hugging Face–style checkpoints from disk layer-by-layer; GGUF path uses llama.cpp’s mmap/streaming semantics where enabled.
-- **Small models** (e.g. Qwen3.5-9B-class) should run on the standard llama.cpp runner when quantized to GGUF; large HF-only models use the AirLLM runner when the model directory matches the heuristics below.
+- **Ollama-like UX** for local inference on modest hardware (“potato machine”), **without** requiring heavy external Python ML stacks for the default path.
+- **Vulkan** via llama.cpp / GGML for broad GPU support (see `ml/backend/ggml`) — **first-class**; packaged defaults (`OLLAMA_USE_AIRLLM=0`) assume **GGUF + GGML** only.
+- **Weight streaming** for models larger than VRAM: GGUF uses llama.cpp mmap/offload/streaming semantics where enabled. PyTorch **AirLLM** streams Hugging Face–style checkpoints only when **`OLLAMA_USE_AIRLLM=1`** (and deps installed); with **`OLLAMA_USE_AIRLLM=0`** (package default), **only GGUF** is routed to the native runner — HF safetensors trees require opting in.
+- **Small models** (e.g. Qwen3.5-9B-class) should run on the standard llama.cpp runner when quantized to GGUF; large HF-only layouts can use the AirLLM runner when explicitly enabled and heuristics match.
 
 ## Repository map
 
@@ -27,7 +27,7 @@ This document describes how the repository is wired so humans and automation can
 
 - Directory contains `model.safetensors.index.json` or `*.safetensors` → **AirLLM**.
 - `config.json` mentions safetensors / `torch_dtype` / transformers-style hints → **AirLLM**.
-- Glob `*-00001-of-*.gguf` (multi-part GGUF) → **AirLLM** (forced path for weight-streaming experiments).
+- Glob `*-00001-of-*.gguf` (multi-part GGUF) → **AirLLM** when **`OLLAMA_USE_AIRLLM` is not an explicit opt-out** (`0` / `false` / `no`); otherwise **GGML** (default package sets opt-out so multi-part uses native GGML).
 - `OLLAMA_USE_AIRLLM=1` or `true` → **AirLLM** even for plain `.gguf` (testing / overrides).
 
 Otherwise the **llama.cpp** runner is used (GGUF, Vulkan when built).
@@ -38,7 +38,7 @@ Otherwise the **llama.cpp** runner is used (GGUF, Vulkan when built).
 
 | Variable | Effect |
 |----------|--------|
-| `OLLAMA_USE_AIRLLM` | Force AirLLM runner when set to `1` or `true`. |
+| `OLLAMA_USE_AIRLLM` | **Arch package sets `0`**: GGML/llama.cpp for typical GGUF; no PyTorch deps. Set **`1`** / **`true`** to opt into AirLLM. **`0`** / **`false`** / **`no`** disables **all** AirLLM routing. If **unset**, layout heuristics may still pick AirLLM (e.g. multipart GGUF) — see `docs/RUNTIME_DISPATCH.md`. |
 | `OLLAMA_MULTI_GGUF` | Treat as AirLLM-style when `1`. |
 | `AIRLLM_COMPRESSION` | e.g. `4bit`, `8bit`, `none` (passed to `AutoModel.from_pretrained`). |
 | `AIRLLM_DEVICE` | PyTorch device string, default `cuda:0` (ROCm uses the same API). |
@@ -103,7 +103,7 @@ The **default GGUF path** is **llama.cpp** embedded under `llama/` (Go bindings 
 
 **Arch Linux / global deploys:** pin `FETCH_HEAD` in `Makefile.sync` to a **commit SHA** for reproducible binaries; branch names are fine for development only.
 
-**Arch package (this repo):** root **`PKGBUILD`** builds Prismalama from source (CMake GGML CPU/HIP/Vulkan → `/usr/lib/ollama/rocm`, Go `ollama`, AirLLM under `/usr/share/ollama`). Run **`makepkg -sf`** or **`./build-rocm.sh`**; see **`README-PKGBUILD.md`**. Set **`PRISMALAMA_AMDGPU_TARGETS`** before `makepkg` if not `gfx1100`. After any change to **Go runners** or **`llm/`**, rebuild and reinstall the package, then **`sudo systemctl restart ollama`** — a stale **`/usr/bin/ollama`** will not pick up fixes.
+**Arch package (this repo):** root **`PKGBUILD`** builds Prismalama from source (CMake GGML CPU/HIP/Vulkan → `/usr/lib/ollama/rocm`, Go `ollama`, AirLLM under `/usr/share/ollama`). Run **`makepkg -sf`** or **`./build-rocm.sh`**; see **`README-PKGBUILD.md`**. Set **`PRISMALAMA_AMDGPU_TARGETS`** before `makepkg` if not `gfx1100`. After any change to **Go runners** or **`llm/`**, rebuild and reinstall, then restart the service — a stale **`/usr/bin/ollama`** will not pick up fixes. On Arch, the usual loop is **`sudo makepkg -sfi`** in the directory containing **`PKGBUILD`**, then **`sudo systemctl restart ollama`** (**`-s`** deps, **`-f`** force rebuild, **`-i`** install).
 
 **Submodule note:** `src/ollama` may still ship its own `Makefile.sync` from upstream Ollama. Align it with the Prismalama fork when you merge the submodule or build from a unified tree.
 

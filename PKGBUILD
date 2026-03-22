@@ -10,8 +10,8 @@
 pkgname=prismalama-ollama
 epoch=1
 pkgver=0.4.1
-pkgrel=4
-pkgdesc="Prismalama: Ollama-compatible server built from source (ROCm HIP + Vulkan GGML, AirLLM runner, large-model paths)"
+pkgrel=5
+pkgdesc="Prismalama: Ollama-compatible server (ROCm HIP + Vulkan GGML primary; optional AirLLM for HF/PyTorch layouts)"
 arch=('x86_64')
 url="https://github.com/piotroxp/prismallama.cpp"
 license=('MIT')
@@ -36,8 +36,8 @@ makedepends=(
 
 optdepends=(
 	'python-pytorch-rocm: AirLLM runner (weight streaming, multi-part GGUF / HF layouts)'
-	'python-transformers: AirLLM tokenizer / model metadata'
-	'python-safetensors: safetensors checkpoints for AirLLM'
+	'python-transformers: AirLLM (often AUR; else: pip install transformers safetensors — see README-PKGBUILD.md)'
+	'python-safetensors: AirLLM weights (often AUR; pip alternative — see README-PKGBUILD.md)'
 )
 
 provides=('ollama')
@@ -140,8 +140,9 @@ OLLAMA_LIBRARY_PATH=/usr/lib/ollama/rocm
 HIP_VISIBLE_DEVICES=0
 HSA_OVERRIDE_GFX_VERSION=11.0.0
 
-# Prefer AirLLM when the runner detects streaming layouts (safetensors / multi-part GGUF / OLLAMA_USE_AIRLLM)
-OLLAMA_USE_AIRLLM=1
+# GGML/llama.cpp is the default Arch experience (no PyTorch/transformers required).
+# Set OLLAMA_USE_AIRLLM=1 to opt into the Python AirLLM runner (HF safetensors, experiments, multi-part GGUF heuristics).
+OLLAMA_USE_AIRLLM=0
 AIRLLM_COMPRESSION=4bit
 AIRLLM_DEVICE=cuda:0
 EOF

@@ -42,3 +42,6 @@ ollama/
 
 # Submodules initialized flag
 .submodules_initialized
+
+# Local Vulkan / dev marker (do not commit)
+.prismalama_vulkan

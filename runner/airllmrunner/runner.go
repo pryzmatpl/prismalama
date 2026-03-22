@@ -35,8 +35,13 @@ type Server struct {
 	status     llm.ServerStatus
 	progress   float32
 	mu         sync.Mutex
-	ready      sync.WaitGroup
-	httpClient *http.Client
+	commitMu   sync.Mutex // serializes Commit handlers; pairs Add/Done on ready for reloads
+	// commitReturnedOnce is true after any Commit handler has finished (success or failure).
+	// First Commit pairs with ready.Add(1) in NewServer; subsequent Commits must Add(1) before Done
+	// or sync.WaitGroup panics ("negative WaitGroup counter") and the runner dies.
+	commitReturnedOnce bool
+	ready              sync.WaitGroup
+	httpClient         *http.Client
 }
 
 type statusResponse struct {
@@ -151,10 +156,20 @@ func (s *Server) startPythonRunner() error {
 		"--model", s.modelPath,
 		"--port", strconv.Itoa(s.pythonPort),
 	)
-	cmd.Env = append(os.Environ(),
+	// Inherit full parent env (HIP_VISIBLE_DEVICES, HSA_*, AIRLLM_DEVICE, etc.) for GPU visibility in PyTorch.
+	childEnv := append(os.Environ(),
 		"AIRLLM_COMPRESSION="+os.Getenv("AIRLLM_COMPRESSION"),
 		"PYTHONPATH="+airllmPythonPath(pythonRunnerPath),
 	)
+	if _, ok := os.LookupEnv("AIRLLM_DEVICE"); !ok {
+		childEnv = append(childEnv, "AIRLLM_DEVICE=cuda:0")
+	}
+	cmd.Env = childEnv
+	adev := os.Getenv("AIRLLM_DEVICE")
+	if adev == "" {
+		adev = "cuda:0"
+	}
+	slog.Info("airllm python env (subset)", "AIRLLM_DEVICE", adev, "HIP_VISIBLE_DEVICES", os.Getenv("HIP_VISIBLE_DEVICES"))
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 
@@ -232,6 +247,18 @@ func (s *Server) load(w http.ResponseWriter, r *http.Request) {
 
 	switch req.Operation {
 	case llm.LoadOperationCommit:
+		// WaitGroup: NewServer adds 1. First Commit does one Done (pairs with NewServer).
+		// Any later Commit must Add(1) before Done or WaitGroup panics and the runner exits.
+		s.commitMu.Lock()
+		if s.commitReturnedOnce {
+			s.ready.Add(1)
+		}
+		defer func() {
+			s.ready.Done()
+			s.commitReturnedOnce = true
+			s.commitMu.Unlock()
+		}()
+
 		s.mu.Lock()
 		s.status = llm.ServerStatusLoadingModel
 		s.mu.Unlock()
@@ -275,7 +302,6 @@ func (s *Server) load(w http.ResponseWriter, r *http.Request) {
 			s.mu.Lock()
 			s.status = llm.ServerStatusReady
 			s.mu.Unlock()
-			s.ready.Done()
 		}
 
 		json.NewEncoder(w).Encode(pyResp)

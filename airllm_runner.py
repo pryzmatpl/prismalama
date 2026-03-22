@@ -130,12 +130,25 @@ class AirLLMModel:
                 
                 from airllm import AutoModel
                 import torch
-                
+
+                device = os.environ.get("AIRLLM_DEVICE", "cuda:0")
+                cuda_ok = torch.cuda.is_available()
+                n_dev = torch.cuda.device_count() if cuda_ok else 0
+                logger.info(
+                    "PyTorch: cuda.is_available=%s device_count=%s AIRLLM_DEVICE=%s",
+                    cuda_ok,
+                    n_dev,
+                    device,
+                )
+                if not cuda_ok:
+                    logger.warning(
+                        "PyTorch reports no CUDA/ROCm GPU; AirLLM will run on CPU unless you install "
+                        "a ROCm-enabled PyTorch (e.g. python-pytorch-rocm on Arch) and set HIP / "
+                        "AIRLLM_DEVICE correctly."
+                    )
+
                 self.progress = 0.3
                 logger.info("AutoModel imported, initializing...")
-                
-                # Get device from environment or default to cuda:0
-                device = os.environ.get("AIRLLM_DEVICE", "cuda:0")
                 compression = self.compression
                 
                 # AutoModel uses from_pretrained classmethod
@@ -381,6 +394,18 @@ class AirLLMHandler(BaseHTTPRequestHandler):
         self.send_json_response(asdict(response))
 
 
+def _require_airllm_python_deps():
+    try:
+        import transformers  # noqa: F401
+    except ImportError as e:
+        logger.critical(
+            "AirLLM requires Python package 'transformers'. On Arch: "
+            "sudo python3 -m pip install --break-system-packages transformers safetensors "
+            "OR yay -S python-transformers python-safetensors (AUR); keep python-pytorch-rocm from repos."
+        )
+        raise SystemExit(2) from e
+
+
 def main():
     parser = argparse.ArgumentParser(description='AirLLM Runner for Ollama')
     parser.add_argument('--model', type=str, default='', help='Path to model')
@@ -390,6 +415,8 @@ def main():
     
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
+
+    _require_airllm_python_deps()
     
     AirLLMHandler.model = AirLLMModel()
     

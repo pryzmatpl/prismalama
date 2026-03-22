@@ -126,6 +126,14 @@ func TestIsAirLLMModelWithEnv(t *testing.T) {
 	if isAirLLMModel(dir) {
 		t.Error("Expected isAirLLMModel to return false for GGUF without env forcing")
 	}
+
+	// Multi-part GGUF used to force AirLLM even with OLLAMA_USE_AIRLLM=0; opt-out must win.
+	multi := filepath.Join(t.TempDir(), "multipart")
+	os.MkdirAll(multi, 0755)
+	os.WriteFile(filepath.Join(multi, "weights-00001-of-00004.gguf"), []byte("GGUF"), 0644)
+	if isAirLLMModel(multi) {
+		t.Error("Expected isAirLLMModel false for multipart GGUF when OLLAMA_USE_AIRLLM=0")
+	}
 }
 
 func TestGetModelPath(t *testing.T) {

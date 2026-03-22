@@ -6,8 +6,8 @@ This tree ships **`PKGBUILD`** at the repository root that builds **this** codeb
 
 - **GGML**: CPU + **ROCm HIP** + **Vulkan** shared backends installed under `/usr/lib/ollama/rocm` (see `OLLAMA_RUNNER_DIR` in `CMakeLists.txt`).
 - **Go binary**: `ollama` with `version.Version` stamped as `prismalama`.
-- **AirLLM**: `airllm_runner.py` and `src/airllm/air_llm` → `/usr/share/ollama/` for weight streaming / multi-part GGUF paths (install `python-pytorch-rocm` etc. as needed).
-- **systemd** + **`/etc/default/ollama`**: `OLLAMA_MODELS=/nvme3/models`, `OLLAMA_LIBRARY_PATH=/usr/lib/ollama/rocm`, `OLLAMA_USE_AIRLLM=1`, ROCm env vars.
+- **AirLLM (optional)**: `airllm_runner.py` and `src/airllm/air_llm` → `/usr/share/ollama/` for Hugging Face / PyTorch-heavy layouts when you **opt in** (`OLLAMA_USE_AIRLLM=1` + PyTorch stack). **Default install uses GGML only** — no `transformers` / heavy Python deps.
+- **systemd** + **`/etc/default/ollama`**: `OLLAMA_MODELS=/nvme3/models`, `OLLAMA_LIBRARY_PATH=/usr/lib/ollama/rocm`, **`OLLAMA_USE_AIRLLM=0`** (GGUF + GGML GPU out of the box), ROCm env vars.
 
 ## Quick start (recommended)
 
@@ -27,16 +27,40 @@ sudo pacman -U prismalama-ollama-*.pkg.tar.zst
 sudo systemctl enable --now ollama
 ```
 
-Point models at your disk (default `/nvme3/models`); edit `/etc/default/ollama` if needed.
+Point models at your disk (default `/nvme3/models`); edit `/etc/default/ollama` if needed. **GGUF models** match the default (no extra Python). **Hugging Face / safetensors** layouts need **`OLLAMA_USE_AIRLLM=1`** plus the PyTorch stack below — that path is explicitly opt-in.
+
+**If you turn AirLLM on** (`OLLAMA_USE_AIRLLM=1`) **and** the runner selects it (HF-style trees, or you force it), you need **`transformers`** and **`safetensors`** in the same **`python3`** the service uses. **`python-pytorch-rocm`** is in the official repos; **`python-transformers`** / **`python-safetensors`** may or may not be — use **one** of:
+
+```bash
+# A) PyPI (most reliable on Arch; PEP 668 requires --break-system-packages for system python)
+sudo python3 -m pip install --break-system-packages transformers safetensors
+```
+
+```bash
+# B) Official repos first (names vary; use search — do not assume an AUR package exists)
+sudo pacman -Ss safetensors
+sudo pacman -Ss transformers
+# Example if both exist in extra/community:
+# sudo pacman -S --needed python-pytorch-rocm python-safetensors python-transformers
+```
+
+`yay -S python-safetensors` often fails because **there is no AUR package with that exact name**; PyPI packages are **`safetensors`** and **`transformers`**, not `python-safetensors` as a **yay** target unless someone publishes it.
+
+Then **`sudo systemctl restart ollama`**. If `airllm_runner.py` still fails with **`No module named 'transformers'`**, run **`sudo -u ollama python3 -c "import transformers"`** to verify the **`ollama`** user sees the install.
+
+To **avoid** AirLLM entirely (GGUF-only via llama.cpp), set **`OLLAMA_USE_AIRLLM=0`** — **including** multi-part GGUF, AirLLM routing is disabled (see **`docs/RUNTIME_DISPATCH.md`**). No **`transformers`** install is required for that path.
+
+**Docker:** **`docker/gpu`** builds **`prismalama-gpu`** (Go + GGML HIP/Vulkan only). It does **not** ship Python **`transformers`**; use it when you want **GPU GGUF** without the AirLLM stack. **A separate “AirLLM Docker”** is not wired into the runner today (the subprocess expects **`python3`** on the host). If you need AirLLM in a container, you would extend the image with **`pip install transformers safetensors`**, **`python-pytorch-rocm`** (or CUDA), and run **`ollama serve`** there — still simpler than building a second Python-only image unless you are orchestrating at scale.
 
 **When to build:** after each **delivered Prismalama feature** once **integration tests** cover it, and **whenever you change Go or runner code** you intend to run system-wide (otherwise **`/usr/bin/ollama`** stays old until you reinstall). Run **`make ship-check`** (integration + `./build-rocm.sh`) or **`make ship-check-fast`** ( **`TestBlueSky` only**, no package). See **`docs/DEVELOPER.md` § Ship gate**. Bump **`pkgrel`** in **`PKGBUILD`** when releasing a new installable snapshot.
 
 ```bash
-# Typical refresh after git pull
-makepkg -sf
-sudo pacman -U prismalama-ollama-*.pkg.tar.zst
+# Typical refresh after git pull (build, install, pull deps; -f forces rebuild)
+sudo makepkg -sfi
 sudo systemctl restart ollama
 ```
+
+Same idea as **`makepkg -sf`** then **`pacman -U`**, but **`-i`** installs the built package in one step; **`-f`** avoids “already built” skips when **`pkgrel`** was not bumped.
 
 ### Versioning (pacman vs upstream Ollama)
 
@@ -189,17 +213,25 @@ sudo chown -R ollama:ollama /run/media/piotro/CACHE1/airllm
 sudo journalctl -u ollama -n 100
 ```
 
-### AirLLM Not Activating
+### `ollama run` spins forever (CLI spinner)
+
+The client shows a spinner until the **first** `/api/generate` response. For an **empty prompt** (interactive mode), the server still **loads the model** first (`scheduleRunner` → runner process). That step can take **minutes** for very large GGUF, slow disks, or first-time GPU init — it is not necessarily a deadlock.
+
+1. **Do not `Ctrl+Z`** — that **suspends** the CLI; the server may still be loading. Use another terminal, or `fg` to resume.
+2. **Watch the server** while loading: `sudo journalctl -u ollama -f`. Look for **`runner dispatch engine=llama`** vs **`engine=airllm`**, **`error loading llama server`**, **`ModuleNotFoundError`**, or OOM lines.
+3. **Inspect the model**: `ollama show qwopus:latest` — note blob paths / size. Multi-hundred-GB trees take time to mmap even when healthy.
+4. **Environment**: Package default is **`OLLAMA_USE_AIRLLM=0`** (GGML only). A **systemd drop-in** (`/etc/systemd/system/ollama.service.d/override.conf`) can still set **`OLLAMA_USE_AIRLLM=1`**; if AirLLM runs but **`transformers`** is missing, loads can fail or stall — either **`pip install …`** as documented above or set **`OLLAMA_USE_AIRLLM=0`** and rely on GGUF + GGML.
+5. **GPU discovery**: Warnings about **user overrode visible device** mean an env var hid GPUs; check **`HIP_VISIBLE_DEVICES`** / **`CUDA_VISIBLE_DEVICES`** in `/etc/default/ollama` and overrides. **Vulkan** backends stay off unless **`OLLAMA_VULKAN=1`** (`discover/runner.go`).
+
+### AirLLM not used (or you want to force it)
+
+There is **no** `AIRLLM_FORCE` in the Go runner — use **`OLLAMA_USE_AIRLLM=1`** in `/etc/default/ollama` (and restart) to prefer the Python path when heuristics allow. For **opt-out**, use **`OLLAMA_USE_AIRLLM=0`**.
 
 ```bash
-# Force AirLLM mode
-export AIRLLM_FORCE=1
-ollama run <model>
+# Check Python deps (same user as the service if possible)
+sudo -u ollama python3 -c "import transformers, safetensors; print('OK')"
 
-# Check Python dependencies
-python3 -c "from airllm import AutoModel; print('OK')"
-
-# Verify AirLLM installation
+# Verify packaged AirLLM tree
 ls -la /usr/share/ollama/airllm/
 ```
 

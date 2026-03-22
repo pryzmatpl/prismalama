@@ -19,6 +19,13 @@ func airLLMModelAndReason(modelPath string) (ok bool, reason string) {
 		return false, ""
 	}
 
+	// Explicit opt-out: always use GGML/llama.cpp (ROCm/Vulkan GPU). Without this, multi-part
+	// GGUF and other heuristics still selected AirLLM even when OLLAMA_USE_AIRLLM was unset;
+	// setting OLLAMA_USE_AIRLLM=0 now disables all AirLLM routing (see docs/RUNTIME_DISPATCH.md).
+	if v := os.Getenv("OLLAMA_USE_AIRLLM"); v == "0" || strings.EqualFold(v, "false") || v == "no" {
+		return false, ""
+	}
+
 	if os.Getenv("OLLAMA_MULTI_GGUF") == "1" {
 		return true, "OLLAMA_MULTI_GGUF=1"
 	}

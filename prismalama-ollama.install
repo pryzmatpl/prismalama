@@ -8,7 +8,7 @@ post_install() {
 	echo ""
 	echo "Prismalama (Ollama-compatible) installed from this repository."
 	echo "  Models:  set OLLAMA_MODELS in /etc/default/ollama (default /nvme3/models)"
-	echo "  AirLLM:  install python-pytorch-rocm for weight streaming; see docs/DEVELOPER.md"
+	echo "  AirLLM:  optional — set OLLAMA_USE_AIRLLM=1 in /etc/default/ollama, then python-pytorch-rocm + pip transformers; see README-PKGBUILD.md"
 	echo "  Backends: GGML libs under /usr/lib/ollama/rocm (OLLAMA_LIBRARY_PATH is set in defaults)"
 	echo ""
 }

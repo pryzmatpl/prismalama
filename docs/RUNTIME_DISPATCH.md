@@ -8,11 +8,13 @@ When a model loads, the server spawns a subprocess: `ollama runner --model <path
 | **airllm** | Python `airllm_runner.py` + PyTorch | `AIRLLM_DEVICE` (e.g. `cuda:0` on ROCm) |
 | **ollama** | New Ollama engine path | As configured |
 
-Selection is implemented in `runner/runner.go` (`airLLMModelAndReason`). The **Modelfile name** (e.g. `qwopus`) does not select the engine; **on-disk layout** and **env** do (see table below).
+Selection is implemented in `runner/runner.go` (`airLLMModelAndReason`). The **Modelfile name** (e.g. `qwopus`) does not select the engine; **on-disk layout** and **env** do (see table below). The **Prismalama Arch package** defaults to **`OLLAMA_USE_AIRLLM=0`**: GGUF inference uses **GGML** without PyTorch/transformers unless the user opts in.
 
 ## AirLLM runner: two ports (Go proxy + Python)
 
 The AirLLM subprocess is **`runner/airllmrunner`**: a **Go** HTTP server receives **`llm.LoadRequest`** JSON from the main binary on **`port`**, and forwards **snake_case** JSON to **`airllm_runner.py`** on **`port+1`**. The Python process must **not** share the Go port (older bugs posted the proxy payload back into the Go `/load` handler and caused **`bad request`**). **`waitForReady`** polls **Python** `/health` on `port+1`.
+
+**Completion gating:** the Go proxy uses **`sync.WaitGroup`**: **`NewServer`** does **`Add(1)`** so **`completion`** blocks until the **first** **`LoadOperationCommit`** finishes (**`Done()`** on every path, including Python **`success: false`**). **Reload** (a **second** Commit on the same process) must **`Add(1)`** before **`Done()`** or the WaitGroup **panics** (`negative WaitGroup counter`), the **runner subprocess exits**, and the server looks **stuck** / **no GPU** — handled in **`runner/airllmrunner/runner.go`** with **`commitReturnedOnce`** + **`commitMu`**.
 
 ## Logs (after recent changes)
 
@@ -32,6 +34,8 @@ runner dispatch engine=airllm model=/path/to/... reason=OLLAMA_USE_AIRLLM
 
 If **`OLLAMA_USE_AIRLLM=1`** is set globally, **every** model path is routed to AirLLM unless you clear it — even for a single-file `.gguf` tree.
 
+**Disabling AirLLM:** **`OLLAMA_USE_AIRLLM=0`**, **`false`**, or **`no`** turns **off** all AirLLM routing, including **`multipart_gguf`** and **`OLLAMA_MULTI_GGUF`**. (Previously, multi-shard GGUF could still select AirLLM even when you thought AirLLM was disabled.) After that, loads use **GGML** (`engine=llama`) so ROCm/Vulkan can drive the GPU.
+
 ## Manual checks
 
 1. **Process list** — AirLLM: `python3` with `airllm_runner.py`. Llama: no Python child; `ollama runner` only.
@@ -49,9 +53,20 @@ Runners (`runner/*/runner.go`) return **400** with plain text **`bad request`** 
 
 If you see **`500`** with message **`bad request`**, check **`journalctl -u ollama`** for **`llm load error:`** / **`llm predict error:`** / **`airllm load JSON decode`** (raw bytes). Common causes: **version skew** between server and model blobs, **OOM** / runner crash (**EOF**), or a **too-large / invalid** prompt. The server also coerces **`status`** on `gin.H` errors so numeric types (e.g. `float64`) do not incorrectly force **500**.
 
+## GPU usage (AirLLM vs GGML)
+
+Two different stacks:
+
+| Path | What uses the GPU | If VRAM stays idle |
+|------|---------------------|---------------------|
+| **llama** / **ollama** (GGML) | `OLLAMA_LIBRARY_PATH` → HIP/Vulkan `.so` under `/usr/lib/ollama/rocm` | Wrong **`OLLAMA_LIBRARY_PATH`**, **`HIP_VISIBLE_DEVICES`**, or **`num_gpu`/scheduler** loading CPU-only; check logs for backend (ROCm/Vulkan). **Vulkan** backends are skipped unless **`OLLAMA_VULKAN=1`** (see `discover/runner.go`); set it if you rely on Vulkan rather than HIP. |
+| **airllm** (Python) | **PyTorch** with ROCm; **`AIRLLM_DEVICE`** (default **`cuda:0`** — ROCm uses the CUDA API name) | **CPU-only PyTorch** (no `torch.cuda.is_available()`). On Arch install **`python-pytorch-rocm`** (or your distro’s ROCm build), not plain **`python-pytorch`**. After restart, logs should show **`PyTorch: cuda.is_available=True`**. |
+
+`/etc/default/ollama` from the package sets **`HIP_VISIBLE_DEVICES`** and **`AIRLLM_DEVICE=cuda:0`**; override only if you know your layout.
+
 ## Rebuild
 
-After changing **`runner/airllmrunner`**, **`llm/`**, or **`runner/runner.go`**, rebuild the installable artifact (**`makepkg -sf`** / **`./build-rocm.sh`**) and **`sudo systemctl restart ollama`** so `/usr/bin/ollama` matches the tree.
+After changing **`runner/airllmrunner`**, **`llm/`**, or **`runner/runner.go`**, rebuild and reinstall (**e.g. `sudo makepkg -sfi`**) and **`sudo systemctl restart ollama`** so **`/usr/bin/ollama`** and packaged **`airllm_runner.py`** match the tree.
 
 ## Related
 
