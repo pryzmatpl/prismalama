@@ -1,10 +1,12 @@
 package airllmrunner
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"net"
@@ -17,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ollama/ollama/api"
 	"github.com/ollama/ollama/envconfig"
 	"github.com/ollama/ollama/llm"
 	"github.com/ollama/ollama/logutil"
@@ -25,52 +28,20 @@ import (
 
 type Server struct {
 	modelPath  string
-	port       int
+	port       int // port the Go proxy listens on (parent ollama talks here)
+	pythonPort int // Python airllm_runner.py HTTP server — must differ from port
+	pythonBase string
 	pythonCmd  *exec.Cmd
 	status     llm.ServerStatus
 	progress   float32
 	mu         sync.Mutex
 	ready      sync.WaitGroup
 	httpClient *http.Client
-	baseURL    string
-}
-
-type loadRequest struct {
-	Operation      string           `json:"operation"`
-	ModelPath      string           `json:"model_path"`
-	LoraPath       []string         `json:"lora_path"`
-	ProjectorPath  string           `json:"projector_path"`
-	Parallel       int              `json:"parallel"`
-	BatchSize      int              `json:"batch_size"`
-	KvSize         int              `json:"kv_size"`
-	KvCacheType    string           `json:"kv_cache_type"`
-	FlashAttention string           `json:"flash_attention"`
-	NumThreads     int              `json:"num_threads"`
-	MultiUserCache bool             `json:"multi_user_cache"`
-	GPULayers      ml.GPULayersList `json:"gpu_layers"`
-	MainGPU        int              `json:"main_gpu"`
-	UseMmap        bool             `json:"use_mmap"`
-}
-
-type loadResponse struct {
-	Success bool   `json:"success"`
-	Error   string `json:"error,omitempty"`
 }
 
 type statusResponse struct {
 	Status   string  `json:"status"`
 	Progress float32 `json:"progress"`
-}
-
-type completionRequest struct {
-	Prompt      string                  `json:"prompt"`
-	Images      []llm.ImageData         `json:"images"`
-	Grammar     string                  `json:"grammar"`
-	Options     *map[string]interface{} `json:"options"`
-	Logprobs    bool                    `json:"logprobs"`
-	TopLogprobs int                     `json:"top_logprobs"`
-	Shift       bool                    `json:"shift"`
-	Truncate    bool                    `json:"truncate"`
 }
 
 type completionResponse struct {
@@ -84,15 +55,87 @@ type completionResponse struct {
 	EvalDuration       int64         `json:"eval_duration"`
 }
 
+// flashAttentionForPy maps ggml flash-attn enum to strings the Python runner accepts.
+func flashAttentionForPy(f ml.FlashAttentionType) string {
+	switch f {
+	case ml.FlashAttentionAuto:
+		return "auto"
+	case ml.FlashAttentionDisabled:
+		return "disabled"
+	case ml.FlashAttentionEnabled:
+		return "enabled"
+	default:
+		return "auto"
+	}
+}
+
+// pythonLoadBody builds JSON for airllm_runner.py /load using snake_case keys and string operation.
+func pythonLoadBody(req llm.LoadRequest, modelPath string) ([]byte, error) {
+	m := map[string]any{
+		"operation":        req.Operation.String(),
+		"model_path":       modelPath,
+		"lora_path":        req.LoraPath,
+		"projector_path":   req.ProjectorPath,
+		"parallel":         req.Parallel,
+		"batch_size":       req.BatchSize,
+		"kv_size":          req.KvSize,
+		"kv_cache_type":    req.KvCacheType,
+		"flash_attention":  flashAttentionForPy(req.FlashAttention),
+		"num_threads":      req.NumThreads,
+		"multi_user_cache": req.MultiUserCache,
+		"gpu_layers":       req.GPULayers,
+		"main_gpu":         req.MainGPU,
+		"use_mmap":         req.UseMmap,
+	}
+	return json.Marshal(m)
+}
+
+func optionsToMap(o *api.Options) map[string]interface{} {
+	if o == nil {
+		return map[string]interface{}{}
+	}
+	b, err := json.Marshal(o)
+	if err != nil {
+		return map[string]interface{}{}
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(b, &m); err != nil {
+		return map[string]interface{}{}
+	}
+	return m
+}
+
+// pythonCompletionBody builds JSON for airllm_runner.py /completion (snake_case, options object).
+func pythonCompletionBody(req llm.CompletionRequest) ([]byte, error) {
+	m := map[string]any{
+		"prompt":       req.Prompt,
+		"images":       req.Images,
+		"grammar":      req.Grammar,
+		"options":      optionsToMap(req.Options),
+		"logprobs":     req.Logprobs,
+		"top_logprobs": req.TopLogprobs,
+		"shift":        req.Shift,
+		"truncate":     req.Truncate,
+	}
+	return json.Marshal(m)
+}
+
 func NewServer(modelPath string, port int) *Server {
+	// Python must bind a different port than this Go process; otherwise HTTPClient.Post
+	// to /load would hit this same handler with pythonLoadBody JSON and break llm.LoadRequest decode.
+	pyPort := port + 1
+	if pyPort > 65535 {
+		pyPort = port - 1
+	}
 	s := &Server{
-		modelPath: modelPath,
-		port:      port,
-		status:    llm.ServerStatusLaunched,
+		modelPath:  modelPath,
+		port:       port,
+		pythonPort: pyPort,
+		pythonBase: fmt.Sprintf("http://127.0.0.1:%d", pyPort),
+		status:     llm.ServerStatusLaunched,
 		httpClient: &http.Client{
 			Timeout: 0,
 		},
-		baseURL: fmt.Sprintf("http://127.0.0.1:%d", port),
 	}
 	s.ready.Add(1)
 	return s
@@ -106,7 +149,7 @@ func (s *Server) startPythonRunner() error {
 
 	cmd := exec.Command("python3", pythonRunnerPath,
 		"--model", s.modelPath,
-		"--port", strconv.Itoa(s.port),
+		"--port", strconv.Itoa(s.pythonPort),
 	)
 	cmd.Env = append(os.Environ(),
 		"AIRLLM_COMPRESSION="+os.Getenv("AIRLLM_COMPRESSION"),
@@ -130,7 +173,7 @@ func (s *Server) startPythonRunner() error {
 
 func (s *Server) waitForReady() error {
 	for i := 0; i < 60; i++ {
-		resp, err := s.httpClient.Get(s.baseURL + "/health")
+		resp, err := s.httpClient.Get(s.pythonBase + "/health")
 		if err == nil {
 			resp.Body.Close()
 			if resp.StatusCode == 200 {
@@ -178,8 +221,9 @@ func findPythonRunner() string {
 }
 
 func (s *Server) load(w http.ResponseWriter, r *http.Request) {
-	var req loadRequest
+	var req llm.LoadRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Error("airllm load JSON decode", "error", err)
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
@@ -187,27 +231,45 @@ func (s *Server) load(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	switch req.Operation {
-	case "commit":
+	case llm.LoadOperationCommit:
 		s.mu.Lock()
 		s.status = llm.ServerStatusLoadingModel
 		s.mu.Unlock()
 
 		if err := s.startPythonRunner(); err != nil {
 			slog.Error("failed to start Python runner", "error", err)
-			json.NewEncoder(w).Encode(loadResponse{Success: false, Error: err.Error()})
+			json.NewEncoder(w).Encode(llm.LoadResponse{Success: false, Error: err.Error()})
 			return
 		}
 
-		proxyReq, _ := json.Marshal(req)
-		resp, err := s.httpClient.Post(s.baseURL+"/load", "application/json", strings.NewReader(string(proxyReq)))
+		proxyReq, err := pythonLoadBody(req, s.modelPath)
 		if err != nil {
-			json.NewEncoder(w).Encode(loadResponse{Success: false, Error: err.Error()})
+			slog.Error("airllm load proxy body", "error", err)
+			json.NewEncoder(w).Encode(llm.LoadResponse{Success: false, Error: err.Error()})
+			return
+		}
+		resp, err := s.httpClient.Post(s.pythonBase+"/load", "application/json", bytes.NewReader(proxyReq))
+		if err != nil {
+			json.NewEncoder(w).Encode(llm.LoadResponse{Success: false, Error: err.Error()})
 			return
 		}
 		defer resp.Body.Close()
 
-		var pyResp loadResponse
-		json.NewDecoder(resp.Body).Decode(&pyResp)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			json.NewEncoder(w).Encode(llm.LoadResponse{Success: false, Error: err.Error()})
+			return
+		}
+		if resp.StatusCode >= 400 {
+			json.NewEncoder(w).Encode(llm.LoadResponse{Success: false, Error: strings.TrimSpace(string(body))})
+			return
+		}
+
+		var pyResp llm.LoadResponse
+		if err := json.Unmarshal(body, &pyResp); err != nil {
+			json.NewEncoder(w).Encode(llm.LoadResponse{Success: false, Error: err.Error()})
+			return
+		}
 
 		if pyResp.Success {
 			s.mu.Lock()
@@ -218,22 +280,23 @@ func (s *Server) load(w http.ResponseWriter, r *http.Request) {
 
 		json.NewEncoder(w).Encode(pyResp)
 
-	case "close":
+	case llm.LoadOperationClose:
 		if s.pythonCmd != nil && s.pythonCmd.Process != nil {
 			s.pythonCmd.Process.Kill()
 		}
-		json.NewEncoder(w).Encode(loadResponse{Success: true})
+		json.NewEncoder(w).Encode(llm.LoadResponse{Success: true})
 
 	default:
-		json.NewEncoder(w).Encode(loadResponse{Success: true})
+		json.NewEncoder(w).Encode(llm.LoadResponse{Success: true})
 	}
 }
 
 func (s *Server) completion(w http.ResponseWriter, r *http.Request) {
 	s.ready.Wait()
 
-	var req completionRequest
+	var req llm.CompletionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Error("airllm completion JSON decode", "error", err)
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
@@ -241,8 +304,13 @@ func (s *Server) completion(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Transfer-Encoding", "chunked")
 
-	proxyReq, _ := json.Marshal(req)
-	resp, err := s.httpClient.Post(s.baseURL+"/completion", "application/json", strings.NewReader(string(proxyReq)))
+	proxyReq, err := pythonCompletionBody(req)
+	if err != nil {
+		slog.Error("airllm completion proxy body", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	resp, err := s.httpClient.Post(s.pythonBase+"/completion", "application/json", bytes.NewReader(proxyReq))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

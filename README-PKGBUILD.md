@@ -29,7 +29,14 @@ sudo systemctl enable --now ollama
 
 Point models at your disk (default `/nvme3/models`); edit `/etc/default/ollama` if needed.
 
-**When to build:** after each **delivered Prismalama feature** once **integration tests** cover it. Run **`make ship-check`** (integration + `./build-rocm.sh`) or **`make ship-check-fast`** ( **`TestBlueSky` only**, no package). See **`docs/DEVELOPER.md` § Ship gate**. Bump **`pkgrel`** in **`PKGBUILD`** when releasing a new installable snapshot.
+**When to build:** after each **delivered Prismalama feature** once **integration tests** cover it, and **whenever you change Go or runner code** you intend to run system-wide (otherwise **`/usr/bin/ollama`** stays old until you reinstall). Run **`make ship-check`** (integration + `./build-rocm.sh`) or **`make ship-check-fast`** ( **`TestBlueSky` only**, no package). See **`docs/DEVELOPER.md` § Ship gate**. Bump **`pkgrel`** in **`PKGBUILD`** when releasing a new installable snapshot.
+
+```bash
+# Typical refresh after git pull
+makepkg -sf
+sudo pacman -U prismalama-ollama-*.pkg.tar.zst
+sudo systemctl restart ollama
+```
 
 ### Versioning (pacman vs upstream Ollama)
 

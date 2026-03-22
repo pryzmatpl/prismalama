@@ -978,3 +978,25 @@ func TestWaitForStream(t *testing.T) {
 		})
 	}
 }
+
+func TestHTTPStatusFromGinH(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		h    gin.H
+		want int
+	}{
+		{"missing", gin.H{"error": "x"}, http.StatusInternalServerError},
+		{"int400", gin.H{"error": "bad", "status": 400}, 400},
+		{"float64_400", gin.H{"error": "bad", "status": float64(400)}, 400},
+		{"json_number", gin.H{"error": "bad", "status": json.Number("401")}, 401},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := httpStatusFromGinH(tt.h); got != tt.want {
+				t.Fatalf("httpStatusFromGinH(%v) = %d, want %d", tt.h, got, tt.want)
+			}
+		})
+	}
+}

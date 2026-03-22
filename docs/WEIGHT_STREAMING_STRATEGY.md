@@ -1,6 +1,6 @@
 # Weight streaming strategy (Prismalama)
 
-This note compares **high-probability** directions for “weight streaming” and large-model inference. It complements `docs/DEVELOPER.md` (runner selection, AirLLM vs llama.cpp).
+This note compares **high-probability** directions for “weight streaming” and large-model inference. It complements `docs/DEVELOPER.md` (runner selection, AirLLM vs llama.cpp). For **runtime dispatch** (what actually runs for a given path: llama vs ollama engine vs AirLLM, logs), see **`docs/RUNTIME_DISPATCH.md`**.
 
 “Weight streaming” in this repo names **two different problems**:
 

@@ -490,8 +490,21 @@ type LoadRequest struct {
 }
 
 type LoadResponse struct {
-	Success bool
-	Memory  ml.BackendMemory
+	Success bool              `json:"success"`
+	Memory  ml.BackendMemory  `json:"memory,omitempty"`
+	Error   string            `json:"error,omitempty"` // runner-specific detail (e.g. AirLLM/Python); OOM often has Memory set only
+}
+
+// errLoadCommitFailed returns a user-visible error when the runner returns success=false on commit.
+// If the runner sent Error text (e.g. AirLLM), that is surfaced; otherwise legacy OOM-style messages apply.
+func errLoadCommitFailed(resp *LoadResponse, noSuccessDetail string) error {
+	if resp == nil {
+		return errors.New("model load failed: empty response")
+	}
+	if strings.TrimSpace(resp.Error) != "" {
+		return fmt.Errorf("model load failed: %s", resp.Error)
+	}
+	return errors.New(noSuccessDetail)
 }
 
 var ErrLoadRequiredFull = errors.New("unable to load full model on GPU")
@@ -706,7 +719,8 @@ func (s *llamaServer) Load(ctx context.Context, systemInfo ml.SystemInfo, system
 	}
 
 	if !resp.Success {
-		return nil, errors.New("failed to allocate memory for model")
+		slog.Warn("load commit rejected by runner", "memory", resp.Memory, "runner_error", resp.Error)
+		return nil, errLoadCommitFailed(resp, "failed to allocate memory for model")
 	}
 
 	// The llama engine does its memory allocations together with model loading, so we
@@ -893,8 +907,8 @@ nextOperation:
 	s.mem = &resp.Memory
 
 	if !success {
-		slog.Warn("failed to commit memory for model", "memory", resp.Memory)
-		return nil, errors.New("failed to commit memory for model")
+		slog.Warn("failed to commit memory for model", "memory", resp.Memory, "runner_error", resp.Error)
+		return nil, errLoadCommitFailed(resp, "failed to commit memory for model")
 	}
 
 	return uniqueDeviceIDs(gpuLayers), nil

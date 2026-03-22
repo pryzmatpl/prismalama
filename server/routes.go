@@ -624,12 +624,7 @@ func (s *Server) GenerateHandler(c *gin.Context) {
 					msg = "unexpected error format in response"
 				}
 
-				status, ok := t["status"].(int)
-				if !ok {
-					status = http.StatusInternalServerError
-				}
-
-				c.JSON(status, gin.H{"error": msg})
+				c.JSON(httpStatusFromGinH(t), gin.H{"error": msg})
 				return
 			default:
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "unexpected response"})
@@ -1748,6 +1743,35 @@ func Serve(ln net.Listener) error {
 	return nil
 }
 
+// httpStatusFromGinH returns the HTTP status from a gin.H error map (runner StatusError path).
+// Defaults to 500 when missing. Accepts int and float64 so mis-typed values do not downgrade to 500.
+func httpStatusFromGinH(h gin.H) int {
+	v, ok := h["status"]
+	if !ok {
+		return http.StatusInternalServerError
+	}
+	switch x := v.(type) {
+	case int:
+		return x
+	case int32:
+		return int(x)
+	case int64:
+		return int(x)
+	case float32:
+		return int(x)
+	case float64:
+		return int(x)
+	case json.Number:
+		i, err := x.Int64()
+		if err != nil {
+			return http.StatusInternalServerError
+		}
+		return int(i)
+	default:
+		return http.StatusInternalServerError
+	}
+}
+
 func waitForStream(c *gin.Context, ch chan any) {
 	c.Header("Content-Type", "application/json")
 	var latest api.ProgressResponse
@@ -1756,10 +1780,7 @@ func waitForStream(c *gin.Context, ch chan any) {
 		case api.ProgressResponse:
 			latest = r
 		case gin.H:
-			status, ok := r["status"].(int)
-			if !ok {
-				status = http.StatusInternalServerError
-			}
+			status := httpStatusFromGinH(r)
 			errorMsg, ok := r["error"].(string)
 			if !ok {
 				errorMsg = "unknown error"
@@ -1789,10 +1810,7 @@ func streamResponse(c *gin.Context, ch chan any) {
 		// content type for the error.
 		if h, ok := val.(gin.H); ok {
 			if e, ok := h["error"].(string); ok {
-				status, ok := h["status"].(int)
-				if !ok {
-					status = http.StatusInternalServerError
-				}
+				status := httpStatusFromGinH(h)
 
 				if !c.Writer.Written() {
 					c.Header("Content-Type", "application/json")
@@ -2427,12 +2445,7 @@ func (s *Server) ChatHandler(c *gin.Context) {
 					msg = "unexpected error format in response"
 				}
 
-				status, ok := t["status"].(int)
-				if !ok {
-					status = http.StatusInternalServerError
-				}
-
-				c.JSON(status, gin.H{"error": msg})
+				c.JSON(httpStatusFromGinH(t), gin.H{"error": msg})
 				return
 			default:
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "unexpected response"})

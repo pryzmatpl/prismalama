@@ -1314,7 +1314,7 @@ func (s *Server) load(w http.ResponseWriter, r *http.Request) {
 
 			var noMem ml.ErrNoMem
 			if errors.As(err, &noMem) {
-				resp := llm.LoadResponse{Success: false, Memory: noMem.BackendMemory}
+				resp := llm.LoadResponse{Success: false, Memory: noMem.BackendMemory, Error: noMem.Error()}
 				if err := json.NewEncoder(w).Encode(&resp); err != nil {
 					http.Error(w, fmt.Sprintf("failed to encode response: %v", err), http.StatusInternalServerError)
 				}

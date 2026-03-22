@@ -15,7 +15,7 @@ This document describes how the repository is wired so humans and automation can
 |------|------|
 | `llm/` | Ollama-compatible server: scheduling, loads, API. |
 | `runner/` | Process entry: chooses **llama** vs **AirLLM** Python runner vs other engines. |
-| `runner/airllmrunner/` | Go HTTP front + `airllm_runner.py` subprocess (PyTorch AirLLM). |
+| `runner/airllmrunner/` | Go HTTP front on **`port`** + `airllm_runner.py` on **`port+1`** (PyTorch AirLLM); see **`docs/RUNTIME_DISPATCH.md` § AirLLM runner**. |
 | `ml/` | GGML backends (CUDA, ROCm, **Vulkan**, Metal, CPU). |
 | `src/airllm/air_llm/` | Vendored/custom AirLLM Python package (`airllm` on `PYTHONPATH`). |
 | `integration/` | Tag-gated Go integration tests (`//go:build integration`). |
@@ -103,7 +103,7 @@ The **default GGUF path** is **llama.cpp** embedded under `llama/` (Go bindings 
 
 **Arch Linux / global deploys:** pin `FETCH_HEAD` in `Makefile.sync` to a **commit SHA** for reproducible binaries; branch names are fine for development only.
 
-**Arch package (this repo):** root **`PKGBUILD`** builds Prismalama from source (CMake GGML CPU/HIP/Vulkan → `/usr/lib/ollama/rocm`, Go `ollama`, AirLLM under `/usr/share/ollama`). Run **`makepkg -sf`** or **`./build-rocm.sh`**; see **`README-PKGBUILD.md`**. Set **`PRISMALAMA_AMDGPU_TARGETS`** before `makepkg` if not `gfx1100`.
+**Arch package (this repo):** root **`PKGBUILD`** builds Prismalama from source (CMake GGML CPU/HIP/Vulkan → `/usr/lib/ollama/rocm`, Go `ollama`, AirLLM under `/usr/share/ollama`). Run **`makepkg -sf`** or **`./build-rocm.sh`**; see **`README-PKGBUILD.md`**. Set **`PRISMALAMA_AMDGPU_TARGETS`** before `makepkg` if not `gfx1100`. After any change to **Go runners** or **`llm/`**, rebuild and reinstall the package, then **`sudo systemctl restart ollama`** — a stale **`/usr/bin/ollama`** will not pick up fixes.
 
 **Submodule note:** `src/ollama` may still ship its own `Makefile.sync` from upstream Ollama. Align it with the Prismalama fork when you merge the submodule or build from a unified tree.
 
