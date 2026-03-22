@@ -336,6 +336,16 @@ nextVar:
 	return out
 }
 
+// hipVisibleDeviceIndexForSingleROCR returns the HIP device index to export when
+// ROCR_VISIBLE_DEVICES selects exactly one device (no comma-separated list).
+// Empty means do not append HIP_VISIBLE_DEVICES in StartRunner.
+func hipVisibleDeviceIndexForSingleROCR(goos, rocr string) string {
+	if goos != "linux" || rocr == "" || strings.Contains(rocr, ",") {
+		return ""
+	}
+	return "0"
+}
+
 func StartRunner(ollamaEngine bool, modelPath string, gpuLibs []string, out io.Writer, extraEnvs map[string]string) (cmd *exec.Cmd, port int, err error) {
 	var exe string
 	exe, err = os.Executable()
@@ -454,6 +464,12 @@ func StartRunner(ollamaEngine bool, modelPath string, gpuLibs []string, out io.W
 	// scheduler's ROCR selection for the child process.
 	if rocr, ok := extraEnvs["ROCR_VISIBLE_DEVICES"]; ok && rocr != "" {
 		cmd.Env = stripEnvKeys(cmd.Env, []string{"HIP_VISIBLE_DEVICES", "GPU_DEVICE_ORDINAL"})
+		// After ROCr filters to one GPU, HIP still needs a stable device index.
+		// Without this, some stacks report "no ROCm-capable device" in ggml even
+		// though Vulkan works — pin the first (only) visible HIP device.
+		if hipIdx := hipVisibleDeviceIndexForSingleROCR(runtime.GOOS, rocr); hipIdx != "" {
+			cmd.Env = append(cmd.Env, "HIP_VISIBLE_DEVICES="+hipIdx)
+		}
 	}
 
 	slog.Info("starting runner", "cmd", cmd)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -278,4 +279,32 @@ func TestLLMServerCompletionFormat(t *testing.T) {
 		Format:  nil, // missing format
 	}, nil)
 	checkValid(err)
+}
+
+func TestStripEnvKeys(t *testing.T) {
+	env := []string{"PATH=/bin", "HIP_VISIBLE_DEVICES=1", "FOO=bar", "hip_visible_devices=2", "GPU_DEVICE_ORDINAL=3"}
+	got := stripEnvKeys(env, []string{"HIP_VISIBLE_DEVICES", "GPU_DEVICE_ORDINAL"})
+	want := []string{"PATH=/bin", "FOO=bar"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("got %#v want %#v", got, want)
+	}
+}
+
+func TestHipVisibleDeviceIndexForSingleROCR(t *testing.T) {
+	tests := []struct {
+		goos, rocr string
+		want       string
+	}{
+		{"linux", "0000:03:00.0", "0"},
+		{"linux", "0", "0"},
+		{"linux", "0,1", ""},
+		{"linux", "", ""},
+		{"windows", "0", ""},
+		{"darwin", "0000:03:00.0", ""},
+	}
+	for _, tt := range tests {
+		if got := hipVisibleDeviceIndexForSingleROCR(tt.goos, tt.rocr); got != tt.want {
+			t.Errorf("goos=%q rocr=%q: got %q want %q", tt.goos, tt.rocr, got, tt.want)
+		}
+	}
 }
