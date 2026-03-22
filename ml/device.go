@@ -519,11 +519,13 @@ func (f FlashAttentionType) String() string {
 }
 
 // rocrVisibleDeviceToken picks a value for ROCR_VISIBLE_DEVICES that HIP/ROCr
-// accept. GGML often reports PCI BDF strings (e.g. 0000:0b:00.0); those are
-// not reliably parsed the same way in the runner subprocess as in discovery,
-// which can yield zero HIP devices and a Vulkan fallback. Numeric indices are
-// reliable for the common single-GPU runner.
-func rocrVisibleDeviceToken(d DeviceInfo, listLen int) string {
+// accept. GGML reports either numeric indices or PCI BDF / GPU-uuid strings.
+// Always preserve non-numeric IDs: mapping PCI ids to "0" breaks multi-GPU
+// AMD systems where ROCR device 0 is an iGPU/APU and the discrete card is
+// another index — the runner would then see the wrong GPU or no offload.
+// Conflicts between user HIP_VISIBLE_DEVICES and ROCR are handled in StartRunner
+// (strip user HIP when the scheduler sets ROCR).
+func rocrVisibleDeviceToken(d DeviceInfo) string {
 	if d.FilterID != "" {
 		if _, err := strconv.Atoi(d.FilterID); err == nil {
 			return d.FilterID
@@ -531,9 +533,6 @@ func rocrVisibleDeviceToken(d DeviceInfo, listLen int) string {
 	}
 	if _, err := strconv.Atoi(d.ID); err == nil {
 		return d.ID
-	}
-	if listLen == 1 {
-		return "0"
 	}
 	return d.ID
 }
@@ -546,9 +545,8 @@ func GetVisibleDevicesEnv(l []DeviceInfo, mustFilter bool) map[string]string {
 		return nil
 	}
 	env := map[string]string{}
-	listLen := len(l)
 	for _, d := range l {
-		d.updateVisibleDevicesEnv(env, mustFilter, listLen)
+		d.updateVisibleDevicesEnv(env, mustFilter)
 	}
 	return env
 }
@@ -580,7 +578,7 @@ func (d DeviceInfo) PreferredLibrary(other DeviceInfo) bool {
 	return false
 }
 
-func (d DeviceInfo) updateVisibleDevicesEnv(env map[string]string, mustFilter bool, listLen int) {
+func (d DeviceInfo) updateVisibleDevicesEnv(env map[string]string, mustFilter bool) {
 	var envVar string
 	switch d.Library {
 	case "ROCm":
@@ -606,7 +604,7 @@ func (d DeviceInfo) updateVisibleDevicesEnv(env map[string]string, mustFilter bo
 	}
 	switch d.Library {
 	case "ROCm":
-		v = v + rocrVisibleDeviceToken(d, listLen)
+		v = v + rocrVisibleDeviceToken(d)
 	default:
 		if d.FilterID != "" {
 			v = v + d.FilterID

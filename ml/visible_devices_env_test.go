@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestGetVisibleDevicesEnvROCmPCIFallback(t *testing.T) {
+func TestGetVisibleDevicesEnvROCmPCIUsesID(t *testing.T) {
 	t.Parallel()
 	gpus := []DeviceInfo{
 		{
@@ -16,7 +16,7 @@ func TestGetVisibleDevicesEnvROCmPCIFallback(t *testing.T) {
 		},
 	}
 	got := GetVisibleDevicesEnv(gpus, true)
-	want := map[string]string{"ROCR_VISIBLE_DEVICES": "0"}
+	want := map[string]string{"ROCR_VISIBLE_DEVICES": "0000:0b:00.0"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("GetVisibleDevicesEnv: got %#v want %#v", got, want)
 	}
