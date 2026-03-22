@@ -911,7 +911,7 @@ func (s *Server) load(w http.ResponseWriter, r *http.Request) {
 		sort.Sort(req.GPULayers)
 		for _, layers := range req.GPULayers {
 			for i := range gpuIDs {
-				if gpuIDs[i].DeviceID == layers.DeviceID {
+				if gpuIDs[i].DeviceID.MatchesForOffload(layers.DeviceID) {
 					numGPU += len(layers.Layers)
 					tensorSplit = append(tensorSplit, float32(len(layers.Layers)))
 					llamaIDs = append(llamaIDs, gpuIDs[i].LlamaID)

@@ -141,6 +141,20 @@ type DeviceID struct {
 	Library string `json:"backend,omitempty"`
 }
 
+// MatchesForOffload returns true if a and b refer to the same accelerator for
+// ggml layer offload. The scheduler may tag a device as ROCm/CUDA while the
+// runner's EnumerateGPUs reports Vulkan (e.g. HIP init failed); matching on ID
+// (e.g. PCI BDF) still binds the planned layers to the same physical GPU.
+func (a DeviceID) MatchesForOffload(b DeviceID) bool {
+	if a == b {
+		return true
+	}
+	if a.ID != "" && a.ID == b.ID {
+		return true
+	}
+	return false
+}
+
 // DeviceMemory provides a breakdown of the memory needed
 // per device, such as a CPU or GPU.
 type DeviceMemory struct {
