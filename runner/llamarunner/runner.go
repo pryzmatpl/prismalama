@@ -919,6 +919,17 @@ func (s *Server) load(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		if planned := req.GPULayers.Sum(); planned > 0 && numGPU == 0 {
+			if len(gpuIDs) == 0 {
+				slog.Warn("GPU offload dropped: ggml enumerated zero devices while scheduler planned GPU layers",
+					"planned_layers", planned, "schedule", req.GPULayers)
+				slog.Info("if HIP/ROCm failed to initialize, set OLLAMA_VULKAN=1 to enable Vulkan backends on Linux (experimental)")
+			} else {
+				slog.Warn("GPU offload dropped: scheduler device IDs did not match any ggml device",
+					"planned_layers", planned, "ggml_devices", gpuIDs, "schedule", req.GPULayers)
+			}
+		}
+
 		params := llama.ModelParams{
 			Devices:      llamaIDs,
 			NumGpuLayers: numGPU,
