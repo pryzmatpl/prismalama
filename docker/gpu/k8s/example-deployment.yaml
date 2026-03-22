@@ -1,0 +1,78 @@
+# Example: Prismalama on Kubernetes with AMD GPU (adjust for your device plugin and storage).
+#
+#   kubectl apply -f docker/gpu/k8s/example-deployment.yaml
+#
+# Prerequisites: AMD GPU device plugin, node with AMD GPU, image pushed to a registry your cluster can pull.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prismalama
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prismalama
+  namespace: prismalama
+  labels:
+    app: prismalama
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prismalama
+  template:
+    metadata:
+      labels:
+        app: prismalama
+    spec:
+      containers:
+        - name: ollama
+          # Replace with your built registry image
+          image: prismalama-gpu
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 11434
+              name: http
+              protocol: TCP
+          env:
+            - name: OLLAMA_HOST
+              value: "0.0.0.0:11434"
+            - name: HIP_VISIBLE_DEVICES
+              value: "0"
+            - name: OLLAMA_LIBRARY_PATH
+              value: "/usr/lib/ollama/rocm"
+            # Optional: set if your GPU needs an override (gfx11, etc.)
+            # - name: HSA_OVERRIDE_GFX_VERSION
+            #   value: "11.0.0"
+          resources:
+            limits:
+              # Resource name depends on your AMD GPU device plugin (amd.com/gpu, rocm/gpu, …)
+              amd.com/gpu: "1"
+            requests:
+              amd.com/gpu: "1"
+          volumeMounts:
+            - name: models
+              mountPath: /models
+          # Uncomment if your cluster requires it for GPU access:
+          # securityContext:
+          #   privileged: true
+      volumes:
+        - name: models
+          emptyDir: {}
+          # Prefer PVC for persistent models:
+          # persistentVolumeClaim:
+          #   claimName: prismalama-models
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prismalama
+  namespace: prismalama
+spec:
+  selector:
+    app: prismalama
+  ports:
+    - port: 11434
+      targetPort: 11434
+      name: http

@@ -1,66 +1,46 @@
-# Ollama with AirLLM and ROCm Support
+# Prismalama Arch package (`PKGBUILD`)
 
-This package provides Ollama built from source with AirLLM integration and ROCm GPU acceleration for AMD RX 7900 XTX (gfx1100).
+This tree ships **`PKGBUILD`** at the repository root that builds **this** codebase (prismallama.cpp / GGML via CMake, Go `ollama` binary, AirLLM runner assets)—**not** upstream release tarballs.
 
-## Features
+## What you get
 
-- **ROCm Support**: Full GPU acceleration for AMD RX 7900 XTX (gfx1100)
-- **AirLLM Integration**: Automatic offloading of large models when VRAM is insufficient
-- **Layer-by-Layer Inference**: Only loads necessary layers into GPU memory
-- **4-bit Compression**: Default compression for reduced memory usage
-- **Safetensors Support**: Native support for safetensors format models
-- **Opencode Integration**: Works seamlessly with opencode for AI assistance
+- **GGML**: CPU + **ROCm HIP** + **Vulkan** shared backends installed under `/usr/lib/ollama/rocm` (see `OLLAMA_RUNNER_DIR` in `CMakeLists.txt`).
+- **Go binary**: `ollama` with `version.Version` stamped as `prismalama`.
+- **AirLLM**: `airllm_runner.py` and `src/airllm/air_llm` → `/usr/share/ollama/` for weight streaming / multi-part GGUF paths (install `python-pytorch-rocm` etc. as needed).
+- **systemd** + **`/etc/default/ollama`**: `OLLAMA_MODELS=/nvme3/models`, `OLLAMA_LIBRARY_PATH=/usr/lib/ollama/rocm`, `OLLAMA_USE_AIRLLM=1`, ROCm env vars.
 
-## Hardware Requirements
-
-- AMD RX 7900 XTX or compatible GPU (gfx1100 architecture)
-- ROCm 6.x or later
-- 16GB+ VRAM recommended
-- 32GB+ RAM for large model offloading
-
-## Quick Start
-
-### Option 1: Use the Build Script (Recommended)
+## Quick start (recommended)
 
 ```bash
-# Full build process
-./build-all.sh
+# Optional: refresh vendored llama.cpp + ggml (pin FETCH_HEAD in Makefile.sync)
+make -f Makefile.sync sync
 
-# Or step by step
-./build-all.sh check      # Check prerequisites
-./build-all.sh prepare    # Clone sources
-./build-all.sh build      # Build from source
-./build-all.sh package    # Create package
-./build-all.sh pkgbuild   # Build pacman package
-./build-all.sh install    # Install locally
+# Install build deps (Arch)
+sudo pacman -S --needed rocm-hip-sdk rocm-hip-runtime go cmake ninja gcc vulkan-headers vulkan-icd-loader
+
+# Faster link for a single GPU ISA (example: RX 7900 class)
+export PRISMALAMA_AMDGPU_TARGETS=gfx1100
+
+./build-rocm.sh
+# or: makepkg -sf
+sudo pacman -U prismalama-ollama-*.pkg.tar.zst
+sudo systemctl enable --now ollama
 ```
 
-### Option 2: Use makepkg Directly
+Point models at your disk (default `/nvme3/models`); edit `/etc/default/ollama` if needed.
 
-```bash
-# Install dependencies first
-sudo pacman -S rocm-hip-sdk go cmake git python-pytorch-rocm python-transformers python-safetensors
+**When to build:** after each **delivered Prismalama feature** once **integration tests** cover it. Run **`make ship-check`** (integration + `./build-rocm.sh`) or **`make ship-check-fast`** ( **`TestBlueSky` only**, no package). See **`docs/DEVELOPER.md` § Ship gate**. Bump **`pkgrel`** in **`PKGBUILD`** when releasing a new installable snapshot.
 
-# Build with makepkg
-makepkg -si
-```
+## Hardware
 
-### Option 3: Manual Installation
+- AMD GPU with ROCm (override `PRISMALAMA_AMDGPU_TARGETS` before `makepkg` if not `gfx1100`).
+- Large quantized GGUF or AirLLM-capable layouts: see `docs/DEVELOPER.md`.
 
-```bash
-# Build
-cd src/ollama
-mkdir build && cd build
-cmake .. -DLLAMA_HIPBLAS=ON -DAMDGPU_TARGETS=gfx1100
-cmake --build . -j$(nproc)
-cd ..
-go build -o ollama .
+---
 
-# Install manually
-sudo cp ollama /usr/bin/
-sudo cp -r build/lib/ollama/* /usr/lib/ollama/
-sudo systemctl daemon-reload
-```
+## Legacy / alternate notes (older scripts)
+
+The sections below describe older `build-all.sh` flows and manual `src/ollama` cmake paths; **prefer `makepkg` + root `PKGBUILD`** above.
 
 ## Configuration
 

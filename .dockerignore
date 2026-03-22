@@ -1,11 +1,10 @@
-.vscode
-ollama
-app
-macapp
-dist
-build
-.env
-.cache
-test_data
 .git
-
+**/.git
+build
+build_*
+*.pkg.tar.zst
+**/node_modules
+.cursor
+*.gguf
+# Shrink context: vendored git objects (sync via Makefile.sync on demand)
+llama/vendor/.git

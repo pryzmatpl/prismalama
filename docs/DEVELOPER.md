@@ -81,6 +81,12 @@ go tool cover -func=/tmp/integration.cov | tail -5
 
 See `integration/TEST_README.md` for the full table and env vars.
 
+## Ship gate (feature → package)
+
+For every **promised Prismalama feature**: (1) land the code, (2) **prove it with integration tests** (`go test -tags=integration …` plus any extra tags/env that feature needs), (3) **build the Arch package** from the repo root (`./build-rocm.sh` or `makepkg -sf`; see **`README-PKGBUILD.md`**). Bump **`pkgrel`** (or **`pkgver`**) in **`PKGBUILD`** when the shipped artifact should change.
+
+**Automation:** **`make ship-check`** runs **`scripts/ship-check.sh`** (integration, then `build-rocm.sh`). **`make ship-check-fast`** runs **`TestBlueSky` only** and skips the package. Env: **`SHIP_SKIP_PKG=1`** (tests only), **`SHIP_GO_TEST_EXTRA`** (e.g. `-run TestFoo`), **`SHIP_INTEGRATION_TIMEOUT`**.
+
 ## Python AirLLM from a git checkout
 
 The packaged install uses `/usr/share/ollama/airllm`. For development, `runner/airllmrunner/runner.go` prepends `../../src/airllm/air_llm` next to the runner when that tree exists so `import airllm` resolves to the repo copy.
@@ -97,11 +103,24 @@ The **default GGUF path** is **llama.cpp** embedded under `llama/` (Go bindings 
 
 **Arch Linux / global deploys:** pin `FETCH_HEAD` in `Makefile.sync` to a **commit SHA** for reproducible binaries; branch names are fine for development only.
 
+**Arch package (this repo):** root **`PKGBUILD`** builds Prismalama from source (CMake GGML CPU/HIP/Vulkan → `/usr/lib/ollama/rocm`, Go `ollama`, AirLLM under `/usr/share/ollama`). Run **`makepkg -sf`** or **`./build-rocm.sh`**; see **`README-PKGBUILD.md`**. Set **`PRISMALAMA_AMDGPU_TARGETS`** before `makepkg` if not `gfx1100`.
+
 **Submodule note:** `src/ollama` may still ship its own `Makefile.sync` from upstream Ollama. Align it with the Prismalama fork when you merge the submodule or build from a unified tree.
+
+## Docker
+
+| Image / target | Dockerfile | Role |
+|----------------|------------|------|
+| `prismalama-test` | `docker/test/Dockerfile` | **CPU-only** GGML + `ollama` for CI and **`make ship-check-fast`** (no GPU). |
+| `prismalama-gpu` | `docker/gpu/Dockerfile` | **AMD ROCm (HIP) + Vulkan + CPU** GGML under `/usr/lib/ollama/rocm`, same layout as the Arch package; for bare-metal GPU or Kubernetes with an AMD GPU device plugin. |
+
+Build/run: **`make docker-test-build`** / **`make docker-test`** vs **`make docker-gpu-build`** / **`make docker-gpu-run`**. Kubernetes notes and example manifests: **`docker/gpu/README.md`**, **`docker/gpu/k8s/example-deployment.yaml`**.
 
 ## Related docs
 
 - `ARCHITECTURE.md` — diagrams and component list.
 - `README.md` — user-facing overview.
+- `README-PKGBUILD.md` — Arch **`prismalama-ollama`** package build.
 - `llama/README.md` — vendoring **prismallama.cpp** into `llama/`.
 - `integration/TEST_README.md` — test tags and hardware expectations.
+- `docker/gpu/README.md` — AMD GPU container (ROCm HIP + Vulkan) and Kubernetes.

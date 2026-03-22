@@ -1,0 +1,28 @@
+# Isolated test runner (CPU GGML + Vulkan if available in image).
+# Usage:
+#   docker compose -f docker-compose.test.yml run --rm test
+#   docker compose -f docker-compose.test.yml run --rm test make ship-check
+#
+# Optional GPU (ROCm): export PRISMALAMA_DOCKER_GPU=1 and pass devices (see scripts/docker-test.sh).
+
+services:
+  test:
+    build:
+      context: .
+      dockerfile: docker/test/Dockerfile
+    image: prismalama-test
+    working_dir: /workspace
+    volumes:
+      - .:/workspace:rw
+      - prismalama-gomod:/go/pkg/mod
+      - prismalama-gocache:/root/.cache/go-build
+    environment:
+      CGO_ENABLED: "1"
+      OLLAMA_BIN: /usr/bin/ollama
+      OLLAMA_LIBRARY_PATH: /usr/lib/ollama
+      LD_LIBRARY_PATH: /usr/lib/ollama
+    command: ["make", "ship-check-fast"]
+
+volumes:
+  prismalama-gomod:
+  prismalama-gocache:
