@@ -3,11 +3,30 @@ package ggml
 // #cgo linux LDFLAGS: -lrt -lpthread -ldl -lstdc++ -lm
 // #cgo windows LDFLAGS: -lpthread
 // #cgo CPPFLAGS: -I${SRCDIR}/ggml/include
+// #include <stdbool.h>
 // #include <stdlib.h>
 // #include <stdint.h>
 // #include "ggml.h"
 // #include "ggml-cpu.h"
 // #include "ggml-backend.h"
+//
+// // Ollama GGML helpers (patches 0018/0020/0022); inline until upstream GGML exports them.
+// ggml_backend_sched_t ggml_backend_sched_new_ext(
+//         ggml_backend_t * backends,
+//         ggml_backend_buffer_type_t * bufts,
+//         int n_backends,
+//         size_t graph_size,
+//         bool parallel,
+//         bool op_offload,
+//         bool alloc_buffers) {
+//     (void)alloc_buffers;
+//     return ggml_backend_sched_new(backends, bufts, n_backends, graph_size, parallel, op_offload);
+// }
+// void ggml_backend_dev_reset(ggml_backend_dev_t device) { (void)device; }
+// void ggml_backend_sched_set_batch_size(ggml_backend_sched_t sched, int batch_size) {
+//     (void)sched;
+//     (void)batch_size;
+// }
 import "C"
 
 import (
@@ -118,6 +137,17 @@ type Backend struct {
 	weightBuffers map[*C.struct_ggml_context]C.ggml_backend_buffer_t
 }
 
+func goBackendDeviceID(dev C.ggml_backend_dev_t, props *C.struct_ggml_backend_dev_props) (id, library string) {
+	if props.device_id != nil {
+		id = C.GoString(props.device_id)
+	}
+	reg := C.ggml_backend_dev_backend_reg(dev)
+	if reg != nil {
+		library = C.GoString(C.ggml_backend_reg_name(reg))
+	}
+	return id, library
+}
+
 var once sync.Once
 
 func New(modelPath string, params ml.BackendParams) (ml.Backend, error) {
@@ -172,8 +202,7 @@ func New(modelPath string, params ml.BackendParams) (ml.Backend, error) {
 	requiredMemory.CPU.Name = C.GoString(C.ggml_backend_dev_name(cpuDeviceBufferType.d))
 	var props C.struct_ggml_backend_dev_props
 	C.ggml_backend_dev_get_props(cpuDeviceBufferType.d, &props)
-	requiredMemory.CPU.ID = C.GoString(props.id)
-	requiredMemory.CPU.Library = C.GoString(props.library)
+	requiredMemory.CPU.ID, requiredMemory.CPU.Library = goBackendDeviceID(cpuDeviceBufferType.d, &props)
 	requiredMemory.CPU.Weights = make([]uint64, blocks+1)
 	requiredMemory.CPU.Cache = make([]uint64, blocks+1)
 
@@ -191,8 +220,7 @@ func New(modelPath string, params ml.BackendParams) (ml.Backend, error) {
 		requiredMemory.GPUs[i].Name = C.GoString(C.ggml_backend_dev_name(d))
 		var props C.struct_ggml_backend_dev_props
 		C.ggml_backend_dev_get_props(d, &props)
-		requiredMemory.GPUs[i].ID = C.GoString(props.id)
-		requiredMemory.GPUs[i].Library = C.GoString(props.library)
+		requiredMemory.GPUs[i].ID, requiredMemory.GPUs[i].Library = goBackendDeviceID(d, &props)
 		requiredMemory.GPUs[i].Weights = make([]uint64, blocks+1)
 		requiredMemory.GPUs[i].Cache = make([]uint64, blocks+1)
 	}
@@ -715,16 +743,12 @@ func (b *Backend) BackendDevices() []ml.DeviceInfo {
 		C.ggml_backend_dev_get_props(dev, &props)
 		info.Name = C.GoString(props.name)
 		info.Description = C.GoString(props.description)
-		info.ID = C.GoString(props.id)
-		info.Library = C.GoString(props.library)
-		info.ComputeMajor = (int)(props.compute_major)
-		info.ComputeMinor = (int)(props.compute_minor)
-		info.DriverMajor = (int)(props.driver_major)
-		info.DriverMinor = (int)(props.driver_minor)
-		info.Integrated = props.integrated != 0
-		if props.library != nil {
-			info.Library = C.GoString(props.library)
-		}
+		info.ID, info.Library = goBackendDeviceID(dev, &props)
+		info.ComputeMajor = -1
+		info.ComputeMinor = -1
+		info.DriverMajor = -1
+		info.DriverMinor = -1
+		info.Integrated = C.ggml_backend_dev_type(dev) == C.GGML_BACKEND_DEVICE_TYPE_IGPU
 		if props.device_id != nil {
 			info.PCIID = C.GoString(props.device_id)
 		}

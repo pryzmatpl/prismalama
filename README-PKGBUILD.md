@@ -319,6 +319,9 @@ MIT License - See LICENSE file for details.
 
 ## Support
 
-- Ollama: https://github.com/ollama/ollama
+- Prismalama GGUF engine (llama.cpp fork): https://github.com/piotroxp/prismallama.cpp
+- Ollama (upstream): https://github.com/ollama/ollama
 - AirLLM: https://github.com/lyogavin/AirLLM
 - ROCm: https://rocm.docs.amd.com/
+
+Source builds should sync the vendored engine via `make -f Makefile.sync …` (see `llama/README.md`) and pin `FETCH_HEAD` for reproducible packages.

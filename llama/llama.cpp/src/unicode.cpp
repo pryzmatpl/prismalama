@@ -12,9 +12,9 @@
 
 #include <algorithm>
 #include <cassert>
-#include <codecvt>
 #include <cstddef>
 #include <cstdint>
+#include <codecvt>
 #include <locale>
 #include <map>
 #include <regex>
@@ -518,49 +518,26 @@ static std::vector<size_t> unicode_regex_split_custom_llama3(const std::string &
     return bpe_offsets;
 }
 
-// use std::wregex to split the text
-static std::vector<size_t> unicode_regex_split_stl(const std::wstring & wtext, const std::wstring & regex_expr, const std::vector<size_t> & offsets) {
-    std::wregex expr(regex_expr, std::regex_constants::optimize | std::regex_constants::nosubs);
+template <typename CharT>
+static std::vector<size_t> unicode_regex_split_stl(const std::basic_string<CharT> & text, const std::basic_string<CharT> & regex, const std::vector<size_t> & offsets) {
+    using BidirIt = typename std::basic_string<CharT>::const_iterator;
+#ifdef _MSC_VER
+    // Bypass bug in MSVC: https://github.com/ggml-org/llama.cpp/issues/17830
+    constexpr auto regex_flags = std::regex_constants::ECMAScript;
+#else
+    constexpr auto regex_flags = std::regex_constants::optimize | std::regex_constants::nosubs;
+#endif
+    std::basic_regex<CharT> expr(regex, regex_flags);
     std::vector<size_t> bpe_offsets; // store the offset of each word
     bpe_offsets.reserve(offsets.size()); // Reserve memory for the approximate size
     size_t start = 0;
     for (auto offset : offsets) {
-        std::wcregex_iterator it(wtext.data() + start, wtext.data() + start + offset, expr);
-        std::wcregex_iterator end;
+        std::regex_iterator<BidirIt> it(text.begin() + start, text.begin() + start + offset, expr);
+        std::regex_iterator<BidirIt> end;
 
         int64_t start_idx = 0;
         while (it != end) {
-            std::wcmatch match = *it;
-            if (match.position() > start_idx) {
-                bpe_offsets.emplace_back(match.position() - start_idx);
-            }
-            bpe_offsets.emplace_back(match.length());
-            start_idx = match.position() + match.length();
-            ++it;
-        }
-
-        if (start_idx < (int64_t) offset) {
-            bpe_offsets.emplace_back(offset - start_idx);
-        }
-        start += offset;
-    }
-
-    return bpe_offsets;
-}
-
-// use std::regex to split the text
-static std::vector<size_t> unicode_regex_split_stl(const std::string & text, const std::string & regex_expr, const std::vector<size_t> & offsets) {
-    std::regex expr(regex_expr, std::regex_constants::optimize | std::regex_constants::nosubs);
-    std::vector<size_t> bpe_offsets; // store the offset of each word
-    bpe_offsets.reserve(offsets.size()); // Reserve memory for the approximate size
-    size_t start = 0;
-    for (auto offset : offsets) {
-        std::cregex_iterator it(text.data() + start, text.data() + start + offset, expr);
-        std::cregex_iterator end;
-
-        int64_t start_idx = 0;
-        while (it != end) {
-            std::cmatch match = *it;
+            std::match_results<BidirIt> match = *it;
             if (match.position() > start_idx) {
                 bpe_offsets.emplace_back(match.position() - start_idx);
             }
@@ -840,6 +817,12 @@ static std::vector<size_t> unicode_regex_split_custom(const std::string & text, 
     } else if (regex_expr == "\\p{AFMoE_digits}") {
         // AFMOE digit pattern - use custom implementation for proper splitting
         bpe_offsets = unicode_regex_split_custom_afmoe(text, offsets);
+    } else if (regex_expr == "\\d{1,3}(?=(?:\\d{3})*\\b)") {
+        // tiny_aya digit grouping pattern from tokenizer.json:
+        //   {"type": "Split", "pattern": {"Regex": "\\d{1,3}(?=(?:\\d{3})*\\b)"}, "behavior": "Isolated"}
+        // Splits digits into groups of 3 from the right (e.g., 1234567 -> 1, 234, 567)
+        // TODO: Revisit this regex, in case there are any subtle tokenization differences with the original regex.
+        bpe_offsets = unicode_regex_split_custom_afmoe(text, offsets);
     }
 
     return bpe_offsets;
@@ -985,6 +968,11 @@ std::vector<std::string> unicode_regex_split(const std::string & text, const std
         { "\\p{P}", unicode_cpt_flags::PUNCTUATION },
         { "\\p{M}", unicode_cpt_flags::ACCENT_MARK },
         { "\\p{S}", unicode_cpt_flags::SYMBOL },
+        { "\\p{Lu}", unicode_cpt_flags::LETTER }, // Uppercase letter
+        { "\\p{Ll}", unicode_cpt_flags::LETTER }, // Lowercase letter
+        { "\\p{Lt}", unicode_cpt_flags::LETTER }, // Titlecase letter
+        { "\\p{Lm}", unicode_cpt_flags::LETTER }, // Modifier letter
+        { "\\p{Lo}", unicode_cpt_flags::LETTER }, // Other letter
     };
 
     static const std::map<int, int> k_ucat_cpt = {
@@ -1067,10 +1055,10 @@ std::vector<std::string> unicode_regex_split(const std::string & text, const std
                     break;
                 }
             }
+            const auto cpts_regex = unicode_cpts_from_utf8(regex_expr);
 
             if (use_collapsed) {
                 // sanity-check that the original regex does not contain any non-ASCII characters
-                const auto cpts_regex = unicode_cpts_from_utf8(regex_expr);
                 for (size_t i = 0; i < cpts_regex.size(); ++i) {
                     if (cpts_regex[i] >= 128) {
                         throw std::runtime_error("Regex includes both unicode categories and non-ASCII characters - not supported");
@@ -1095,22 +1083,26 @@ std::vector<std::string> unicode_regex_split(const std::string & text, const std
                         continue;
                     }
 
-                    if (regex_expr[i + 0] == '\\' && i + 4 < regex_expr.size() &&
+                    // Match \p{...} Unicode properties of varying lengths
+                    if (regex_expr[i + 0] == '\\' && i + 3 < regex_expr.size() &&
                         regex_expr[i + 1] == 'p' &&
-                        regex_expr[i + 2] == '{' &&
-                        regex_expr[i + 4] == '}') {
-                        const std::string pat = regex_expr.substr(i, 5);
-                        if (k_ucat_enum.find(pat) != k_ucat_enum.end()) {
-                            if (!inside) {
-                                regex_expr_collapsed += '[';
+                        regex_expr[i + 2] == '{') {
+                        // Find the closing brace
+                        size_t closing_brace = regex_expr.find('}', i + 3);
+                        if (closing_brace != std::string::npos && closing_brace <= i + 10) { // reasonable limit
+                            const std::string pat = regex_expr.substr(i, closing_brace - i + 1);
+                            if (k_ucat_enum.find(pat) != k_ucat_enum.end()) {
+                                if (!inside) {
+                                    regex_expr_collapsed += '[';
+                                }
+                                regex_expr_collapsed += k_ucat_cpt.at(k_ucat_enum.at(pat));
+                                regex_expr_collapsed += k_ucat_map.at(k_ucat_enum.at(pat));
+                                if (!inside) {
+                                    regex_expr_collapsed += ']';
+                                }
+                                i = closing_brace;
+                                continue;
                             }
-                            regex_expr_collapsed += k_ucat_cpt.at(k_ucat_enum.at(pat));
-                            regex_expr_collapsed += k_ucat_map.at(k_ucat_enum.at(pat));
-                            if (!inside) {
-                                regex_expr_collapsed += ']';
-                            }
-                            i += 4;
-                            continue;
                         }
                     }
 
@@ -1122,7 +1114,7 @@ std::vector<std::string> unicode_regex_split(const std::string & text, const std
                 bpe_offsets = unicode_regex_split_stl(text_collapsed, regex_expr_collapsed, bpe_offsets);
             } else {
                 // no unicode category used, we can use std::wregex directly
-                const std::wstring wregex_expr = unicode_wstring_from_utf8(regex_expr);
+                std::wstring wregex_expr(cpts_regex.begin(), cpts_regex.end());
 
                 // std::wregex \s does not mach non-ASCII whitespaces, using 0x0B as fallback
                 std::wstring wtext(cpts.begin(), cpts.end());

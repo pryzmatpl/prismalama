@@ -1,6 +1,8 @@
-UPSTREAM=https://github.com/ggml-org/llama.cpp.git
+# Prismallama tracks a fork of llama.cpp (GGUF native + GGML) for a single engine we control.
+# Pin FETCH_HEAD to a commit SHA for reproducible Arch/package builds (bump when merging the fork).
+UPSTREAM=https://github.com/piotroxp/prismallama.cpp.git
 WORKDIR=llama/vendor
-FETCH_HEAD=ec98e2002
+FETCH_HEAD=db9d8aa428012cc5593e18635d4c3c54095f5138
 
 .PHONY: help
 help:
@@ -39,7 +41,7 @@ PATCHED=$(join $(dir $(PATCHES)), $(addsuffix ed, $(addprefix ., $(notdir $(PATC
 apply-patches: $(PATCHED)
 
 llama/patches/.%.patched: llama/patches/%.patch
-	@if git -c user.name=nobody -c 'user.email=<>' -C $(WORKDIR) am -3 $(realpath $<); then \
+	@if git -c user.name=Prism -c user.email=piotr.slupski@pryzmat.pl -C $(WORKDIR) am -3 $(realpath $<); then \
 		touch $@;                                                                           \
 	else                                                                                    \
 		echo "Patch failed. Resolve any conflicts then continue.";                          \

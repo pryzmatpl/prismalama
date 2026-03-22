@@ -197,6 +197,13 @@ class AirLLMModel:
         except Exception as e:
             logger.error(f"Generation error: {e}")
             raise
+        finally:
+            if os.environ.get("AIRLLM_POST_INFER_CLEANUP", "1") != "0":
+                try:
+                    from airllm.utils import finalize_inference_memory
+                    finalize_inference_memory()
+                except Exception as ex:
+                    logger.debug("finalize_inference_memory: %s", ex)
     
     def count_tokens(self, text: str) -> int:
         """Count tokens in text."""

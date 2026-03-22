@@ -19,12 +19,8 @@ static bool ggml_uncaught_exception_init = []{
         return false;
     }
     const auto prev{std::get_terminate()};
-    // GGML_ASSERT(prev != ggml_uncaught_exception);
-    if (prev != ggml_uncaught_exception) {
-        previous_terminate_handler = prev;
-    } else {
-        GGML_LOG_WARN("%s double registration of ggml_uncaught_exception\n", __func__);
-    }
+    GGML_ASSERT(prev != ggml_uncaught_exception);
+    previous_terminate_handler = prev;
     std::set_terminate(ggml_uncaught_exception);
     return true;
 }();

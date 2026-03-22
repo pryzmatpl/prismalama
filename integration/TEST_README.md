@@ -18,6 +18,17 @@ Integration tests are organized by build tags to allow targeted testing:
 | `integration,minimax` | MiniMax model tests | `go test -tags=integration,minimax ./integration` |
 | `integration,perf` | Performance benchmarks | `go test -tags=integration,perf ./integration` |
 
+## Coverage
+
+See **`docs/DEVELOPER.md`** (“Integration tests and coverage”) for commands. Example:
+
+```bash
+go test -tags=integration ./integration -coverprofile=/tmp/integration.cov -covermode=atomic -timeout 10m
+go tool cover -func=/tmp/integration.cov | tail -20
+```
+
+Coverage is **partial** when tests skip (missing models, GPU, or env flags).
+
 ## Running Tests
 
 ### Prerequisites

@@ -110,7 +110,7 @@ func (s *Server) startPythonRunner() error {
 	)
 	cmd.Env = append(os.Environ(),
 		"AIRLLM_COMPRESSION="+os.Getenv("AIRLLM_COMPRESSION"),
-		"PYTHONPATH=/usr/share/ollama/airllm:/usr/share/ollama/airllm/air_llm",
+		"PYTHONPATH="+airllmPythonPath(pythonRunnerPath),
 	)
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
@@ -143,11 +143,30 @@ func (s *Server) waitForReady() error {
 	return errors.New("timeout waiting for Python runner to start")
 }
 
+// airllmPythonPath sets import path for the `airllm` package: packaged install
+// or a git checkout (src/airllm/air_llm next to the repo root).
+func airllmPythonPath(pythonRunnerPath string) string {
+	const packaged = "/usr/share/ollama/airllm:/usr/share/ollama/airllm/air_llm"
+	runnerDir := filepath.Dir(pythonRunnerPath)
+	// .../runner/airllmrunner/airllm_runner.py -> .../src/airllm/air_llm
+	devAirLLM := filepath.Join(runnerDir, "..", "..", "src", "airllm", "air_llm")
+	if st, err := os.Stat(filepath.Join(devAirLLM, "airllm")); err == nil && st.IsDir() {
+		return devAirLLM + ":" + packaged
+	}
+	extra := os.Getenv("PRISMALAMA_AIRLLM_PYTHONPATH")
+	if extra != "" {
+		return extra + ":" + packaged
+	}
+	return packaged
+}
+
 func findPythonRunner() string {
+	exeDir := filepath.Dir(os.Args[0])
 	candidates := []string{
 		"/usr/share/ollama/airllm_runner.py",
 		"/usr/lib/ollama/airllm_runner.py",
-		filepath.Join(filepath.Dir(os.Args[0]), "airllm_runner.py"),
+		filepath.Join(exeDir, "airllm_runner.py"),
+		filepath.Join(exeDir, "runner", "airllmrunner", "airllm_runner.py"),
 	}
 
 	for _, p := range candidates {

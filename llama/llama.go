@@ -80,10 +80,18 @@ func EnumerateGPUs() []Devices {
 			C.GGML_BACKEND_DEVICE_TYPE_IGPU:
 			var props C.struct_ggml_backend_dev_props
 			C.ggml_backend_dev_get_props(device, &props)
+			id := ""
+			if props.device_id != nil {
+				id = C.GoString(props.device_id)
+			}
+			lib := ""
+			if reg := C.ggml_backend_dev_backend_reg(device); reg != nil {
+				lib = C.GoString(C.ggml_backend_reg_name(reg))
+			}
 			ids = append(ids, Devices{
 				DeviceID: ml.DeviceID{
-					ID:      C.GoString(props.id),
-					Library: C.GoString(props.library),
+					ID:      id,
+					Library: lib,
 				},
 				LlamaID: uint64(i),
 			})
@@ -352,7 +360,14 @@ func (m *Model) ApplyLoraFromFile(context *Context, loraPath string, scale float
 
 	err := -1
 	if loraAdapter != nil {
-		err = int(C.llama_set_adapter_lora(context.c, loraAdapter, C.float(scale)))
+		adapters := []*C.struct_llama_adapter_lora{loraAdapter}
+		scales := []float32{scale}
+		err = int(C.llama_set_adapters_lora(
+			context.c,
+			(**C.struct_llama_adapter_lora)(unsafe.Pointer(&adapters[0])),
+			C.size_t(len(adapters)),
+			(*C.float)(unsafe.Pointer(&scales[0])),
+		))
 	}
 	if err != 0 {
 		return errors.New("error applying lora from file")

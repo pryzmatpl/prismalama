@@ -1,55 +1,71 @@
 # `llama`
 
-This package provides Go bindings to [llama.cpp](https://github.com/ggerganov/llama.cpp).
+This package provides Go bindings to **llama.cpp** (GGUF + GGML), vendored into this tree.
+
+## Upstream: Prismallama.cpp
+
+Prismalama uses **[prismallama.cpp](https://github.com/piotroxp/prismallama.cpp)** as the **canonical C/C++ engine** for GGUF inference (Vulkan, CUDA, HIP, etc.). That repo is a fork of [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp); GGML-native and GGUF workstreams land there first, then we sync here via `Makefile.sync`.
+
+**Reproducible builds:** pin `FETCH_HEAD` in `Makefile.sync` to a full commit **SHA** (not a branch name) before tagging a release or publishing Arch packages.
 
 ## Vendoring
 
-Ollama vendors [llama.cpp](https://github.com/ggerganov/llama.cpp/) and [ggml](https://github.com/ggerganov/llama.cpp/tree/master/ggml/src). While we generally strive to contribute changes back upstream to avoid drift, we carry a small set of patches which are applied to the tracking commit.
+We vendor `llama.cpp` and `ggml` from the clone in `./vendor/`, and carry a small set of patches under `llama/patches/`.
 
-If you update the vendoring code, start by running the following command to establish the tracking llama.cpp repo in the `./vendor/` directory.
-
-```shell
-make -f Makefile.sync apply-patches
-```
-
-### Updating Base Commit
-
-**Pin to new base commit**
-
-To change the base commit, update `FETCH_HEAD` in Makefile.sync.
-
-When updating to a newer base commit, the existing patches may not apply cleanly and require manual merge resolution.
-
-Start by applying the patches. If any of the patches have conflicts, the `git am` will stop at the first failure.
+To (re)establish the tracking tree and apply patches:
 
 ```shell
 make -f Makefile.sync apply-patches
 ```
 
-If there are conflicts, you will see an error message. Resolve the conflicts in `./vendor/`, and continue the patch series with `git am --continue` and rerun `make -f Makefile.sync apply-patches`. Repeat until all patches are successfully applied.
+### Updating the base commit
 
-Once all patches are applied, commit the changes to the tracking repository.
+**Pin to a new base commit**
+
+1. Set `FETCH_HEAD` in `Makefile.sync` to the desired commit from [prismallama.cpp](https://github.com/piotroxp/prismallama.cpp) (or merge your fork’s `master` first).
+2. Run:
+
+```shell
+make -f Makefile.sync apply-patches
+```
+
+If patches fail, resolve conflicts in `./vendor/`, then continue the series (commits use **Prism** / **piotr.slupski@pryzmat.pl**):
+
+```shell
+GIT_AUTHOR_NAME=Prism GIT_AUTHOR_EMAIL=piotr.slupski@pryzmat.pl git -C llama/vendor am --continue
+```
+
+Repeat `apply-patches` until clean.
+
+3. Sync vendored sources into the tree:
 
 ```shell
 make -f Makefile.sync format-patches sync
 ```
 
-### Generating Patches
+**Switching the remote for the first time** (e.g. from ggml-org to the fork):
 
-When working on new fixes or features that impact vendored code, use the following model. First get a clean tracking repo with all current patches applied:
+```shell
+rm -rf llama/vendor
+make -f Makefile.sync checkout apply-patches sync
+```
+
+### Generating patches
+
+When changing vendored C/C++ code:
 
 ```shell
 make -f Makefile.sync clean apply-patches
 ```
 
-Iterate until you're ready to submit PRs. Once your code is ready, commit a change in the `./vendor/` directory, then generate the patches for ollama with
+Iterate in `./vendor/`, then:
 
 ```shell
 make -f Makefile.sync format-patches
 ```
 
-In your `./vendor/` directory, create a branch, and cherry-pick the new commit to that branch, then submit a PR upstream to llama.cpp.
+Prefer upstreaming fixes to **prismallama.cpp** so the fork stays the single source of truth; keep patches here only for Prismalama-specific glue if needed.
 
-Commit the changes in the ollama repo and submit a PR to Ollama, which will include the vendored code update with your change, along with the patches.
+### Submodule `src/ollama`
 
-After your PR upstream is merged, follow the **Updating Base Commit** instructions above, however first remove your patch before running `apply-patches` since the new base commit contains your change already.
+The `src/ollama` git submodule has its own `Makefile.sync` (upstream Ollama defaults). For a **single** engine story across the repo, mirror the same `UPSTREAM` / `FETCH_HEAD` policy there when you merge or vendor from this project.

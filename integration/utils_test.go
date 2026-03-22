@@ -368,19 +368,46 @@ var (
 	serverCmd   *exec.Cmd
 )
 
-func startServer(t *testing.T, ctx context.Context, ollamaHost string) error {
-	// Make sure the server has been built
-	CLIName, err := filepath.Abs("../ollama")
-	if err != nil {
-		return fmt.Errorf("failed to get absolute path: %w", err)
+// findOllamaCLI resolves the server binary for integration tests. Prefer OLLAMA_BIN;
+// otherwise try ollama-bin (avoids conflict with a directory named ollama), then build outputs.
+func findOllamaCLI() (string, error) {
+	if v := os.Getenv("OLLAMA_BIN"); v != "" {
+		return filepath.Abs(v)
 	}
-
+	root := ".."
+	candidates := []string{
+		filepath.Join(root, "ollama-bin"),
+		filepath.Join(root, "build_ollama_airllm", "ollama-bin"),
+		filepath.Join(root, "ollama"),
+	}
 	if runtime.GOOS == "windows" {
-		CLIName += ".exe"
+		for i := range candidates {
+			candidates[i] += ".exe"
+		}
 	}
-	_, err = os.Stat(CLIName)
+	for _, c := range candidates {
+		abs, err := filepath.Abs(c)
+		if err != nil {
+			continue
+		}
+		fi, err := os.Stat(abs)
+		if err != nil {
+			continue
+		}
+		if fi.Mode().IsDir() {
+			continue
+		}
+		if fi.Mode().IsRegular() {
+			return abs, nil
+		}
+	}
+	return "", fmt.Errorf("ollama CLI not found (expected ../ollama-bin or set OLLAMA_BIN); build with: go build -o ollama-bin .")
+}
+
+func startServer(t *testing.T, ctx context.Context, ollamaHost string) error {
+	CLIName, err := findOllamaCLI()
 	if err != nil {
-		return fmt.Errorf("CLI missing, did you forget to 'go build .' first?  %w", err)
+		return err
 	}
 	serverMutex.Lock()
 	defer serverMutex.Unlock()

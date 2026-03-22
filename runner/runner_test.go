@@ -67,6 +67,14 @@ func TestIsAirLLMModel(t *testing.T) {
 			expected: false,
 		},
 		{
+			name: "multipart GGUF first shard",
+			setup: func(dir string) {
+				os.MkdirAll(dir, 0755)
+				os.WriteFile(filepath.Join(dir, "weights-00001-of-00004.gguf"), []byte("GGUF"), 0644)
+			},
+			expected: true,
+		},
+		{
 			name: "empty directory",
 			setup: func(dir string) {
 				os.MkdirAll(dir, 0755)

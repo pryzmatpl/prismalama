@@ -19,6 +19,8 @@ The system uses Vulkan to avoid fragmentation issues between CUDA and ROCm, prov
 - **Arch Linux packaging** for streamlined installation and updates
 
 ### For Developers
+- Technical layout, runners, tests, and memory behavior: [docs/DEVELOPER.md](docs/DEVELOPER.md); for automation, see [AGENTS.md](AGENTS.md).
+- **GGUF engine:** [prismallama.cpp](https://github.com/piotroxp/prismallama.cpp) is the maintained fork of llama.cpp/ggml; sync into this repo via `Makefile.sync` and [llama/README.md](llama/README.md).
 - Vulkan backend with compute shader optimizations
 - Modular runner system supporting Llama.cpp, AirLLM, and custom backends
 - Comprehensive test coverage for core components (attention mechanisms, device capabilities, quantization)
@@ -154,5 +156,5 @@ Prismalama is released under the MIT License. See [LICENSE](LICENSE) for details
 - Built upon [Ollama](https://github.com/ollama/ollama)
 - Inspired by [AirLLM](https://github.com/AIR-ML/AirLLM) for weight streaming concepts
 - Uses [Vulkan](https://www.vulkan.org/) for cross-platform GPU acceleration
-- GGUF format support from [llama.cpp](https://github.com/ggerganov/llama.cpp)
-- Vulkan compute shader foundations from [ggml-vulkan](https://github.com/ggerganov/llama.cpp/tree/master/src/ggml-vulkan)
+- GGUF format support via [prismallama.cpp](https://github.com/piotroxp/prismallama.cpp) (fork of [llama.cpp](https://github.com/ggml-org/llama.cpp))
+- Vulkan compute shader foundations from [ggml-vulkan](https://github.com/piotroxp/prismallama.cpp/tree/master/ggml/src/ggml-vulkan) (upstream: [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp))
