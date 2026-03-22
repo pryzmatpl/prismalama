@@ -198,6 +198,8 @@ var (
 	SchedSpread = Bool("OLLAMA_SCHED_SPREAD")
 	// MultiUserCache optimizes prompt caching for multi-user scenarios
 	MultiUserCache = Bool("OLLAMA_MULTIUSER_CACHE")
+	// AdaptiveMemory enables load-time num_ctx reduction to fit system RAM (default true).
+	AdaptiveMemory = BoolWithDefault("OLLAMA_ADAPTIVE_MEMORY")
 	// Enable the new Ollama engine
 	NewEngine = Bool("OLLAMA_NEW_ENGINE")
 	// ContextLength sets the default context length
@@ -315,6 +317,7 @@ func AsMap() map[string]EnvVar {
 		"OLLAMA_ORIGINS":           {"OLLAMA_ORIGINS", AllowedOrigins(), "A comma separated list of allowed origins"},
 		"OLLAMA_SCHED_SPREAD":      {"OLLAMA_SCHED_SPREAD", SchedSpread(), "Always schedule model across all GPUs"},
 		"OLLAMA_MULTIUSER_CACHE":   {"OLLAMA_MULTIUSER_CACHE", MultiUserCache(), "Optimize prompt caching for multi-user scenarios"},
+		"OLLAMA_ADAPTIVE_MEMORY":   {"OLLAMA_ADAPTIVE_MEMORY", AdaptiveMemory(true), "Shrink num_ctx at load when estimates exceed free RAM (default true)"},
 		"OLLAMA_CONTEXT_LENGTH":    {"OLLAMA_CONTEXT_LENGTH", ContextLength(), "Context length to use unless otherwise specified (default: 4k/32k/256k based on VRAM)"},
 		"OLLAMA_MEMORY_POLICY":     {"OLLAMA_MEMORY_POLICY", MemoryPolicy(), "performance (default) or balanced — VRAM tier num_ctx; balanced caps parallel KV for huge models"},
 		"OLLAMA_NEW_ENGINE":        {"OLLAMA_NEW_ENGINE", NewEngine(), "Enable the new Ollama engine"},

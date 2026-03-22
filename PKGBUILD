@@ -10,7 +10,7 @@
 pkgname=prismalama-ollama
 epoch=1
 pkgver=0.4.1
-pkgrel=7
+pkgrel=8
 pkgdesc="Prismalama: Ollama-compatible server (ROCm HIP + Vulkan GGML primary; optional AirLLM for HF/PyTorch layouts)"
 arch=('x86_64')
 url="https://github.com/piotroxp/prismallama.cpp"

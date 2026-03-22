@@ -262,6 +262,9 @@ func NewLlamaServer(systemInfo ml.SystemInfo, gpus []ml.DeviceInfo, modelPath st
 		}
 	}
 
+	totalLayers := int(f.KV().BlockCount()) + 1
+	adaptNumCtxForAvailableMemory(&opts, &loadRequest, f, systemInfo, gpus, numParallel, totalLayers)
+
 	gpuLibs := ml.LibraryPaths(gpus)
 	status := NewStatusWriter(os.Stderr)
 	cmd, port, err := StartRunner(
@@ -282,7 +285,7 @@ func NewLlamaServer(systemInfo ml.SystemInfo, gpus []ml.DeviceInfo, modelPath st
 		llamaModel:     llamaModel,
 		llamaModelLock: &sync.Mutex{},
 		sem:            semaphore.NewWeighted(int64(numParallel)),
-		totalLayers:    f.KV().BlockCount() + 1,
+		totalLayers:    uint64(totalLayers),
 		loadStart:      time.Now(),
 		done:           make(chan error, 1),
 		ggml:           f,
