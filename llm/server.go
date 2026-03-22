@@ -106,12 +106,15 @@ type llmServer struct {
 	loadProgress float32
 
 	sem *semaphore.Weighted
+
+	// ggml holds decoded GGUF metadata for layer-size estimates. Present for all GGUF loads
+	// (both llama.cpp and Ollama engine); required so ollamaServer.Load can build s.mem
+	// before the first createLayout (qwen3next and other OllamaEngineRequired models).
+	ggml *ggml.GGML
 }
 
 type llamaServer struct {
 	llmServer
-
-	ggml *ggml.GGML
 }
 
 type ollamaServer struct {
@@ -282,6 +285,7 @@ func NewLlamaServer(systemInfo ml.SystemInfo, gpus []ml.DeviceInfo, modelPath st
 		totalLayers:    f.KV().BlockCount() + 1,
 		loadStart:      time.Now(),
 		done:           make(chan error, 1),
+		ggml:           f,
 	}
 
 	if err != nil {
@@ -313,9 +317,8 @@ func NewLlamaServer(systemInfo ml.SystemInfo, gpus []ml.DeviceInfo, modelPath st
 
 	if tok != nil {
 		return &ollamaServer{llmServer: s, tokenizer: tok}, nil
-	} else {
-		return &llamaServer{llmServer: s, ggml: f}, nil
 	}
+	return &llamaServer{llmServer: s}, nil
 }
 
 func StartRunner(ollamaEngine bool, modelPath string, gpuLibs []string, out io.Writer, extraEnvs map[string]string) (cmd *exec.Cmd, port int, err error) {
@@ -519,8 +522,14 @@ func errLoadCommitFailed(resp *LoadResponse, noSuccessDetail string) error {
 
 var ErrLoadRequiredFull = errors.New("unable to load full model on GPU")
 
-func (s *llamaServer) Load(ctx context.Context, systemInfo ml.SystemInfo, systemGPUs []ml.DeviceInfo, requireFull bool) ([]ml.DeviceID, error) {
-	slog.Info("loading model", "model layers", s.totalLayers, "requested", s.options.NumGPU)
+// prepareMemoryEstimateFromGGML fills s.mem from GGUF metadata and computes an initial
+// GPU layer layout. Both llama.cpp and Ollama engine loads need this; the Ollama engine
+// path previously skipped it and called createLayout with nil mem (all-zero layer sizes),
+// which broke VRAM offload for qwen3next and similar architectures.
+func (s *llmServer) prepareMemoryEstimateFromGGML(systemInfo ml.SystemInfo, systemGPUs []ml.DeviceInfo, requireFull bool) (gpuLayers ml.GPULayersList, err error) {
+	if s.ggml == nil {
+		return nil, errors.New("internal error: missing GGUF metadata for memory estimate")
+	}
 
 	gpus := append(make([]ml.DeviceInfo, 0, len(systemGPUs)), systemGPUs...)
 
@@ -638,11 +647,9 @@ func (s *llamaServer) Load(ctx context.Context, systemInfo ml.SystemInfo, system
 
 	// Create a layout based on the memory data that we've built. The compute graph
 	// for GPUs is iteratively assigned based on the number of GPUs that are required.
-	var gpuLayers ml.GPULayersList
 	for {
 		prevGPULayers := gpuLayers
 
-		var err error
 		gpuLayers, err = s.createLayout(systemInfo, gpus, s.mem, requireFull, 0)
 		if err != nil {
 			return nil, err
@@ -693,6 +700,17 @@ func (s *llamaServer) Load(ctx context.Context, systemInfo ml.SystemInfo, system
 
 	slog.Debug("memory", "estimate", s.mem)
 	s.mem.Log(slog.LevelInfo)
+	return gpuLayers, nil
+}
+
+func (s *llamaServer) Load(ctx context.Context, systemInfo ml.SystemInfo, systemGPUs []ml.DeviceInfo, requireFull bool) ([]ml.DeviceID, error) {
+	slog.Info("loading model", "model layers", s.totalLayers, "requested", s.options.NumGPU)
+
+	gpuLayers, err := s.prepareMemoryEstimateFromGGML(systemInfo, systemGPUs, requireFull)
+	if err != nil {
+		return nil, err
+	}
+	gpus := append(make([]ml.DeviceInfo, 0, len(systemGPUs)), systemGPUs...)
 
 	// The llama engine uses mmap by default
 	s.loadRequest.UseMmap = true
@@ -792,10 +810,11 @@ func (s *ollamaServer) Load(ctx context.Context, systemInfo ml.SystemInfo, gpus 
 	pastAllocations := make(map[uint64]struct{})
 	var backoff float32
 
-	gpuLayers, err := s.createLayout(systemInfo, gpus, s.mem, requireFull, backoff)
+	gpuLayers, err := s.prepareMemoryEstimateFromGGML(systemInfo, gpus, requireFull)
 	if err != nil {
 		return nil, err
 	}
+	logGGMLGPUOffload(s.totalLayers, gpuLayers, s.loadRequest.UseMmap)
 
 	if err := s.waitUntilRunnerLaunched(ctx); err != nil {
 		return nil, err

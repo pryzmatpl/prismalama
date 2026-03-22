@@ -53,6 +53,10 @@ Runners (`runner/*/runner.go`) return **400** with plain text **`bad request`** 
 
 If you see **`500`** with message **`bad request`**, check **`journalctl -u ollama`** for **`llm load error:`** / **`llm predict error:`** / **`airllm load JSON decode`** (raw bytes). Common causes: **version skew** between server and model blobs, **OOM** / runner crash (**EOF**), or a **too-large / invalid** prompt. The server also coerces **`status`** on `gin.H` errors so numeric types (e.g. `float64`) do not incorrectly force **500**.
 
+## Ollama engine models (e.g. `qwen3next`, `qwen3-coder-next`)
+
+Architectures listed in `fs/ggml/ggml.go` **`OllamaEngineRequired()`** use the **`--ollama-engine`** runner. The server must still **estimate per-layer sizes from GGUF** before the first `createLayout`; otherwise the scheduler sees **all-zero** layer weights and **GPU offload can be wrong or empty** (no VRAM growth). That path is handled in **`llm/server.go`** via **`prepareMemoryEstimateFromGGML`** shared with the llama.cpp loader.
+
 ## GPU usage (AirLLM vs GGML)
 
 Two different stacks:
