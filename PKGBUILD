@@ -5,7 +5,7 @@
 
 pkgname=prismalama-ollama
 pkgver=0.4.1
-pkgrel=2
+pkgrel=3
 pkgdesc="Prismalama: Ollama-compatible server built from source (ROCm HIP + Vulkan GGML, AirLLM runner, large-model paths)"
 arch=('x86_64')
 url="https://github.com/piotroxp/prismallama.cpp"
@@ -68,7 +68,8 @@ build() {
 	export CGO_CXXFLAGS="${CGO_CXXFLAGS:-}"
 	export GOFLAGS="-buildmode=pie -trimpath"
 	_xver="${pkgver}-r${pkgrel}-prismalama"
-	go build -o ollama \
+	# Do not use -o ollama: a directory named ollama/ may exist in the tree (install would fail).
+	go build -o prismalama-ollama \
 		-ldflags "-w -s -X=github.com/ollama/ollama/version.Version=${_xver}" \
 		.
 }
@@ -84,7 +85,7 @@ package() {
 		DESTDIR="${pkgdir}" cmake --install build --prefix /usr --component Vulkan
 	fi
 
-	install -Dm755 ollama "${pkgdir}/usr/bin/ollama"
+	install -Dm755 prismalama-ollama "${pkgdir}/usr/bin/ollama"
 
 	install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
 

@@ -1,3 +1,6 @@
+# makepkg / local Go output (avoid clobbering or colliding with ollama/ directory)
+prismalama-ollama
+
 # Build artifacts
 build/
 build_ollama_airllm/
