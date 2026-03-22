@@ -59,7 +59,7 @@ Two different stacks:
 
 | Path | What uses the GPU | If VRAM stays idle |
 |------|---------------------|---------------------|
-| **llama** / **ollama** (GGML) | `OLLAMA_LIBRARY_PATH` → HIP/Vulkan `.so` under `/usr/lib/ollama/rocm` | Wrong **`OLLAMA_LIBRARY_PATH`**, **`HIP_VISIBLE_DEVICES`**, or **`num_gpu`/scheduler** loading CPU-only; check logs for backend (ROCm/Vulkan). **Vulkan** backends are skipped unless **`OLLAMA_VULKAN=1`** (see `discover/runner.go`); set it if you rely on Vulkan rather than HIP. |
+| **llama** / **ollama** (GGML) | `OLLAMA_LIBRARY_PATH` → HIP/Vulkan `.so` under `/usr/lib/ollama/rocm` | The scheduler packs **as many transformer layers as fit** into reported free VRAM (minus **`OLLAMA_GPU_OVERHEAD`**). Logs include **`ggml GPU layer offload`** with **`offload_percent`** and **`use_mmap`**. If VRAM looks **tiny** but the model runs (slowly), offload is likely **low** — check **`num_gpu`** in the Modelfile, discovery, and **`HIP_VISIBLE_DEVICES`**. On **Linux**, mmap is **off** when free system RAM is below the estimated model size (avoids thrashing); for large GGUF on **fast NVMe**, set **`OLLAMA_MMAP_ALLOW_LOW_RAM=1`** so weights can **mmap** from disk (`llm/server.go`). **Vulkan** backends are skipped unless **`OLLAMA_VULKAN=1`**; HIP does not need it. |
 | **airllm** (Python) | **PyTorch** with ROCm; **`AIRLLM_DEVICE`** (default **`cuda:0`** — ROCm uses the CUDA API name) | **CPU-only PyTorch** (no `torch.cuda.is_available()`). On Arch install **`python-pytorch-rocm`** (or your distro’s ROCm build), not plain **`python-pytorch`**. After restart, logs should show **`PyTorch: cuda.is_available=True`**. |
 
 `/etc/default/ollama` from the package sets **`HIP_VISIBLE_DEVICES`** and **`AIRLLM_DEVICE=cuda:0`**; override only if you know your layout.
@@ -71,4 +71,4 @@ After changing **`runner/airllmrunner`**, **`llm/`**, or **`runner/runner.go`**,
 ## Related
 
 - `docs/WEIGHT_STREAMING_STRATEGY.md` — GGML vs AirLLM product tradeoffs.
-- `llm/server.go` — Vulkan disables mmap by default (`UseMmap`).
+- `llm/server.go` — mmap defaults; Vulkan disables mmap unless overridden; Linux may disable mmap when RAM is tight unless **`OLLAMA_MMAP_ALLOW_LOW_RAM`**.

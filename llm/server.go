@@ -497,6 +497,16 @@ type LoadResponse struct {
 
 // errLoadCommitFailed returns a user-visible error when the runner returns success=false on commit.
 // If the runner sent Error text (e.g. AirLLM), that is surfaced; otherwise legacy OOM-style messages apply.
+func logGGMLGPUOffload(totalLayers uint64, gpuLayers ml.GPULayersList, useMmap bool) {
+	off := gpuLayers.Sum()
+	if totalLayers == 0 {
+		return
+	}
+	pct := 100.0 * float64(off) / float64(totalLayers)
+	slog.Info("ggml GPU layer offload", "gpu_layers", off, "total_layers", totalLayers,
+		"offload_percent", fmt.Sprintf("%.0f%%", pct), "use_mmap", useMmap)
+}
+
 func errLoadCommitFailed(resp *LoadResponse, noSuccessDetail string) error {
 	if resp == nil {
 		return errors.New("model load failed: empty response")
@@ -698,15 +708,22 @@ func (s *llamaServer) Load(ctx context.Context, systemInfo ml.SystemInfo, system
 	}
 
 	// Windows CUDA should not use mmap for best performance
-	// Linux  with a model larger than free space, mmap leads to thrashing
+	// Linux with a model larger than free RAM: mmap is disabled by default (page-cache thrashing).
+	// Set OLLAMA_MMAP_ALLOW_LOW_RAM=1 to keep mmap for large GGUF on fast NVMe.
 	// For CPU loads we want the memory to be allocated, not FS cache
+	linuxDisableMmap := runtime.GOOS == "linux" && systemInfo.FreeMemory < s.TotalSize() && s.options.UseMMap == nil
+	if envconfig.MmapAllowLowRamLinux() {
+		linuxDisableMmap = false
+	}
 	if (runtime.GOOS == "windows" && len(gpus) > 0 && gpus[0].Library == "CUDA" && s.options.UseMMap == nil) ||
-		(runtime.GOOS == "linux" && systemInfo.FreeMemory < s.TotalSize() && s.options.UseMMap == nil) ||
+		linuxDisableMmap ||
 		(len(gpus) == 0 && s.options.UseMMap == nil) ||
 		(len(gpus) > 0 && gpus[0].Library == "Vulkan" && s.options.UseMMap == nil) ||
 		(s.options.UseMMap != nil && !*s.options.UseMMap) {
 		s.loadRequest.UseMmap = false
 	}
+
+	logGGMLGPUOffload(s.totalLayers, gpuLayers, s.loadRequest.UseMmap)
 
 	if err := s.waitUntilRunnerLaunched(ctx); err != nil {
 		return nil, err
