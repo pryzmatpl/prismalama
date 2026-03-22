@@ -124,3 +124,4 @@ Build/run: **`make docker-test-build`** / **`make docker-test`** vs **`make dock
 - `llama/README.md` — vendoring **prismallama.cpp** into `llama/`.
 - `integration/TEST_README.md` — test tags and hardware expectations.
 - `docker/gpu/README.md` — AMD GPU container (ROCm HIP + Vulkan) and Kubernetes.
+- `docs/RUNTIME_DISPATCH.md` — which runner (**llama** vs **AirLLM**) handles a model; read **`runner dispatch`** logs.

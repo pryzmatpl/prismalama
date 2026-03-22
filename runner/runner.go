@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,27 +12,29 @@ import (
 	"github.com/ollama/ollama/x/imagegen"
 )
 
-func isAirLLMModel(modelPath string) bool {
+// airLLMModelAndReason reports whether the AirLLM runner should handle modelPath and why.
+// reason is empty when ok is false.
+func airLLMModelAndReason(modelPath string) (ok bool, reason string) {
 	if modelPath == "" {
-		return false
+		return false, ""
 	}
 
 	if os.Getenv("OLLAMA_MULTI_GGUF") == "1" {
-		return true
+		return true, "OLLAMA_MULTI_GGUF=1"
 	}
 
 	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
-		return false
+		return false, ""
 	}
 
 	safetensorsFile := filepath.Join(modelPath, "model.safetensors.index.json")
 	if _, err := os.Stat(safetensorsFile); err == nil {
-		return true
+		return true, "model.safetensors.index.json"
 	}
 
 	safetensorsFiles, _ := filepath.Glob(filepath.Join(modelPath, "*.safetensors"))
 	if len(safetensorsFiles) > 0 {
-		return true
+		return true, "safetensors_shards"
 	}
 
 	configFile := filepath.Join(modelPath, "config.json")
@@ -40,21 +43,26 @@ func isAirLLMModel(modelPath string) bool {
 		if strings.Contains(content, "safetensors") ||
 			strings.Contains(content, "torch_dtype") ||
 			strings.Contains(content, "transformers") {
-			return true
+			return true, "config.json_hf_heuristic"
 		}
 	}
 
 	ggufFiles, _ := filepath.Glob(filepath.Join(modelPath, "*-00001-of-*.gguf"))
 	if len(ggufFiles) > 0 {
-		return true
+		return true, "multipart_gguf"
 	}
 
 	envFlag := os.Getenv("OLLAMA_USE_AIRLLM")
 	if envFlag == "1" || strings.ToLower(envFlag) == "true" {
-		return true
+		return true, "OLLAMA_USE_AIRLLM"
 	}
 
-	return false
+	return false, ""
+}
+
+func isAirLLMModel(modelPath string) bool {
+	ok, _ := airLLMModelAndReason(modelPath)
+	return ok
 }
 
 func getModelPath(args []string) string {
@@ -77,18 +85,22 @@ func Execute(args []string) error {
 	if len(args) > 0 {
 		switch args[0] {
 		case "--ollama-engine":
+			slog.Info("runner dispatch", "engine", "ollama", "model", getModelPath(args))
 			return ollamarunner.Execute(args[1:])
 		case "--imagegen-engine":
+			slog.Info("runner dispatch", "engine", "imagegen", "model", getModelPath(args))
 			return imagegen.Execute(args[1:])
 		case "--airllm-engine":
+			slog.Info("runner dispatch", "engine", "airllm", "model", getModelPath(args), "reason", "explicit_flag")
 			return airllmrunner.Execute(args[1:])
 		}
 	}
 
 	modelPath := getModelPath(args)
-	if isAirLLMModel(modelPath) {
+	if useAir, why := airLLMModelAndReason(modelPath); useAir {
+		slog.Info("runner dispatch", "engine", "airllm", "model", modelPath, "reason", why)
 		return airllmrunner.Execute(args)
 	}
-
+	slog.Info("runner dispatch", "engine", "llama", "model", modelPath)
 	return llamarunner.Execute(args)
 }
