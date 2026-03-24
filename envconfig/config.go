@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ollama/ollama/format"
 )
 
 // Host returns the scheme and host. Host can be configured via the OLLAMA_HOST environment variable.
@@ -119,9 +121,9 @@ func KeepAlive() (keepAlive time.Duration) {
 
 // LoadTimeout returns the duration for stall detection during model loads. LoadTimeout can be configured via the OLLAMA_LOAD_TIMEOUT environment variable.
 // Zero or Negative values are treated as infinite.
-// Default is 5 minutes.
+// Default is 15 minutes.
 func LoadTimeout() (loadTimeout time.Duration) {
-	loadTimeout = 5 * time.Minute
+	loadTimeout = 15 * time.Minute
 	if s := Var("OLLAMA_LOAD_TIMEOUT"); s != "" {
 		if d, err := time.ParseDuration(s); err == nil {
 			loadTimeout = d
@@ -208,6 +210,10 @@ var (
 	UseAuth = Bool("OLLAMA_AUTH")
 	// Enable Vulkan backend
 	EnableVulkan = Bool("OLLAMA_VULKAN")
+	// VulkanMmap allows mmap’d GGUF weights on Linux when using Vulkan (default true) so
+	// tensors stream from NVMe/page cache instead of fully copying to RAM before GPU upload.
+	// Set OLLAMA_VULKAN_MMAP=false for the legacy path (no mmap with Vulkan).
+	VulkanMmap = BoolWithDefault("OLLAMA_VULKAN_MMAP")
 )
 
 // MemoryPolicy selects default VRAM→num_ctx heuristics.
@@ -282,8 +288,9 @@ func Uint64(key string, defaultValue uint64) func() uint64 {
 	}
 }
 
-// Set aside VRAM per GPU
-var GpuOverhead = Uint64("OLLAMA_GPU_OVERHEAD", 0)
+// Set aside VRAM per GPU (bytes). Default 2 GiB so compositor/desktop (e.g. Plasma) keeps
+// headroom on single-GPU workstations; set OLLAMA_GPU_OVERHEAD=0 to disable.
+var GpuOverhead = Uint64("OLLAMA_GPU_OVERHEAD", 3*format.GibiByte)
 
 // MmapAllowLowRamLinux when true, keeps mmap enabled on Linux even when free system RAM
 // is below the estimated model size (default: mmap is disabled in that case to reduce
@@ -302,12 +309,13 @@ func AsMap() map[string]EnvVar {
 		"OLLAMA_DEBUG":             {"OLLAMA_DEBUG", LogLevel(), "Show additional debug information (e.g. OLLAMA_DEBUG=1)"},
 		"OLLAMA_FLASH_ATTENTION":   {"OLLAMA_FLASH_ATTENTION", FlashAttention(false), "Enabled flash attention"},
 		"OLLAMA_KV_CACHE_TYPE":     {"OLLAMA_KV_CACHE_TYPE", KvCacheType(), "Quantization type for the K/V cache (default: f16)"},
-		"OLLAMA_GPU_OVERHEAD":         {"OLLAMA_GPU_OVERHEAD", GpuOverhead(), "Reserve a portion of VRAM per GPU (bytes)"},
+		"OLLAMA_GPU_OVERHEAD":         {"OLLAMA_GPU_OVERHEAD", GpuOverhead(), "Reserve VRAM per GPU for non-Ollama use (bytes; default 2 GiB; 0 disables)"},
 		"OLLAMA_MMAP_ALLOW_LOW_RAM":   {"OLLAMA_MMAP_ALLOW_LOW_RAM", MmapAllowLowRamLinux(), "Linux: keep mmap when free RAM < model size (NVMe streaming)"},
+		"OLLAMA_VULKAN_MMAP":          {"OLLAMA_VULKAN_MMAP", VulkanMmap(true), "Linux: mmap GGUF with Vulkan (default true; false copies weights to RAM first)"},
 		"OLLAMA_HOST":              {"OLLAMA_HOST", Host(), "IP Address for the ollama server (default 127.0.0.1:11434)"},
 		"OLLAMA_KEEP_ALIVE":        {"OLLAMA_KEEP_ALIVE", KeepAlive(), "The duration that models stay loaded in memory (default \"5m\")"},
 		"OLLAMA_LLM_LIBRARY":       {"OLLAMA_LLM_LIBRARY", LLMLibrary(), "Set LLM library to bypass autodetection"},
-		"OLLAMA_LOAD_TIMEOUT":      {"OLLAMA_LOAD_TIMEOUT", LoadTimeout(), "How long to allow model loads to stall before giving up (default \"5m\")"},
+		"OLLAMA_LOAD_TIMEOUT":      {"OLLAMA_LOAD_TIMEOUT", LoadTimeout(), "How long to allow model loads to stall before giving up (default \"15m\")"},
 		"OLLAMA_MAX_LOADED_MODELS": {"OLLAMA_MAX_LOADED_MODELS", MaxRunners(), "Maximum number of loaded models per GPU"},
 		"OLLAMA_MAX_QUEUE":         {"OLLAMA_MAX_QUEUE", MaxQueue(), "Maximum number of queued requests"},
 		"OLLAMA_MODELS":            {"OLLAMA_MODELS", Models(), "The path to the models directory"},

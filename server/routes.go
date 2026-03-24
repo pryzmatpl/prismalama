@@ -1722,7 +1722,7 @@ func Serve(ln net.Listener) error {
 	}
 
 	// Set default context based on VRAM tier and OLLAMA_MEMORY_POLICY (balanced vs performance).
-	s.defaultNumCtx = defaultNumCtxFromVRAM(totalVRAM)
+	s.defaultNumCtx = defaultNumCtxFromVRAM(totalVRAM, gpus)
 	slog.Info("vram-based default context", "total_vram", format.HumanBytes2(totalVRAM), "memory_policy", envconfig.MemoryPolicy(), "default_num_ctx", s.defaultNumCtx)
 
 	err = srvr.Serve(ln)

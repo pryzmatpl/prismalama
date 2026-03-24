@@ -103,7 +103,7 @@ func (l *Loader) ListTensors(filePath string) (map[string]gguf.TensorInfo, error
 	}
 
 	result := make(map[string]gguf.TensorInfo)
-	for i, t := range f.TensorInfos() {
+	for _, t := range f.TensorInfos() {
 		result[t.Name] = t
 	}
 	return result, nil

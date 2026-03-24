@@ -15,6 +15,7 @@ import (
 )
 
 func TestLLMServerFitGPU(t *testing.T) {
+	t.Setenv("OLLAMA_GPU_OVERHEAD", "0")
 	minMemory := 457 * format.MebiByte
 
 	tests := []struct {
@@ -218,6 +219,35 @@ func TestLLMServerFitGPU(t *testing.T) {
 				t.Errorf("fitGPU assigned %v, want %v", gpuLayers, tt.expected)
 			}
 		})
+	}
+}
+
+func TestBackendMemoryFromRunner(t *testing.T) {
+	t.Parallel()
+	if backendMemoryFromRunner(ml.BackendMemory{}) {
+		t.Fatal("empty memory should not count as runner-reported")
+	}
+	if !backendMemoryFromRunner(ml.BackendMemory{InputWeights: 1}) {
+		t.Fatal("input weights should count")
+	}
+	if !backendMemoryFromRunner(ml.BackendMemory{CPU: ml.DeviceMemory{Weights: []uint64{1}}}) {
+		t.Fatal("CPU weights should count")
+	}
+	if !backendMemoryFromRunner(ml.BackendMemory{GPUs: []ml.DeviceMemory{{Weights: []uint64{7}}}}) {
+		t.Fatal("GPU weights should count")
+	}
+}
+
+func TestInitialLayoutBackoff(t *testing.T) {
+	t.Parallel()
+	if initialLayoutBackoff(nil) != 0 {
+		t.Fatalf("expected 0 for empty GPU list")
+	}
+	if initialLayoutBackoff([]ml.DeviceInfo{{DeviceID: ml.DeviceID{Library: "CUDA"}}}) != 0 {
+		t.Fatalf("expected 0 for non-Vulkan")
+	}
+	if g := initialLayoutBackoff([]ml.DeviceInfo{{DeviceID: ml.DeviceID{Library: "Vulkan"}}}); g <= 0 {
+		t.Fatalf("expected positive backoff for Vulkan, got %v", g)
 	}
 }
 

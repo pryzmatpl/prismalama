@@ -5,30 +5,39 @@ import (
 
 	"github.com/ollama/ollama/api"
 	"github.com/ollama/ollama/format"
+	"github.com/ollama/ollama/ml"
+)
+
+var (
+	rocmGPU   = []ml.DeviceInfo{{DeviceID: ml.DeviceID{Library: "ROCm"}}}
+	vulkanGPU = []ml.DeviceInfo{{DeviceID: ml.DeviceID{Library: "Vulkan"}}}
 )
 
 func TestDefaultNumCtxFromVRAM(t *testing.T) {
 	t.Setenv("OLLAMA_MEMORY_POLICY", "")
-	if g := defaultNumCtxFromVRAM(24 * format.GibiByte); g != 32768 {
+	if g := defaultNumCtxFromVRAM(24*format.GibiByte, rocmGPU); g != 32768 {
 		t.Fatalf("unset policy uses performance 24GiB tier: got %d want 32768", g)
+	}
+	if g := defaultNumCtxFromVRAM(24*format.GibiByte, vulkanGPU); g != 8192 {
+		t.Fatalf("vulkan-only 24GiB performance: got %d want 8192", g)
 	}
 
 	t.Setenv("OLLAMA_MEMORY_POLICY", "balanced")
-	if g := defaultNumCtxFromVRAM(24 * format.GibiByte); g != 8192 {
+	if g := defaultNumCtxFromVRAM(24*format.GibiByte, vulkanGPU); g != 8192 {
 		t.Fatalf("balanced 24GiB tier: got %d want 8192", g)
 	}
-	if g := defaultNumCtxFromVRAM(48 * format.GibiByte); g != 65536 {
+	if g := defaultNumCtxFromVRAM(48*format.GibiByte, vulkanGPU); g != 65536 {
 		t.Fatalf("balanced 48GiB tier: got %d want 65536", g)
 	}
-	if g := defaultNumCtxFromVRAM(8 * format.GibiByte); g != 4096 {
+	if g := defaultNumCtxFromVRAM(8*format.GibiByte, vulkanGPU); g != 4096 {
 		t.Fatalf("balanced low VRAM: got %d want 4096", g)
 	}
 
 	t.Setenv("OLLAMA_MEMORY_POLICY", "performance")
-	if g := defaultNumCtxFromVRAM(24 * format.GibiByte); g != 32768 {
-		t.Fatalf("performance 24GiB tier: got %d want 32768", g)
+	if g := defaultNumCtxFromVRAM(24*format.GibiByte, rocmGPU); g != 32768 {
+		t.Fatalf("performance 24GiB tier ROCm: got %d want 32768", g)
 	}
-	if g := defaultNumCtxFromVRAM(48 * format.GibiByte); g != 262144 {
+	if g := defaultNumCtxFromVRAM(48*format.GibiByte, vulkanGPU); g != 262144 {
 		t.Fatalf("performance 48GiB tier: got %d want 262144", g)
 	}
 }

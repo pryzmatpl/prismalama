@@ -542,6 +542,26 @@ type LoadResponse struct {
 
 // errLoadCommitFailed returns a user-visible error when the runner returns success=false on commit.
 // If the runner sent Error text (e.g. AirLLM), that is surfaced; otherwise legacy OOM-style messages apply.
+// backendMemoryFromRunner is true when the runner JSON included a non-empty memory
+// breakdown (weights/cache/graph). The llama.cpp runner typically returns success
+// without a "memory" field; unmarshaling yields a zero BackendMemory which must not
+// replace the GGUF estimate in s.mem — otherwise TotalSize/VRAMSize and layout
+// refinement see all-zero layer sizes.
+func backendMemoryFromRunner(m ml.BackendMemory) bool {
+	if m.InputWeights != 0 {
+		return true
+	}
+	if m.CPU.Size() != 0 {
+		return true
+	}
+	for i := range m.GPUs {
+		if m.GPUs[i].Size() != 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func logGGMLGPUOffload(totalLayers uint64, gpuLayers ml.GPULayersList, useMmap bool) {
 	off := gpuLayers.Sum()
 	if totalLayers == 0 {
@@ -550,6 +570,44 @@ func logGGMLGPUOffload(totalLayers uint64, gpuLayers ml.GPULayersList, useMmap b
 	pct := 100.0 * float64(off) / float64(totalLayers)
 	slog.Info("ggml GPU layer offload", "gpu_layers", off, "total_layers", totalLayers,
 		"offload_percent", fmt.Sprintf("%.0f%%", pct), "use_mmap", useMmap)
+}
+
+// initialLayoutBackoff reserves a fraction of reported free VRAM when building the first
+// layer layout. Vulkan allocations often exceed our GGUF-based estimates (driver pools,
+// alignment), so we start with a conservative margin before the fit/allocate retry loop.
+func initialLayoutBackoff(systemGPUs []ml.DeviceInfo) float32 {
+	for i := range systemGPUs {
+		if systemGPUs[i].Library == "Vulkan" {
+			return 0.38
+		}
+	}
+	return 0
+}
+
+func (s *llmServer) applyLoadMmapPolicy(systemInfo ml.SystemInfo, gpus []ml.DeviceInfo) {
+	s.loadRequest.UseMmap = true
+
+	for _, g := range gpus {
+		if g.Library == "Metal" &&
+			uint64(s.options.NumGPU) > 0 &&
+			uint64(s.options.NumGPU) < s.totalLayers {
+			s.options.UseMMap = new(bool)
+			*s.options.UseMMap = false
+		}
+	}
+
+	linuxDisableMmap := runtime.GOOS == "linux" && systemInfo.FreeMemory < s.TotalSize() && s.options.UseMMap == nil
+	if envconfig.MmapAllowLowRamLinux() {
+		linuxDisableMmap = false
+	}
+	vulkanForceNoMmap := len(gpus) > 0 && gpus[0].Library == "Vulkan" && s.options.UseMMap == nil && !envconfig.VulkanMmap(true)
+	if (runtime.GOOS == "windows" && len(gpus) > 0 && gpus[0].Library == "CUDA" && s.options.UseMMap == nil) ||
+		linuxDisableMmap ||
+		(len(gpus) == 0 && s.options.UseMMap == nil) ||
+		vulkanForceNoMmap ||
+		(s.options.UseMMap != nil && !*s.options.UseMMap) {
+		s.loadRequest.UseMmap = false
+	}
 }
 
 func errLoadCommitFailed(resp *LoadResponse, noSuccessDetail string) error {
@@ -574,6 +632,7 @@ func (s *llmServer) prepareMemoryEstimateFromGGML(systemInfo ml.SystemInfo, syst
 	}
 
 	gpus := append(make([]ml.DeviceInfo, 0, len(systemGPUs)), systemGPUs...)
+	layoutBackoff := initialLayoutBackoff(systemGPUs)
 
 	// Synthesize memory allocation information based on our estimates
 	s.mem = &ml.BackendMemory{CPU: ml.DeviceMemory{
@@ -692,7 +751,7 @@ func (s *llmServer) prepareMemoryEstimateFromGGML(systemInfo ml.SystemInfo, syst
 	for {
 		prevGPULayers := gpuLayers
 
-		gpuLayers, err = s.createLayout(systemInfo, gpus, s.mem, requireFull, 0)
+		gpuLayers, err = s.createLayout(systemInfo, gpus, s.mem, requireFull, layoutBackoff)
 		if err != nil {
 			return nil, err
 		}
@@ -745,67 +804,6 @@ func (s *llmServer) prepareMemoryEstimateFromGGML(systemInfo ml.SystemInfo, syst
 	return gpuLayers, nil
 }
 
-func (s *llamaServer) Load(ctx context.Context, systemInfo ml.SystemInfo, systemGPUs []ml.DeviceInfo, requireFull bool) ([]ml.DeviceID, error) {
-	slog.Info("loading model", "model layers", s.totalLayers, "requested", s.options.NumGPU)
-
-	gpuLayers, err := s.prepareMemoryEstimateFromGGML(systemInfo, systemGPUs, requireFull)
-	if err != nil {
-		return nil, err
-	}
-	gpus := append(make([]ml.DeviceInfo, 0, len(systemGPUs)), systemGPUs...)
-
-	// The llama engine uses mmap by default
-	s.loadRequest.UseMmap = true
-
-	// mmap has issues with partial offloading on metal
-	for _, g := range gpus {
-		if g.Library == "Metal" &&
-			uint64(s.options.NumGPU) > 0 &&
-			uint64(s.options.NumGPU) < s.totalLayers {
-			s.options.UseMMap = new(bool)
-			*s.options.UseMMap = false
-		}
-	}
-
-	// Windows CUDA should not use mmap for best performance
-	// Linux with a model larger than free RAM: mmap is disabled by default (page-cache thrashing).
-	// Set OLLAMA_MMAP_ALLOW_LOW_RAM=1 to keep mmap for large GGUF on fast NVMe.
-	// For CPU loads we want the memory to be allocated, not FS cache
-	linuxDisableMmap := runtime.GOOS == "linux" && systemInfo.FreeMemory < s.TotalSize() && s.options.UseMMap == nil
-	if envconfig.MmapAllowLowRamLinux() {
-		linuxDisableMmap = false
-	}
-	if (runtime.GOOS == "windows" && len(gpus) > 0 && gpus[0].Library == "CUDA" && s.options.UseMMap == nil) ||
-		linuxDisableMmap ||
-		(len(gpus) == 0 && s.options.UseMMap == nil) ||
-		(len(gpus) > 0 && gpus[0].Library == "Vulkan" && s.options.UseMMap == nil) ||
-		(s.options.UseMMap != nil && !*s.options.UseMMap) {
-		s.loadRequest.UseMmap = false
-	}
-
-	logGGMLGPUOffload(s.totalLayers, gpuLayers, s.loadRequest.UseMmap)
-
-	if err := s.waitUntilRunnerLaunched(ctx); err != nil {
-		return nil, err
-	}
-
-	s.loadRequest.GPULayers = gpuLayers
-	resp, err := s.initModel(ctx, s.loadRequest, LoadOperationCommit)
-	if err != nil {
-		return nil, err
-	}
-
-	if !resp.Success {
-		slog.Warn("load commit rejected by runner", "memory", resp.Memory, "runner_error", resp.Error)
-		return nil, errLoadCommitFailed(resp, "failed to allocate memory for model")
-	}
-
-	// The llama engine does its memory allocations together with model loading, so we
-	// need to wait until it is done to ensure that we have accurate memory data before
-	// loading the next model
-	return uniqueDeviceIDs(s.loadRequest.GPULayers), s.WaitUntilRunning(ctx)
-}
-
 func projectorMemoryRequirements(filename string) (weights uint64) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -836,7 +834,7 @@ func projectorMemoryRequirements(filename string) (weights uint64) {
 // allowing for faster iteration, but may return less information.
 //
 // Returns the list of GPU IDs that were used in the final allocation on success
-func (s *ollamaServer) Load(ctx context.Context, systemInfo ml.SystemInfo, gpus []ml.DeviceInfo, requireFull bool) ([]ml.DeviceID, error) {
+func (s *llmServer) Load(ctx context.Context, systemInfo ml.SystemInfo, gpus []ml.DeviceInfo, requireFull bool) ([]ml.DeviceID, error) {
 	var success bool
 	defer func() {
 		if !success {
@@ -850,12 +848,13 @@ func (s *ollamaServer) Load(ctx context.Context, systemInfo ml.SystemInfo, gpus 
 	slog.Info("loading model", "model layers", s.totalLayers, "requested", s.options.NumGPU)
 
 	pastAllocations := make(map[uint64]struct{})
-	var backoff float32
+	backoff := initialLayoutBackoff(gpus)
 
 	gpuLayers, err := s.prepareMemoryEstimateFromGGML(systemInfo, gpus, requireFull)
 	if err != nil {
 		return nil, err
 	}
+	s.applyLoadMmapPolicy(systemInfo, gpus)
 	logGGMLGPUOffload(s.totalLayers, gpuLayers, s.loadRequest.UseMmap)
 
 	if err := s.waitUntilRunnerLaunched(ctx); err != nil {
@@ -876,7 +875,9 @@ nextOperation:
 			slog.Debug("memory", "success", resp.Success, "required", resp.Memory)
 
 			pastAllocations[gpuLayers.Hash()] = struct{}{}
-			s.mem = &resp.Memory
+			if backendMemoryFromRunner(resp.Memory) {
+				s.mem = &resp.Memory
+			}
 
 			for {
 				newGPULayers, err := s.createLayout(systemInfo, gpus, s.mem, requireFull, backoff)
@@ -929,7 +930,11 @@ nextOperation:
 						slog.Debug("memory", "success", resp.Success, "required", resp.Memory)
 
 						if resp.Success {
-							verifyGPULayers, err := s.createLayout(systemInfo, gpus, &resp.Memory, requireFull, backoff)
+							verifyMem := &resp.Memory
+							if !backendMemoryFromRunner(resp.Memory) {
+								verifyMem = s.mem
+							}
+							verifyGPULayers, err := s.createLayout(systemInfo, gpus, verifyMem, requireFull, backoff)
 							if err != nil {
 								return nil, err
 							}
@@ -982,7 +987,9 @@ nextOperation:
 	}
 
 	success = resp.Success
-	s.mem = &resp.Memory
+	if backendMemoryFromRunner(resp.Memory) {
+		s.mem = &resp.Memory
+	}
 
 	if !success {
 		slog.Warn("failed to commit memory for model", "memory", resp.Memory, "runner_error", resp.Error)

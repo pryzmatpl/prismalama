@@ -132,10 +132,11 @@ func predictUseMmap(opts *api.Options, systemInfo ml.SystemInfo, gpus []ml.Devic
 	if envconfig.MmapAllowLowRamLinux() {
 		linuxDisable = false
 	}
+	vulkanNoMmap := len(gpus) > 0 && gpus[0].Library == "Vulkan" && !envconfig.VulkanMmap(true)
 	if (runtime.GOOS == "windows" && len(gpus) > 0 && gpus[0].Library == "CUDA") ||
 		linuxDisable ||
 		len(gpus) == 0 ||
-		(len(gpus) > 0 && gpus[0].Library == "Vulkan") {
+		vulkanNoMmap {
 		return false
 	}
 	return true

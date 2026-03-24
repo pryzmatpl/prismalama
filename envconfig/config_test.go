@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/ollama/ollama/format"
 	"github.com/ollama/ollama/logutil"
 )
 
@@ -245,14 +246,15 @@ func TestMemoryPolicy(t *testing.T) {
 }
 
 func TestLoadTimeout(t *testing.T) {
-	defaultTimeout := 5 * time.Minute
+	defaultTimeout := 15 * time.Minute
 	cases := map[string]time.Duration{
 		"":       defaultTimeout,
 		"1s":     time.Second,
 		"1m":     time.Minute,
 		"1h":     time.Hour,
-		"5m0s":   defaultTimeout,
+		"15m0s":  defaultTimeout,
 		"1h2m3s": 1*time.Hour + 2*time.Minute + 3*time.Second,
+		"5m0s":   5 * time.Minute,
 		"0":      time.Duration(math.MaxInt64),
 		"60":     60 * time.Second,
 		"120":    2 * time.Minute,
@@ -342,5 +344,31 @@ func TestLogLevel(t *testing.T) {
 				t.Errorf("%s: expected %d, got %d", k, v, i)
 			}
 		})
+	}
+}
+
+func TestVulkanMmapDefault(t *testing.T) {
+	t.Setenv("OLLAMA_VULKAN_MMAP", "")
+	if !VulkanMmap(true) {
+		t.Fatal("unset OLLAMA_VULKAN_MMAP must default to true (mmap GGUF with Vulkan)")
+	}
+	t.Setenv("OLLAMA_VULKAN_MMAP", "false")
+	if VulkanMmap(true) {
+		t.Fatal("OLLAMA_VULKAN_MMAP=false must disable mmap with Vulkan")
+	}
+}
+
+func TestGpuOverheadDefault(t *testing.T) {
+	t.Setenv("OLLAMA_GPU_OVERHEAD", "")
+	if g := GpuOverhead(); g != 3*format.GibiByte {
+		t.Fatalf("unset OLLAMA_GPU_OVERHEAD: got %d want %d (3 GiB)", g, 3*format.GibiByte)
+	}
+	t.Setenv("OLLAMA_GPU_OVERHEAD", "0")
+	if g := GpuOverhead(); g != 0 {
+		t.Fatalf("OLLAMA_GPU_OVERHEAD=0: got %d want 0", g)
+	}
+	t.Setenv("OLLAMA_GPU_OVERHEAD", "1073741824")
+	if g := GpuOverhead(); g != 1*format.GibiByte {
+		t.Fatalf("OLLAMA_GPU_OVERHEAD=1GiB bytes: got %d", g)
 	}
 }

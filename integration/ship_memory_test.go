@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ollama/ollama/envconfig"
+	"github.com/ollama/ollama/format"
 )
 
 // TestShipMemoryPolicyEnv locks the Prismalama default: unset OLLAMA_MEMORY_POLICY must
@@ -43,5 +44,24 @@ func TestShipAdaptiveMemoryEnv(t *testing.T) {
 	t.Setenv("OLLAMA_ADAPTIVE_MEMORY", "true")
 	if !envconfig.AdaptiveMemory(true) {
 		t.Fatal("OLLAMA_ADAPTIVE_MEMORY=true must enable adaptive clamp")
+	}
+}
+
+// TestShipGpuOverheadDefault reserves 2 GiB per GPU for compositor/desktop unless disabled.
+func TestShipGpuOverheadDefault(t *testing.T) {
+	t.Setenv("OLLAMA_GPU_OVERHEAD", "")
+	if g := envconfig.GpuOverhead(); g != 3*format.GibiByte {
+		t.Fatalf("unset OLLAMA_GPU_OVERHEAD must default to 3 GiB, got %d", g)
+	}
+	t.Setenv("OLLAMA_GPU_OVERHEAD", "0")
+	if envconfig.GpuOverhead() != 0 {
+		t.Fatal("OLLAMA_GPU_OVERHEAD=0 must disable reserved VRAM")
+	}
+}
+
+func TestShipVulkanMmapDefault(t *testing.T) {
+	t.Setenv("OLLAMA_VULKAN_MMAP", "")
+	if !envconfig.VulkanMmap(true) {
+		t.Fatal("unset OLLAMA_VULKAN_MMAP must default to true")
 	}
 }
