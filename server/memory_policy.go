@@ -21,9 +21,12 @@ func onlyVulkanGPUs(gpus []ml.DeviceInfo) bool {
 	return true
 }
 
-// defaultNumCtxFromVRAM maps total detected VRAM to a default num_ctx.
+// defaultNumCtxFromVRAM maps total detected VRAM to a default num_ctx, capped by system RAM.
 // Policy is OLLAMA_MEMORY_POLICY: performance (default) vs balanced (see envconfig.MemoryPolicy).
-func defaultNumCtxFromVRAM(totalVRAM uint64, gpus []ml.DeviceInfo) int {
+// systemRAM is the total physical system memory in bytes (from discover.GetSystemInfo).
+// A large num_ctx pre-allocates a huge KV cache at load time; without a RAM ceiling a
+// 256k-context load on a 64 GB machine will OOM before the first token is generated.
+func defaultNumCtxFromVRAM(totalVRAM uint64, gpus []ml.DeviceInfo, systemRAM uint64) int {
 	var n int
 	switch envconfig.MemoryPolicy() {
 	case "performance":
@@ -53,7 +56,28 @@ func defaultNumCtxFromVRAM(totalVRAM uint64, gpus []ml.DeviceInfo) int {
 		totalVRAM < 32*format.GibiByte && n > 8192 {
 		slog.Info("vulkan-only GPU: capping default num_ctx for VRAM headroom",
 			"default_num_ctx_before", n, "default_num_ctx", 8192, "total_vram", format.HumanBytes2(totalVRAM))
-		return 8192
+		n = 8192
+	}
+	// Cap by system RAM: a 256k KV cache (f16, 80-layer model) ≈ 40 GB; 64k ≈ 10 GB;
+	// 32k ≈ 5 GB. Without enough headroom the runner will OOM during load.
+	if systemRAM > 0 {
+		ramCap := 4096
+		switch {
+		case systemRAM >= 128*format.GibiByte:
+			ramCap = 262144
+		case systemRAM >= 96*format.GibiByte:
+			ramCap = 65536
+		case systemRAM >= 48*format.GibiByte:
+			ramCap = 32768
+		case systemRAM >= 32*format.GibiByte:
+			ramCap = 8192
+		}
+		if n > ramCap {
+			slog.Info("capping default num_ctx by system RAM",
+				"default_num_ctx_before", n, "default_num_ctx", ramCap,
+				"system_ram", format.HumanBytes2(systemRAM))
+			n = ramCap
+		}
 	}
 	return n
 }

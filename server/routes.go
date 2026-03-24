@@ -1721,9 +1721,12 @@ func Serve(ln net.Listener) error {
 		totalVRAM += gpu.TotalMemory - envconfig.GpuOverhead()
 	}
 
-	// Set default context based on VRAM tier and OLLAMA_MEMORY_POLICY (balanced vs performance).
-	s.defaultNumCtx = defaultNumCtxFromVRAM(totalVRAM, gpus)
-	slog.Info("vram-based default context", "total_vram", format.HumanBytes2(totalVRAM), "memory_policy", envconfig.MemoryPolicy(), "default_num_ctx", s.defaultNumCtx)
+	// Retrieve system RAM so the default num_ctx never exceeds what the machine can hold.
+	systemRAM := discover.GetSystemInfo().TotalMemory
+
+	// Set default context based on VRAM tier, system RAM, and OLLAMA_MEMORY_POLICY.
+	s.defaultNumCtx = defaultNumCtxFromVRAM(totalVRAM, gpus, systemRAM)
+	slog.Info("vram-based default context", "total_vram", format.HumanBytes2(totalVRAM), "system_ram", format.HumanBytes2(systemRAM), "memory_policy", envconfig.MemoryPolicy(), "default_num_ctx", s.defaultNumCtx)
 
 	err = srvr.Serve(ln)
 	// If server is closed from the signal handler, wait for the ctx to be done

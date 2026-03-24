@@ -65,6 +65,10 @@ func adaptNumCtxForAvailableMemory(
 	}
 	fa := loadRequest.FlashAttention
 
+	// runtimeOverhead reserves memory for the Go runtime, runner process, and allocator
+	// fragmentation that our GGUF-based estimate does not capture.
+	runtimeOverhead := uint64(1024 * 1024 * 1024) // 1 GiB
+
 	tryFit := func(n int) bool {
 		if n < adaptiveMinNumCtx {
 			return false
@@ -83,7 +87,7 @@ func adaptNumCtxForAvailableMemory(
 				weightPart = 512 * 1024 * 1024
 			}
 		}
-		need := weightPart + kvSum + max(part, full)
+		need := weightPart + kvSum + max(part, full) + runtimeOverhead
 		return need <= usable
 	}
 
