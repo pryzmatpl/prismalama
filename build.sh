@@ -38,7 +38,7 @@ export CGO_ENABLED=1
 export CGO_CFLAGS="$MLX_CFLAGS"
 export CGO_CPPFLAGS="-DMLX_ENGINE=OFF -DGGML_HIP=ON"
 export LDFLAGS="-w -s -X=github.com/ollama/ollama/version.Version=${PKG_VERSION}"
-go build -tags="" -o "$BUILD_DIR/ollama-bin" -ldflags="-w -s -X=github.com/ollama/ollama/version.Version=${PKG_VERSION}" .
+go build -tags="" -buildvcs=false -o "$BUILD_DIR/ollama-bin" -ldflags="-w -s -X=github.com/ollama/ollama/version.Version=${PKG_VERSION}" .
 
 # Create package structure
 echo "Creating package structure..."

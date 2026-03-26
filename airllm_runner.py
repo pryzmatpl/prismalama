@@ -114,12 +114,11 @@ class AirLLMModel:
         self.compression = "4bit"
         self._model_loaded = False
         
-    def load(self, model_path: str, compression: str = "4bit"):
+    def load(self, model_path: str, options: dict):
         """Load model using AirLLM with layer-by-layer loading."""
         self.status = ServerStatus.LOADING_MODEL
         self.progress = 0.0
         self.model_path = model_path
-        self.compression = compression
         
         def load_thread():
             try:
@@ -130,12 +129,22 @@ class AirLLMModel:
                 
                 from airllm import AutoModel
                 import torch
-
-                device = os.environ.get("AIRLLM_DEVICE", "cuda:0")
+                
+                # Extract options
+                compression = options.get('compression', os.environ.get('AIRLLM_COMPRESSION', '4bit'))
+                main_gpu = options.get('main_gpu', 0)
+                kv_size = options.get('kv_size', 2048)
+                
+                # Set device
+                if torch.cuda.is_available():
+                    device = f"cuda:{main_gpu}"
+                else:
+                    device = "cpu"
+                
                 cuda_ok = torch.cuda.is_available()
                 n_dev = torch.cuda.device_count() if cuda_ok else 0
                 logger.info(
-                    "PyTorch: cuda.is_available=%s device_count=%s AIRLLM_DEVICE=%s",
+                    "PyTorch: cuda.is_available=%s device_count=%s device=%s",
                     cuda_ok,
                     n_dev,
                     device,
@@ -146,16 +155,16 @@ class AirLLMModel:
                         "a ROCm-enabled PyTorch (e.g. python-pytorch-rocm on Arch) and set HIP / "
                         "AIRLLM_DEVICE correctly."
                     )
-
+                
                 self.progress = 0.3
                 logger.info("AutoModel imported, initializing...")
-                compression = self.compression
                 
                 # AutoModel uses from_pretrained classmethod
                 self.model = AutoModel.from_pretrained(
                     model_path,
                     device=device,
                     compression=compression,
+                    max_seq_len=kv_size,
                     profiling_mode=False
                 )
                 self.progress = 0.5
@@ -283,8 +292,12 @@ class AirLLMHandler(BaseHTTPRequestHandler):
                     self.send_json_response({'success': False, 'error': 'No model path'})
                     return
                 
-                compression = os.environ.get('AIRLLM_COMPRESSION', '4bit')
-                self.model.load(model_path, compression)
+                options = {
+                    'compression': os.environ.get('AIRLLM_COMPRESSION', '4bit'),
+                    'main_gpu': req.main_gpu,
+                    'kv_size': req.kv_size,
+                }
+                self.model.load(model_path, options)
                 self.send_json_response({'success': True})
                 
             elif req.operation == "close":

@@ -243,7 +243,28 @@ def split_and_save_layers(checkpoint_path, layer_shards_saving_path=None, splitt
         if all(found_layers.values()):
             # already downloaded, return saving path...
             print(f"saved layers already found in {saving_path}")
-            return str(saving_path)
+    return str(saving_path)
+
+
+def finalize_inference_memory():
+    """Clean up GPU and CPU memory after inference."""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
+    except Exception:
+        pass
+    gc.collect()
+    try:
+        # Try to trim malloc heap (Linux/Unix)
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except Exception:
+        try:
+            # Alternative for some systems
+            ctypes.CDLL("libc.dylib").malloc_zone_pressure_relief(0)
+        except Exception:
+            pass
         else:
             print(f"some layer splits found, some are not, re-save all layers in case there's some corruptions.")
 
