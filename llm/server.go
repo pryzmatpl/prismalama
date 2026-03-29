@@ -37,6 +37,14 @@ import (
 	"github.com/ollama/ollama/tokenizer"
 )
 
+// httpClient is the shared HTTP client used for communicating with the runner subprocess.
+// It is configured with a 5-minute timeout per request to prevent infinite hangs
+// on a non-responsive runner. Long timeouts are used because model loading and inference
+// on large models can take minutes.
+var httpClient = &http.Client{
+	Timeout: 5 * time.Minute,
+}
+
 type filteredEnv []string
 
 func (e filteredEnv) LogValue() slog.Value {
@@ -1703,7 +1711,7 @@ func (s *llmServer) Completion(ctx context.Context, req CompletionRequest, fn fu
 	}
 	serverReq.Header.Set("Content-Type", "application/json")
 
-	res, err := http.DefaultClient.Do(serverReq)
+	res, err := httpClient.Do(serverReq)
 	if err != nil && errors.Is(err, context.Canceled) {
 		// client closed connection
 		return err

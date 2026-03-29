@@ -27,6 +27,8 @@ import (
 	"syscall"
 	"time"
 
+	"net/http/pprof" // registers /debug/pprof/* handlers on http.DefaultServeMux
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/image/webp"
@@ -1683,14 +1685,19 @@ func Serve(ln net.Listener) error {
 
 	slog.Info(fmt.Sprintf("Listening on %s (version %s)", ln.Addr(), version.Version))
 	srvr := &http.Server{
-		// Use http.DefaultServeMux so we get net/http/pprof for
-		// free.
+		// Use http.DefaultServeMux so we get net/http/pprof for free.
+		// pprof handlers are registered when this package is imported (see import above).
+		// Available endpoints:
+		//   /debug/pprof/           — index page
+		//   /debug/pprof/heap       — heap profile
+		//   /debug/pprof/goroutine  — goroutine stack
+		//   /debug/pprof/cpu        — CPU profile (add ?seconds=10 to collect)
+		//   /debug/pprof/block      — blocking profile
+		//   /debug/pprof/mutex      — mutex profile
+		//   /debug/pprof/threadcreate — thread creation profile
 		//
-		// TODO(bmizerany): Decide if we want to make this
-		// configurable so it is not exposed by default, or allow
-		// users to bind it to a different port. This was a quick
-		// and easy way to get pprof, but it may not be the best
-		// way.
+		// Note: pprof is always available on the main HTTP port. For production
+		// deployments, consider firewall rules or a reverse proxy to restrict access.
 		Handler: nil,
 	}
 

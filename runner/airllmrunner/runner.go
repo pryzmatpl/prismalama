@@ -140,7 +140,9 @@ func NewServer(modelPath string, port int) *Server {
 		pythonBase: fmt.Sprintf("http://127.0.0.1:%d", pyPort),
 		status:     llm.ServerStatusLaunched,
 		httpClient: &http.Client{
-			Timeout: 0,
+			// 10-minute timeout per request — long enough for model loading or
+			// a single inference step on large models, but prevents indefinite hangs.
+			Timeout: 10 * time.Minute,
 		},
 		pythonDone: make(chan struct{}),
 	}
