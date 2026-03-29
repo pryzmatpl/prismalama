@@ -98,8 +98,10 @@ func Execute(args []string) error {
 			slog.Info("runner dispatch", "engine", "imagegen", "model", getModelPath(args))
 			return imagegen.Execute(args[1:])
 		case "--airllm-engine":
-			slog.Info("runner dispatch", "engine", "airllm", "model", getModelPath(args), "reason", "explicit_flag")
-			return airllmrunner.Execute(args[1:])
+			modelPath := getModelPath(args)
+			slog.Info("runner dispatch", "engine", "airllm", "model", modelPath, "reason", "explicit_flag")
+			// Pass args unchanged; the airllmrunner parses --model and --port from it.
+			return airllmrunner.Execute(args)
 		}
 	}
 

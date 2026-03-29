@@ -17,8 +17,10 @@ import (
 )
 
 var (
-	weightStreamingModelPath = "/nvme3/models/MiniMaxM2.5"
-	weightStreamingGGUFGlob  = "*-00001-of-*.gguf"
+	// Model path can be overridden via OLLAMA_TEST_MODEL_PATH env var.
+	// Defaults are example paths; tests skip gracefully when not found.
+	weightStreamingModelPath = os.Getenv("OLLAMA_TEST_MODEL_PATH")
+	weightStreamingGGUFGlob = "*-00001-of-*.gguf"
 )
 
 func skipIfNoWeightStreamingModel(t *testing.T) {

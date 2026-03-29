@@ -407,9 +407,23 @@ func TestAirLLMCompressionModes(t *testing.T) {
 func TestAirLLMModelDetection(t *testing.T) {
 	skipIfNoAirLLMEnv(t)
 
-	modelDirs := []string{
-		"/nvme3/AI Models/MiniMaxM2.5",
-		"/run/media/piotro/CACHE/airllm/Qwen2.5-Coder-32B-Instruct",
+	// Allow model dirs to be specified via env var as a comma-separated list.
+	envDirs := os.Getenv("OLLAMA_TEST_MODEL_DIRS")
+	var modelDirs []string
+	if envDirs != "" {
+		for _, d := range strings.Split(envDirs, ",") {
+			d = strings.TrimSpace(d)
+			if d != "" {
+				modelDirs = append(modelDirs, d)
+			}
+		}
+	}
+	// If no env var, use defaults (will be skipped gracefully by the dir check below).
+	if modelDirs == nil {
+		modelDirs = []string{
+			"/nvme3/AI Models/MiniMaxM2.5",
+			"/run/media/piotro/CACHE/airllm/Qwen2.5-Coder-32B-Instruct",
+		}
 	}
 
 	for _, dir := range modelDirs {

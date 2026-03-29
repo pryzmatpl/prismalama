@@ -135,26 +135,35 @@ class AirLLMModel:
                 main_gpu = options.get('main_gpu', 0)
                 kv_size = options.get('kv_size', 2048)
                 
-                # Set device
-                if torch.cuda.is_available():
-                    device = f"cuda:{main_gpu}"
-                else:
-                    device = "cpu"
-                
+                # Set device: AIRLLM_DEVICE overrides the default cuda:{main_gpu}.
+                # On ROCm, device strings are also "cuda:X" (HIP is CUDA-compatible).
+                # HIP_VISIBLE_DEVICES="" (empty) means no GPU is visible to this process.
+                device = os.environ.get("AIRLLM_DEVICE", f"cuda:{main_gpu}")
                 cuda_ok = torch.cuda.is_available()
                 n_dev = torch.cuda.device_count() if cuda_ok else 0
+                # Validate that the requested device index is in range.
+                if cuda_ok and n_dev > 0:
+                    requested_gpu = int(device.split(":")[1]) if ":" in device else 0
+                    if requested_gpu >= n_dev:
+                        logger.warning(
+                            "requested GPU %d but only %d device(s) visible; falling back to cuda:0",
+                            requested_gpu, n_dev,
+                        )
+                        device = "cuda:0"
+                else:
+                    device = "cpu"
+                    logger.warning(
+                        "PyTorch reports no CUDA/ROCm GPU (HIP_VISIBLE_DEVICES may be empty); "
+                        "AirLLM will run on CPU. Install a ROCm-enabled PyTorch and set "
+                        "HIP_VISIBLE_DEVICES / AIRLLM_DEVICE correctly for GPU inference."
+                    )
                 logger.info(
-                    "PyTorch: cuda.is_available=%s device_count=%s device=%s",
+                    "PyTorch: cuda.is_available=%s device_count=%s device=%s AIRLLM_DEVICE=%s",
                     cuda_ok,
                     n_dev,
                     device,
+                    os.environ.get("AIRLLM_DEVICE", "(not set)"),
                 )
-                if not cuda_ok:
-                    logger.warning(
-                        "PyTorch reports no CUDA/ROCm GPU; AirLLM will run on CPU unless you install "
-                        "a ROCm-enabled PyTorch (e.g. python-pytorch-rocm on Arch) and set HIP / "
-                        "AIRLLM_DEVICE correctly."
-                    )
                 
                 self.progress = 0.3
                 logger.info("AutoModel imported, initializing...")
@@ -408,15 +417,33 @@ class AirLLMHandler(BaseHTTPRequestHandler):
 
 
 def _require_airllm_python_deps():
+    missing = []
     try:
         import transformers  # noqa: F401
-    except ImportError as e:
+    except ImportError:
+        missing.append("transformers")
+    try:
+        import torch  # noqa: F401
+    except ImportError:
+        missing.append("torch")
+    try:
+        import safetensors  # noqa: F401
+    except ImportError:
+        missing.append("safetensors")
+    # bitsandbytes is required only when compression != "none"
+    try:
+        import bitsandbytes  # noqa: F401
+    except ImportError:
+        # Only warn; compression=none can work without it.
+        logger.warning("bitsandbytes not installed — 4-bit/8-bit compression will be unavailable; set AIRLLM_COMPRESSION=none to disable")
+    if missing:
         logger.critical(
-            "AirLLM requires Python package 'transformers'. On Arch: "
-            "sudo python3 -m pip install --break-system-packages transformers safetensors "
-            "OR yay -S python-transformers python-safetensors (AUR); keep python-pytorch-rocm from repos."
+            "AirLLM requires: %s. On Arch: pacman -S python-transformers python-pytorch python-pytorch-safetensors, "
+            "or pip: python3 -m pip install --break-system-packages transformers torch safetensors. "
+            "For AMD GPUs install ROCm-enabled PyTorch separately.",
+            ", ".join(missing)
         )
-        raise SystemExit(2) from e
+        raise SystemExit(2)
 
 
 def main():

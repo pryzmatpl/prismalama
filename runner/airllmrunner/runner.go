@@ -42,6 +42,7 @@ type Server struct {
 	commitReturnedOnce bool
 	ready              sync.WaitGroup
 	httpClient         *http.Client
+	pythonDone         chan struct{} // closed when the Python subprocess exits
 }
 
 type statusResponse struct {
@@ -141,6 +142,7 @@ func NewServer(modelPath string, port int) *Server {
 		httpClient: &http.Client{
 			Timeout: 0,
 		},
+		pythonDone: make(chan struct{}),
 	}
 	s.ready.Add(1)
 	return s
@@ -181,6 +183,7 @@ func (s *Server) startPythonRunner() error {
 	go func() {
 		cmd.Wait()
 		slog.Info("Python runner exited")
+		close(s.pythonDone) // signal that the Python process has exited
 	}()
 
 	return s.waitForReady()
@@ -250,11 +253,16 @@ func (s *Server) load(w http.ResponseWriter, r *http.Request) {
 		// WaitGroup: NewServer adds 1. First Commit does one Done (pairs with NewServer).
 		// Any later Commit must Add(1) before Done or WaitGroup panics and the runner exits.
 		s.commitMu.Lock()
+		// commitAdded tracks whether Add(1) was called in THIS invocation so that
+		// early-returns (before the defer runs) don't cause a WaitGroup underflow.
+		commitAdded := s.commitReturnedOnce
 		if s.commitReturnedOnce {
 			s.ready.Add(1)
 		}
 		defer func() {
-			s.ready.Done()
+			if commitAdded {
+				s.ready.Done()
+			}
 			s.commitReturnedOnce = true
 			s.commitMu.Unlock()
 		}()
@@ -265,6 +273,7 @@ func (s *Server) load(w http.ResponseWriter, r *http.Request) {
 
 		if err := s.startPythonRunner(); err != nil {
 			slog.Error("failed to start Python runner", "error", err)
+			// commitAdded=false here: Add(1) was not called above, so Don't call Done().
 			json.NewEncoder(w).Encode(llm.LoadResponse{Success: false, Error: err.Error()})
 			return
 		}
@@ -310,6 +319,8 @@ func (s *Server) load(w http.ResponseWriter, r *http.Request) {
 		if s.pythonCmd != nil && s.pythonCmd.Process != nil {
 			s.pythonCmd.Process.Kill()
 		}
+		// Reset pythonDone so a new runner can be started on a subsequent Commit.
+		s.pythonDone = make(chan struct{})
 		json.NewEncoder(w).Encode(llm.LoadResponse{Success: true})
 
 	default:
