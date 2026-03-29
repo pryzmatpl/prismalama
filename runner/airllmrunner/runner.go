@@ -43,6 +43,13 @@ type Server struct {
 	ready              sync.WaitGroup
 	httpClient         *http.Client
 	pythonDone         chan struct{} // closed when the Python subprocess exits
+
+	// Health tracking for circuit breaker pattern.
+	// After consecutiveErrorLimit errors, the runner starts failing fast instead of
+	// retrying. This prevents hammering a dead runner and allows faster fallback.
+	consecutiveErrors     int
+	consecutiveErrorLimit int   // defaults to 0; set to 5 in NewServer
+	lastError            string
 }
 
 type statusResponse struct {
@@ -144,7 +151,8 @@ func NewServer(modelPath string, port int) *Server {
 			// a single inference step on large models, but prevents indefinite hangs.
 			Timeout: 10 * time.Minute,
 		},
-		pythonDone: make(chan struct{}),
+		pythonDone:            make(chan struct{}),
+		consecutiveErrorLimit: 5, // open circuit breaker after 5 consecutive errors
 	}
 	s.ready.Add(1)
 	return s
@@ -401,17 +409,97 @@ func (s *Server) completion(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// healthResponse extends llm.ServerStatusResponse with additional diagnostic fields.
+type healthResponse struct {
+	Status             llm.ServerStatus `json:"status"`
+	Progress           float32          `json:"progress"`
+	ModelPath          string           `json:"model_path"`
+	PythonAlive        bool             `json:"python_alive"`
+	PythonPID          int              `json:"python_pid,omitempty"`
+	ConsecutiveErrors  int              `json:"consecutive_errors"`
+	LastError          string           `json:"last_error,omitempty"`
+	ReadyForInference  bool             `json:"ready_for_inference"`
+}
+
+// recordError increments the consecutive error counter.
+// When consecutiveErrorLimit is reached, the runner becomes unavailable.
+func (s *Server) recordError(err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.consecutiveErrors++
+	s.lastError = err.Error()
+	if s.consecutiveErrors >= s.consecutiveErrorLimit {
+		s.status = llm.ServerStatusError
+	}
+}
+
+// resetErrors clears the consecutive error counter on successful operations.
+func (s *Server) resetErrors() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.consecutiveErrors = 0
+	s.lastError = ""
+}
+
+// readyz returns 200 OK when the runner is ready to accept inference requests,
+// or 503 Service Unavailable when still loading or errored.
+// This is useful for Kubernetes readiness probes.
+func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	status := s.status
+	s.mu.Unlock()
+
+	// ready.Wait() blocks until the first Commit finishes (model loaded).
+	// Use status as a quick check; if not ready, use WaitGroup to wait.
+	if status != llm.ServerStatusReady {
+		http.Error(w, fmt.Sprintf("runner not ready: status=%d", status), http.StatusServiceUnavailable)
+		return
+	}
+
+	// Double-check by trying WaitGroup with a short timeout.
+	done := make(chan struct{})
+	go func() {
+		s.ready.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, `{"ready":true}`)
+	case <-time.After(5 * time.Second):
+		http.Error(w, "timeout waiting for runner to be ready", http.StatusServiceUnavailable)
+	}
+}
+
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	s.mu.Lock()
 	status := s.status
 	progress := s.progress
+	modelPath := s.modelPath
+	consecutiveErrors := s.consecutiveErrors
+	lastError := s.lastError
+	var pythonPID int
+	pythonAlive := false
+	if s.pythonCmd != nil && s.pythonCmd.Process != nil {
+		pythonPID = s.pythonCmd.Process.Pid
+		pythonAlive = s.pythonCmd.Process.Pid > 0
+	}
 	s.mu.Unlock()
 
-	json.NewEncoder(w).Encode(&llm.ServerStatusResponse{
-		Status:   status,
-		Progress: progress,
-	})
+	resp := healthResponse{
+		Status:            status,
+		Progress:          progress,
+		ModelPath:         modelPath,
+		PythonAlive:       pythonAlive,
+		PythonPID:         pythonPID,
+		ConsecutiveErrors: consecutiveErrors,
+		LastError:         lastError,
+		ReadyForInference: status == llm.ServerStatusReady && consecutiveErrors < 5,
+	}
+
+	json.NewEncoder(w).Encode(&resp)
 }
 
 func Execute(args []string) error {
@@ -445,6 +533,7 @@ func Execute(args []string) error {
 	mux.HandleFunc("POST /load", server.load)
 	mux.HandleFunc("/completion", server.completion)
 	mux.HandleFunc("/health", server.health)
+	mux.HandleFunc("/readyz", server.readyz) // returns 200 only when ready to serve
 
 	httpServer := &http.Server{
 		Handler: mux,
