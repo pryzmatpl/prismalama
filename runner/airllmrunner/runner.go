@@ -2,6 +2,7 @@ package airllmrunner
 
 import (
 	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -25,6 +26,157 @@ import (
 	"github.com/ollama/ollama/logutil"
 	"github.com/ollama/ollama/ml"
 )
+
+// GPUType distinguishes AMD ROCm from NVIDIA CUDA hardware.
+type GPUType string
+
+const (
+	GPUTypeAMD   GPUType = "amd"
+	GPUTypeNVIDIA GPUType = "nvidia"
+	GPUTypeUnknown GPUType = "unknown"
+)
+
+// GPUDevice represents a single GPU with its hardware topology metadata.
+type GPUDevice struct {
+	Type     GPUType // "amd", "nvidia", or "unknown"
+	Index    int     // backend-native device index (HIP index on AMD, CUDA index on NVIDIA)
+	BusID    string  // PCIe bus ID, e.g. "0001:3A:00.0"
+	NUMANode int     // NUMA node index; -1 when unknown
+}
+
+// GPUTopology summarises all GPUs detected on the host.
+type GPUTopology struct {
+	Devices []GPUDevice // ordered by discovery order (AMD GPUs first, then NVIDIA)
+}
+
+// discoverGPUTopology probes the host for AMD ROCm and NVIDIA CUDA GPUs.
+// It queries rocm-smi --json for AMD devices and nvidia-smi for NVIDIA devices,
+// building a combined ordered list that the Python runner uses to set device
+// visibility and affinity.
+func discoverGPUTopology() GPUTopology {
+	var topo GPUTopology
+
+	// ── AMD ROCm ──────────────────────────────────────────────────────────────
+	// rocm-smi --json emits: { "card$i": { "GPU ID": "...", "Bus ID": "...", ... } }
+	out, err := exec.Command("rocm-smi", "--json").Output()
+	if err == nil {
+		var rocmMap map[string]map[string]string
+		if err := json.Unmarshal(out, &rocmMap); err == nil {
+			// Collect in index order (card0, card1, …)
+			for i := 0; ; i++ {
+				key := fmt.Sprintf("card%d", i)
+				card, ok := rocmMap[key]
+				if !ok {
+					break
+				}
+				// Bus ID may be empty if the GPU is not initialised; skip it.
+				busID := strings.TrimSpace(card["Bus ID"])
+				if busID == "" {
+					busID = "unknown"
+				}
+				numa := -1
+				if node, ok := card["Numa Node"]; ok {
+					if n, err := strconv.Atoi(strings.TrimSpace(node)); err == nil {
+						numa = n
+					}
+				}
+				dev := GPUDevice{Type: GPUTypeAMD, Index: i, BusID: busID, NUMANode: numa}
+				topo.Devices = append(topo.Devices, dev)
+				slog.Debug("GPU topology: discovered AMD GPU", "index", i, "bus_id", busID, "numa", numa)
+			}
+		}
+	}
+
+	// ── NVIDIA CUDA ────────────────────────────────────────────────────────────
+	// nvidia-smi --query-gpu=index,pci.bus_id --format=csv,noheader
+	// Output: "0,0001:3A:00.0\n1,0001:3B:00.0\n"
+	out, err = exec.Command("nvidia-smi", "--query-gpu=index,pci.bus_id", "--format=csv,noheader").Output()
+	if err == nil {
+		reader := csv.NewReader(bytes.NewReader(out))
+		records, err := reader.ReadAll()
+		if err == nil {
+			for _, rec := range records {
+				if len(rec) < 2 {
+					continue
+				}
+				idx, err := strconv.Atoi(strings.TrimSpace(rec[0]))
+				if err != nil {
+					continue
+				}
+				busID := strings.TrimSpace(rec[1])
+				// NUMA for NVIDIA GPUs requires parsing /sys/class/nvme/nvme*.../device/numa_node
+				// which is only reliable when the nvme driver is loaded. We default to -1 and
+				// do not block startup on a missing sysfs node.
+				numa := -1
+				dev := GPUDevice{Type: GPUTypeNVIDIA, Index: idx, BusID: busID, NUMANode: numa}
+				topo.Devices = append(topo.Devices, dev)
+				slog.Debug("GPU topology: discovered NVIDIA GPU", "index", idx, "bus_id", busID)
+			}
+		}
+	}
+
+	// ── Summary log ────────────────────────────────────────────────────────────
+	summary := make([]string, 0, len(topo.Devices))
+	for _, d := range topo.Devices {
+		summary = append(summary, fmt.Sprintf("%s:%d(%s)", d.Type, d.Index, d.BusID))
+	}
+	slog.Info("GPU topology discovered", "devices", summary)
+
+	return topo
+}
+
+// gpuVisibleDevices builds ROCR_VISIBLE_DEVICES and CUDA_VISIBLE_DEVICES strings
+// from the detected topology, honouring any AIRLLM_GPU_TOPOLOGY override.
+// topologyOverride is the raw AIRLLM_GPU_TOPOLOGY env value (may be empty).
+func gpuVisibleDevices(topo GPUTopology, topologyOverride string) (rocr string, cuda string) {
+	if topologyOverride != "" {
+		// Format: "amd:0,nvidia:0,amd:1"  (comma-separated, colon-separated type:index)
+		parts := strings.Split(topologyOverride, ",")
+		var rocrList, cudaList []string
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p == "" {
+				continue
+			}
+			kv := strings.SplitN(p, ":", 2)
+			if len(kv) != 2 {
+				slog.Warn("AIRLLM_GPU_TOPOLOGY: malformed entry, skipping", "entry", p)
+				continue
+			}
+			kind := strings.TrimSpace(kv[0])
+			idxStr := strings.TrimSpace(kv[1])
+			idx, err := strconv.Atoi(idxStr)
+			if err != nil {
+				slog.Warn("AIRLLM_GPU_TOPOLOGY: non-numeric index, skipping", "entry", p)
+				continue
+			}
+			switch strings.ToLower(kind) {
+			case "amd", "rocm", "hip":
+				rocrList = append(rocrList, strconv.Itoa(idx))
+			case "nvidia", "cuda", "nv":
+				cudaList = append(cudaList, strconv.Itoa(idx))
+			default:
+				slog.Warn("AIRLLM_GPU_TOPOLOGY: unknown GPU type, skipping", "type", kind)
+			}
+		}
+		slog.Info("AIRLLM_GPU_TOPOLOGY override applied",
+			"ROCR_VISIBLE_DEVICES", strings.Join(rocrList, ","),
+			"CUDA_VISIBLE_DEVICES", strings.Join(cudaList, ","))
+		return strings.Join(rocrList, ","), strings.Join(cudaList, ",")
+	}
+
+	// No override — use all detected devices in discovered order.
+	var rocrList, cudaList []string
+	for _, d := range topo.Devices {
+		switch d.Type {
+		case GPUTypeAMD:
+			rocrList = append(rocrList, strconv.Itoa(d.Index))
+		case GPUTypeNVIDIA:
+			cudaList = append(cudaList, strconv.Itoa(d.Index))
+		}
+	}
+	return strings.Join(rocrList, ","), strings.Join(cudaList, ",")
+}
 
 type Server struct {
 	modelPath  string
@@ -164,34 +316,62 @@ func (s *Server) startPythonRunner() error {
 		return errors.New("airllm_runner.py not found")
 	}
 
+	// HC-51: discover heterogeneous GPU topology (AMD ROCm + NVIDIA CUDA) before
+	// starting the Python subprocess so we can set ROCR_VISIBLE_DEVICES,
+	// CUDA_VISIBLE_DEVICES, and AIRLLM_GPU_TOPOLOGY correctly.
+	topo := discoverGPUTopology()
+	topoOverride := os.Getenv("AIRLLM_GPU_TOPOLOGY")
+	rocrVisible, cudaVisible := gpuVisibleDevices(topo, topoOverride)
+
 	cmd := exec.Command("python3", pythonRunnerPath,
 		"--model", s.modelPath,
 		"--port", strconv.Itoa(s.pythonPort),
 	)
-	// Inherit full parent env (HIP_VISIBLE_DEVICES, HSA_*, AIRLLM_DEVICE, etc.) for GPU visibility in PyTorch.
-	// ROCR_VISIBLE_DEVICES is set by the Ollama scheduler to select AMD GPU(s).
-	// We pass it through so the Python runner can map ROCr indices → HIP device indices.
+	// Inherit full parent env (HIP_VISIBLE_DEVICES, HSA_*, etc.) for GPU visibility in PyTorch.
+	// We override the GPU visibility variables based on discovered topology.
 	childEnv := append(os.Environ(),
 		"AIRLLM_COMPRESSION="+os.Getenv("AIRLLM_COMPRESSION"),
 		"PYTHONPATH="+airllmPythonPath(pythonRunnerPath),
-		"ROCR_VISIBLE_DEVICES="+os.Getenv("ROCR_VISIBLE_DEVICES"),
+		// HC-51: use topology-aware values; parent env is a fallback only.
+		"ROCR_VISIBLE_DEVICES="+rocrVisible,
+		"CUDA_VISIBLE_DEVICES="+cudaVisible,
 	)
 	if _, ok := os.LookupEnv("AIRLLM_DEVICE"); !ok {
 		// On ROCm, HIP uses device indices that are independent of rocr-visible-devices order.
-		// Use hip:0 as the safe default (first visible HIP device); the Python runner will
-		// probe torch.cuda to confirm the device is actually usable.
-		if os.Getenv("ROCR_VISIBLE_DEVICES") != "" {
+		// Default to the first visible AMD device when AMD GPUs are detected;
+		// otherwise fall back to the first CUDA device. The Python runner probes
+		// torch.cuda to confirm the device is actually usable.
+		if len(topo.Devices) > 0 && topo.Devices[0].Type == GPUTypeAMD {
 			childEnv = append(childEnv, "AIRLLM_DEVICE=hip:0")
 		} else {
 			childEnv = append(childEnv, "AIRLLM_DEVICE=cuda:0")
 		}
 	}
+	// Pass the GPU topology string through to the Python runner so it can log it
+	// and optionally re-order its internal device list.
+	if topoOverride != "" {
+		childEnv = append(childEnv, "AIRLLM_GPU_TOPOLOGY="+topoOverride)
+	} else if len(topo.Devices) > 0 {
+		// Encode the discovered topology as a canonical string for the Python runner.
+		var parts []string
+		for _, d := range topo.Devices {
+			parts = append(parts, fmt.Sprintf("%s:%d", d.Type, d.Index))
+		}
+		childEnv = append(childEnv, "AIRLLM_GPU_TOPOLOGY="+strings.Join(parts, ","))
+	}
+
 	cmd.Env = childEnv
 	adev := os.Getenv("AIRLLM_DEVICE")
 	if adev == "" {
 		adev = "cuda:0"
 	}
-	slog.Info("airllm python env (subset)", "AIRLLM_DEVICE", adev, "HIP_VISIBLE_DEVICES", os.Getenv("HIP_VISIBLE_DEVICES"))
+	slog.Info("airllm python env (subset)",
+		"AIRLLM_DEVICE", adev,
+		"HIP_VISIBLE_DEVICES", os.Getenv("HIP_VISIBLE_DEVICES"),
+		"ROCR_VISIBLE_DEVICES", rocrVisible,
+		"CUDA_VISIBLE_DEVICES", cudaVisible,
+		"AIRLLM_GPU_TOPOLOGY", os.Getenv("AIRLLM_GPU_TOPOLOGY"),
+		"gpu_devices", len(topo.Devices))
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 

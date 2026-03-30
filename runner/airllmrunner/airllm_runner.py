@@ -146,6 +146,17 @@ class AirLLMModel:
                 # Detect ROCm runtime: torch.version.hip is set when PyTorch is built for AMD.
                 is_rocm = getattr(torch, 'version', None) and getattr(torch.version, 'hip', None)
 
+                # HC-51: Honour AIRLLM_GPU_TOPOLOGY to force a specific device ordering
+                # across a mixed AMD+NVIDIA pool.  Format: "amd:0,nvidia:0,amd:1"
+                gpu_topology_raw = os.environ.get("AIRLLM_GPU_TOPOLOGY", "")
+                if gpu_topology_raw:
+                    topo_parts = [p.strip() for p in gpu_topology_raw.split(",") if p.strip()]
+                    logger.info(
+                        "AIRLLM_GPU_TOPOLOGY=%s  (%d device slots)", gpu_topology_raw, len(topo_parts)
+                    )
+                else:
+                    topo_parts = []
+
                 # Map AIRLLM_DEVICE to the appropriate backend:
                 # - ROCm: "hip:X" or "cuda:X" both work via HIP; prefer "cuda:X" as the
                 #   canonical string for torch.cuda APIs (HIP is CUDA-compatible on AMD).
@@ -188,13 +199,17 @@ class AirLLMModel:
                             "HIP_VISIBLE_DEVICES / AIRLLM_DEVICE correctly for GPU inference."
                         )
                 logger.info(
-                    "PyTorch: is_rocm=%s cuda.is_available=%s device_count=%s device=%s AIRLLM_DEVICE=%s ROCR_VISIBLE_DEVICES=%s",
+                    "PyTorch: is_rocm=%s cuda.is_available=%s device_count=%s device=%s "
+                    "AIRLLM_DEVICE=%s ROCR_VISIBLE_DEVICES=%s CUDA_VISIBLE_DEVICES=%s "
+                    "AIRLLM_GPU_TOPOLOGY=%s",
                     is_rocm,
                     cuda_ok,
                     n_dev,
                     device,
                     os.environ.get("AIRLLM_DEVICE", "(not set)"),
                     rocr_devices,
+                    os.environ.get("CUDA_VISIBLE_DEVICES", "(not set)"),
+                    gpu_topology_raw or "(auto)",
                 )
                 
                 self.progress = 0.3
