@@ -27,7 +27,7 @@ import (
 	"syscall"
 	"time"
 
-	"net/http/pprof" // registers /debug/pprof/* handlers on http.DefaultServeMux
+	_ "net/http/pprof" // registers /debug/pprof/* handlers on http.DefaultServeMux
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
