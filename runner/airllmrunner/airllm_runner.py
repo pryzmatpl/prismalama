@@ -105,6 +105,7 @@ def _compute_layer_buckets(num_layers: int, gpu_budgets: list[int]) -> dict[int,
 # ─────────────────────────────────────────────────────────────────────────────
 # Dataclasses
 # ─────────────────────────────────────────────────────────────────────────────
+logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
@@ -325,6 +326,17 @@ class AirLLMModel:
                 logger.info(f"Loading AirLLM model from {model_path}")
                 self.progress = 0.1
                 
+                # HC-52: inject NVME striping persister BEFORE AutoModel import
+                # so that subsequent AutoModel.load calls use multi-NVME parallel reads.
+                self._nvme_striped_persister = None
+                try:
+                    from prismalama.nvme_striping import inject_striped_persister
+                    striped = inject_striped_persister(model_path)
+                    if striped:
+                        self._nvme_striped_persister = striped
+                except Exception as ex:
+                    logger.warning("HC-52: failed to inject NVME striped persister (non-fatal): %s", ex)
+
                 from airllm import AutoModel
                 import torch
                 
@@ -727,6 +739,12 @@ def main():
         server.serve_forever()
     except KeyboardInterrupt:
         logger.info("Shutting down...")
+        # HC-52: close NVME mount file handles
+        if runner and runner._nvme_striped_persister:
+            try:
+                runner._nvme_striped_persister.close_all_handles()
+            except Exception:
+                pass
         server.shutdown()
 
 

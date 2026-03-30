@@ -537,19 +537,29 @@ func (s *Server) waitForReady() error {
 
 // airllmPythonPath sets import path for the `airllm` package: packaged install
 // or a git checkout (src/airllm/air_llm next to the repo root).
+// Also includes src/prismalama for prismalama-specific integration code (HC-52 nvme_striping).
 func airllmPythonPath(pythonRunnerPath string) string {
 	const packaged = "/usr/share/ollama/airllm:/usr/share/ollama/airllm/air_llm"
 	runnerDir := filepath.Dir(pythonRunnerPath)
 	// .../runner/airllmrunner/airllm_runner.py -> .../src/airllm/air_llm
 	devAirLLM := filepath.Join(runnerDir, "..", "..", "src", "airllm", "air_llm")
+	// prismalama-specific integration modules (HC-52 nvme_striping, etc.)
+	devPrismalama := filepath.Join(runnerDir, "..", "..", "src", "prismalama")
+
+	var parts []string
 	if st, err := os.Stat(filepath.Join(devAirLLM, "airllm")); err == nil && st.IsDir() {
-		return devAirLLM + ":" + packaged
+		parts = append(parts, devAirLLM)
 	}
+	if st, err := os.Stat(devPrismalama); err == nil && st.IsDir() {
+		parts = append(parts, devPrismalama)
+	}
+	parts = append(parts, packaged)
+
 	extra := os.Getenv("PRISMALAMA_AIRLLM_PYTHONPATH")
 	if extra != "" {
-		return extra + ":" + packaged
+		parts = append([]string{extra}, parts...)
 	}
-	return packaged
+	return strings.Join(parts, ":")
 }
 
 func findPythonRunner() string {

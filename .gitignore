@@ -7,6 +7,8 @@ build_ollama_airllm/
 build_ollama_airllm_rocm/
 pkg/
 src/
+!src/
+!src/prismalama/
 *.pkg.tar.zst
 *.tar.zst
 ollama-bin
