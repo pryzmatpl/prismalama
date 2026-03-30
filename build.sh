@@ -93,8 +93,17 @@ cat > "$BUILD_DIR/etc/default/ollama" << 'EOF'
 export OLLAMA_MODELS="/sda2/airllm"
 EOF
 
- # Copy AirLLM
- cp -r airllm-clean/air_llm "$BUILD_DIR/usr/share/ollama/airllm"
+# AirLLM — two variants exist in this repo:
+#   src/airllm/air_llm/  (git submodule) — NVME weight streaming, CUDA/ROCm, used by PKGBUILD
+#   airllm-clean/air_llm/                    — MLX for Apple Silicon ONLY, NOT for Linux/ROCm
+# Use src/airllm for the Linux/ROCm packaged build.
+if [ -d "src/airllm/air_llm" ]; then
+    cp -r src/airllm/air_llm "$BUILD_DIR/usr/share/ollama/airllm"
+    echo "AirLLM: using src/airllm/air_llm (NVME weight streaming, CUDA/ROCm)"
+else
+    echo "ERROR: src/airllm/air_llm not found. Cannot proceed — airllm-clean is NOT compatible with Linux/ROCm."
+    exit 1
+fi
 
 # Copy license
 cp LICENSE "$BUILD_DIR/usr/share/licenses/$PKG_NAME/"

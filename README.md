@@ -2,7 +2,16 @@
 
 Powered-up Ollama with Vulkan-accelerated weight streaming for GGUF models.
 
-## Overview
+## AirLLM Variants
+
+This repo contains two AirLLM directories:
+
+| Path | Variant | Platform | Used by |
+|------|---------|----------|---------|
+| `src/airllm/air_llm/` | Full (NVME streaming, CUDA/ROCm) | Linux + ROCm/CUDA | `PKGBUILD`, `build-pkg.sh` |
+| `airllm-clean/air_llm/` | MLX only | Apple Silicon (macOS) | Not for Linux/ROCm |
+
+**Only `src/airllm/air_llm` should be used for the Linux/ROCm build.** If you have `airllm-clean` locally, do not copy it into the build path — it is not compatible with Linux ROCm backends.
 
 Prismalama is an enhanced version of Ollama designed to stream weights of local LLM models in GGUF format to the GPU using Vulkan for fast, optimal inference. It implements weight streaming inspired by AirLLM to handle models larger than VRAM while providing multiple runner interfaces to support diverse architectures.
 
