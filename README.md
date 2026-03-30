@@ -1,6 +1,6 @@
 # Prismalama
 
-Powered-up Ollama with Vulkan-accelerated weight streaming for GGUF models.
+Powered-up Ollama with Vulkan-accelerated inference for GGUF models, with optional true NVME weight streaming via AirLLM for models larger than VRAM.
 
 ## AirLLM Variants
 
@@ -13,18 +13,18 @@ This repo contains two AirLLM directories:
 
 **Only `src/airllm/air_llm` should be used for the Linux/ROCm build.** If you have `airllm-clean` locally, do not copy it into the build path — it is not compatible with Linux ROCm backends.
 
-Prismalama is an enhanced version of Ollama designed to stream weights of local LLM models in GGUF format to the GPU using Vulkan for fast, optimal inference. It implements weight streaming inspired by AirLLM to handle models larger than VRAM while providing multiple runner interfaces to support diverse architectures.
+Prismalama is an enhanced version of Ollama designed for fast, optimal inference of local LLM models in GGUF format using Vulkan. For models larger than VRAM, Prismalama offers two paths: (1) GGUF with mmap + partial GPU offload (limited by VRAM), and (2) AirLLM with true NVME-based weight streaming for models that exceed GPU memory entirely.
 
 The system uses Vulkan to avoid fragmentation issues between CUDA and ROCm, providing hardware-agnostic GPU acceleration. Prismalama is packaged as a single Arch Linux package for easy deployment.
 
 ## Key Features
 
 ### Core Capabilities
-- **Vulkan-based weight streaming** for efficient GPU utilization across AMD, NVIDIA, and Intel GPUs
-- **GGUF format support** with intelligent weight streaming from storage to GPU
+- **Vulkan-based inference** for efficient GPU utilization across AMD, NVIDIA, and Intel GPUs
+- **GGUF format support** with mmap and partial GPU offload (llama.cpp/prismallama.cpp)
 - **Multiple runner interfaces** supporting different inference backends
 - **Hardware-agnostic inference** using Vulkan to avoid CUDA/ROCm fragmentation
-- **Inspired by AirLLM** for streaming weights larger than VRAM capacity
+- **True NVME weight streaming** via AirLLM for models larger than GPU VRAM
 - **Arch Linux packaging** for streamlined installation and updates
 
 ### For Developers
@@ -46,9 +46,10 @@ The system uses Vulkan to avoid fragmentation issues between CUDA and ROCm, prov
 
 ## Architecture
 
-Prismalama enhances Ollama by integrating Vulkan-accelerated weight streaming:
+Prismalama enhances Ollama by integrating Vulkan-accelerated inference for GGUF models:
 
-1. **Weight Streaming Layer**: Inspired by AirLLM, streams model weights from storage to GPU as needed
+1. **GGUF inference**: Memory-mapped access and partial GPU layer offload via prismallama.cpp; limited by available VRAM
+2. **Weight Streaming (AirLLM)**: True layer-by-layer NVME streaming for models larger than VRAM, via the AirLLM Python runner
 2. **Vulkan Backend**: Hardware-agnostic GPU compute using Vulkan API with compute shaders
 3. **Runner Interface**: Pluggable system supporting multiple inference methods (llama.cpp, AirLLM, etc.)
 4. **Memory Management**: Efficient VRAM utilization with dynamic weight loading/offloading
@@ -92,7 +93,7 @@ curl http://localhost:11434/api/generate -d '{
 - **Test Coverage**: Unit tests for attention mechanisms (`ml/attention/paged_attention_test.go`), device capabilities (`ml/device_capability_test.go`), quantization (`ml/quantization/quantization_test.go`), and weight streaming integration (`integration/weight_streaming_test.go`)
 - **Benchmarks**: Performance validated against Llama, Qwen, and MiniMax model families
 - **Hardware Compatibility**: Tested on AMD (RADV), NVIDIA, and Intel GPUs via Vulkan
-- **Memory Efficiency**: Demonstrated ability to run models larger than available VRAM through weight streaming
+- **Memory Efficiency**: GGUF with mmap + partial offload maximises VRAM utilisation; AirLLM NVME weight streaming handles models larger than VRAM by streaming layers on demand
 - **Vulkan Optimization**: Compute shader optimizations for attention and MLP operations
 
 ## Development
