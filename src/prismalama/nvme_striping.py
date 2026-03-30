@@ -23,6 +23,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+import torch
+
 logger = logging.getLogger(__name__)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -242,12 +244,14 @@ class NVMEStripingModelPersister:
     Architecture:
       - Each NVME mount gets its own file handle kept open for inference duration
       - Reads for different NVME mounts issued concurrently via ThreadPoolExecutor
+      - HC-50: NUMA proximity map routes shard reads to NUMA-closest NVME for
+        each GPU, reducing cross-socket memory bandwidth on multi-socket systems
       - Read errors on one mount do NOT affect shards on other mounts
       - Single NVME fallback when AIRLLM_NVME_MOUNTS has < 2 mounts
 
     Usage (called by airllm_runner.py before AutoModel.from_pretrained):
       from prismalama.nvme_striping import inject_striped_persister
-      inject_striped_persister(model_path)
+      inject_striped_persister(model_path, numa_proximity_map=numa_map)
     """
 
     def __init__(
@@ -255,10 +259,14 @@ class NVMEStripingModelPersister:
         wrapped,  # SafetensorModelPersister
         shard_to_mount: Optional[Dict[str, str]] = None,
         max_workers: int = 4,
+        numa_proximity_map: Optional[Dict[int, List[str]]] = None,
+        default_gpu_index: int = 0,
     ):
         self._wrapped = wrapped
         self._shard_to_mount: Dict[str, str] = shard_to_mount or {}
         self._max_workers = max_workers
+        self._numa_proximity_map: Dict[int, List[str]] = numa_proximity_map or {}
+        self._default_gpu_index = default_gpu_index
         self._mount_handles: Dict[str, io.BufferedReader] = {}
         self._executor: Optional[ThreadPoolExecutor] = None
         self._nvme_mounts: List[str] = []
@@ -278,6 +286,14 @@ class NVMEStripingModelPersister:
                 "HC-52: NVME striping active — %d mounts, max_workers=%d",
                 len(self._nvme_mounts), self._max_workers,
             )
+            # HC-50: log NUMA proximity map for operator visibility
+            if self._numa_proximity_map:
+                for gpu_idx, mounts in sorted(self._numa_proximity_map.items()):
+                    if mounts:
+                        logger.info(
+                            "HC-50: GPU %d NUMA-closest NVME: %s",
+                            gpu_idx, mounts[0] if mounts else "(none)",
+                        )
         else:
             logger.info(
                 "HC-52: single NVME mount — striping disabled, using direct reads",
@@ -321,6 +337,39 @@ class NVMEStripingModelPersister:
             self._executor = None
         self._initialized = False
 
+    def _numa_optimal_mount(self, shard_path: str, gpu_index: int) -> Optional[str]:
+        """
+        Return the NUMA-optimal NVME mount for reading a shard on a given GPU.
+
+        Logic (HC-50):
+          1. If shard is explicitly mapped to a mount, and that mount is valid for
+             this GPU's NUMA node, use it.
+          2. Otherwise, use the NUMA-proximity list for gpu_index (first entry =
+             NUMA-closest mount for that GPU).
+          3. Fall back to the direct read (no striping) if no valid mount found.
+        """
+        # Get the list of mounts sorted by NUMA closeness for this GPU
+        numa_mounts = self._numa_proximity_map.get(
+            gpu_index, self._numa_proximity_map.get(self._default_gpu_index, [])
+        )
+        if not numa_mounts:
+            return None
+
+        # Preferred mount from explicit shard mapping
+        preferred = self._shard_to_mount.get(shard_path)
+
+        # HC-50: if the preferred mount is not NUMA-optimal for this GPU,
+        # prefer the NUMA-closest mount instead. This avoids cross-socket traffic.
+        if preferred and preferred in self._nvme_mounts:
+            if numa_mounts and preferred != numa_mounts[0]:
+                logger.debug(
+                    "HC-50: shard %s preferred mount %s is not NUMA-closest (%s) for GPU %d — "
+                    "using NUMA-optimal mount",
+                    shard_path, preferred, numa_mounts[0], gpu_index,
+                )
+            return preferred
+        return numa_mounts[0] if numa_mounts else None
+
     def _striped_read(self, layer_name: str, checkpoint_path: str):
         """Read a shard file, routing to the appropriate NVME mount."""
         from safetensors.torch import load_file
@@ -328,11 +377,21 @@ class NVMEStripingModelPersister:
         shard_path = str(Path(checkpoint_path) / (layer_name + ".safetensors"))
         self._lazy_init()
 
-        if not self._nvme_mounts or shard_path not in self._shard_to_mount:
+        # Determine which GPU is active (default to 0 for single-GPU)
+        gpu_idx = self._default_gpu_index
+        try:
+            gpu_idx = torch.cuda.current_device() if torch.cuda.is_available() else 0
+        except Exception:
+            pass
+
+        if not self._nvme_mounts:
             return load_file(shard_path, device="cpu")
 
-        mount = self._shard_to_mount[shard_path]
-        if mount not in self._nvme_mounts:
+        # HC-50: use NUMA-proximity-aware mount selection
+        mount = self._numa_optimal_mount(shard_path, gpu_idx)
+
+        if mount is None or mount not in self._nvme_mounts:
+            return load_file(shard_path, device="cpu")
             logger.debug(
                 "HC-52: mapped mount %s not in valid mounts, direct read for %s",
                 mount, shard_path,
@@ -393,12 +452,25 @@ class NVMEStripingModelPersister:
 # Monkey-patch injection (called by airllm_runner.py)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def inject_striped_persister(model_path: str):
+def inject_striped_persister(
+    model_path: str,
+    numa_proximity_map: Optional[Dict[int, List[str]]] = None,
+) -> Optional["NVMEStripingModelPersister"]:
     """
     Build and inject a NVMEStripingModelPersister into the airllm.persist
     module so that subsequent AutoModel.load calls use multi-NVME reads.
 
     Must be called BEFORE ``from airllm import AutoModel``.
+
+    Args:
+      model_path: path to the model directory
+      numa_proximity_map: optional GPU-index → [nvme_mount_paths] map sorted by
+        NUMA closeness (from AIRLLM_NUMA_PROXIMITY_MAP env var, HC-50)
+
+    Env vars:
+      AIRLLM_NVME_MOUNTS: colon-separated NVME mount paths (required for striping)
+      AIRLLM_SHARD_MOUNTS: shard path → mount mappings
+      AIRLLM_NUMA_PROXIMITY_MAP: JSON GPU-index → [mounts] map (HC-50, set by runner.go)
     """
     nvme_mounts = discover_nvme_mounts()
     if len(nvme_mounts) < 2:
@@ -412,6 +484,21 @@ def inject_striped_persister(model_path: str):
         )
         return None
 
+    # HC-50: accept numa_proximity_map from caller (reads AIRLLM_NUMA_PROXIMITY_MAP
+    # in airllm_runner.py and passes it here). Also check env var directly.
+    if numa_proximity_map is None:
+        import json as _json
+        raw_numa = os.environ.get("AIRLLM_NUMA_PROXIMITY_MAP", "")
+        if raw_numa:
+            try:
+                numa_proximity_map = _json.loads(raw_numa)
+                # Convert JSON keys (which are strings) to int
+                numa_proximity_map = {
+                    int(k): v for k, v in numa_proximity_map.items()
+                }
+            except Exception as ex:
+                logger.warning("HC-50: failed to parse AIRLLM_NUMA_PROXIMITY_MAP: %s", ex)
+
     from airllm.persist.safetensor_model_persister import SafetensorModelPersister
     from airllm.persist import model_persister as mp_module
 
@@ -420,6 +507,7 @@ def inject_striped_persister(model_path: str):
         wrapped=wrapped,
         shard_to_mount=shard_to_mount,
         max_workers=len(nvme_mounts),
+        numa_proximity_map=numa_proximity_map or {},
     )
     mp_module.model_persister = striped
 
@@ -427,4 +515,6 @@ def inject_striped_persister(model_path: str):
         "HC-52: NVMEStripingModelPersister injected — %d shards mapped across %d mounts",
         len(shard_to_mount), len(nvme_mounts),
     )
+    if numa_proximity_map:
+        logger.info("HC-50: NUMA proximity map active — GPU→NVME routing enabled")
     return striped

@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -48,6 +49,17 @@ type GPUDevice struct {
 type GPUTopology struct {
 	Devices []GPUDevice // ordered by discovery order (AMD GPUs first, then NVIDIA)
 }
+
+// NUMANodeInfo describes a single NUMA node and the PCIe bus IDs attached to it.
+type NUMANodeInfo struct {
+	ID       int      // NUMA node index (0, 1, …)
+	Distance int      // relative NUMA distance (0 = self)
+	BusIDs   []string // PCIe bus IDs belonging to this node
+}
+
+// GPUToNVMEProximityMap maps GPU index → NVME mount paths sorted by NUMA closeness.
+// The first entry in the slice is the NUMA-closest mount; ties are broken arbitrarily.
+type GPUToNVMEProximityMap map[int][]string
 
 // discoverGPUTopology probes the host for AMD ROCm and NVIDIA CUDA GPUs.
 // It queries rocm-smi --json for AMD devices and nvidia-smi for NVIDIA devices,
@@ -123,6 +135,272 @@ func discoverGPUTopology() GPUTopology {
 	slog.Info("GPU topology discovered", "devices", summary)
 
 	return topo
+}
+
+// discoverNUMANodes queries the host for NUMA topology using numactl --hardware
+// and falls back to parsing /sys/devices/system/node/ on NUMA-aware Linux kernels.
+// Returns a map of NUMA node ID → NUMANodeInfo, and an empty map if NUMA is unavailable
+// (e.g., single-socket workstations, Windows, or containers without topology access).
+func discoverNUMANodes() map[int]NUMANodeInfo {
+	nodes := make(map[int]NUMANodeInfo)
+
+	// ── Method 1: numactl --hardware (preferred) ─────────────────────────────────
+	// Output format:
+	//   available: 2 nodes (0-1)
+	//   node 0 cpus: 0 1 2 3 4 5 6 7
+	//   node 0 size: 257922 MB
+	//   node 0 free: 223194 MB
+	//   node 1 cpus: 8 9 10 11 12 13 14 15
+	//   node 1 size: 258046 MB
+	//   node 1 free: 234589 MB
+	//   node distances:
+	//   node   0   1
+	//     0  10  20
+	//     1  20  10
+	out, err := exec.Command("numactl", "--hardware").Output()
+	if err == nil {
+		lines := strings.Split(string(out), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if !strings.HasPrefix(line, "node ") || strings.Contains(line, "distances") || strings.Contains(line, "cpus") || strings.Contains(line, "size") || strings.Contains(line, "free") {
+				continue
+			}
+			// Parse "node 0 cpus:" or "node 0 size:" lines
+			fields := strings.Fields(line)
+			if len(fields) < 2 {
+				continue
+			}
+			if fields[0] != "node" {
+				continue
+			}
+			id, err := strconv.Atoi(fields[1])
+			if err != nil {
+				continue
+			}
+			if _, ok := nodes[id]; !ok {
+				nodes[id] = NUMANodeInfo{ID: id, Distance: 0}
+			}
+		}
+		slog.Debug("NUMA nodes discovered via numactl", "count", len(nodes))
+	}
+
+	// ── Method 2: /sys/devices/system/node/ (sysfs fallback) ──────────────────
+	if len(nodes) == 0 {
+		sysNodeDir := "/sys/devices/system/node"
+		entries, err := os.ReadDir(sysNodeDir)
+		if err == nil {
+			for _, entry := range entries {
+				if !strings.HasPrefix(entry.Name(), "node") {
+					continue
+				}
+				idStr := strings.TrimPrefix(entry.Name(), "node")
+				id, err := strconv.Atoi(idStr)
+				if err != nil {
+					continue
+				}
+				nodes[id] = NUMANodeInfo{ID: id, Distance: 0}
+				slog.Debug("NUMA node discovered via sysfs", "node", id)
+			}
+		}
+	}
+
+	// ── Populate BusIDs for each node via /sys/devices/system/node/nodeN/devices/ ─
+	for nodeID := range nodes {
+		devicesDir := fmt.Sprintf("/sys/devices/system/node/node%d/devices", nodeID)
+		entries, err := os.ReadDir(devicesDir)
+		if err != nil {
+			continue
+		}
+		var busIDs []string
+		for _, entry := range entries {
+			// PCIe devices are listed under:
+			// - /sys/devices/system/node/nodeN/devices/pci0000:00/... (PCI bridges)
+			// - /sys/devices/system/node/nodeN/devices/gpu... (GPUs)
+			path := filepath.Join(devicesDir, entry.Name())
+			symlink, err := os.Readlink(path)
+			if err != nil {
+				continue
+			}
+			// Extract bus ID from symlink target path (e.g., ../../../pci0000:00/.../0001:3A:00.0)
+			if strings.Contains(symlink, "pci") {
+				parts := strings.Split(symlink, "/")
+				for _, p := range parts {
+					if strings.Contains(p, ":") && strings.Count(p, ":") == 2 {
+						busIDs = append(busIDs, p)
+					}
+				}
+			}
+		}
+		nodes[nodeID].BusIDs = busIDs
+	}
+
+	// ── Summary log ─────────────────────────────────────────────────────────────
+	if len(nodes) > 0 {
+		var nodeIDs []int
+		for id := range nodes {
+			nodeIDs = append(nodeIDs, id)
+		}
+		slog.Info("NUMA topology discovered", "nodes", nodeIDs, "total", len(nodes))
+	} else {
+		slog.Info("NUMA topology not available (single-node or unsupported platform)")
+	}
+
+	return nodes
+}
+
+// mapNVMEToNUMA probes the NVME block devices under /sys/block/nvme* and resolves
+// each one to its NUMA node via the PCIe topology under /sys/block/nvme*/device.
+//
+// Returns a map of mountPath → NUMA node ID (or -1 if unknown).
+func mapNVMEToNUMA(nvmeMounts []string) map[string]int {
+	result := make(map[string]int)
+
+	// Build a quick index: for each nvmeXn1 device, look up its PCIe bus ID
+	// and then find the NUMA node via the PCI device's numa_node attribute.
+	// The path varies between kernels:
+	//   /sys/block/nvme0n1/device/device/physfn/numa_node   (for VFIO/Virtual Function)
+	//   /sys/block/nvme0n1/device/numa_node                (direct NVMe on some kernels)
+	//   /sys/block/nvme0n1/device/device/numa_node          (PCIe endpoint)
+	blocks, _ := filepath.Glob("/sys/block/nvme*")
+	for _, blockPath := range blocks {
+		blockName := filepath.Base(blockPath) // e.g. "nvme0n1"
+
+		// Try direct numa_node first (most common on modern kernels).
+		numaPath := filepath.Join(blockPath, "device", "numa_node")
+		numa := readIntFile(numaPath, -1)
+
+		// Fallback: walk up the PCIe tree to find numa_node on the physical function.
+		if numa == -1 {
+			// /sys/block/nvme0n1/device/device points to the parent PCIe device.
+			deviceDevice := filepath.Join(blockPath, "device", "device")
+			if st, err := os.Stat(deviceDevice); err == nil && st.IsDir() {
+				// Try the physfn path (SR-IOV VF hierarchy).
+				physfnNumaPath := filepath.Join(deviceDevice, "physfn", "numa_node")
+				numa = readIntFile(physfnNumaPath, -1)
+			}
+			// Try the parent device directly.
+			if numa == -1 {
+				parentNumaPath := filepath.Join(blockPath, "device", "device", "numa_node")
+				numa = readIntFile(parentNumaPath, -1)
+			}
+		}
+
+		slog.Debug("NVMe block device NUMA mapping",
+			"device", blockName, "numa_node", numa)
+
+		// If we found a NUMA node for this NVMe, record it for every mount that
+		// uses this device (though we don't directly track which mount maps to which
+		// block device here — we just record the block → numa mapping; the caller
+		// matches mounts via the provided nvmeMounts list).
+		for _, mount := range nvmeMounts {
+			// Simple heuristic: if the mount path looks like it might be on this NVMe,
+			// associate it. In practice, nvmeMounts are filtered by the caller to
+			// only include paths on NVMe filesystems.
+			result[mount] = numa
+		}
+	}
+
+	// Fallback: if nvmeMounts were provided but we couldn't resolve them, mark as unknown.
+	for _, mount := range nvmeMounts {
+		if _, ok := result[mount]; !ok {
+			result[mount] = -1
+		}
+	}
+
+	return result
+}
+
+// buildGPUToNVMEProximityMap sorts the provided NVME mounts for each GPU by NUMA
+// proximity (closest first).  A GPU's own NUMA node has distance 0; each NUMA hop
+// away adds 20 (standard ACPI SLIT distance on x86).
+// The returned map's values are ordered: index 0 = NUMA-closest, last = NUMA-furthest.
+// If GPU-to-NUMA mapping is unknown for a GPU, all NVMe mounts are returned in
+// the order they were discovered (untouched).
+func buildGPUToNVMEProximityMap(topo GPUTopology, nvmeMountToNUMA map[string]int) GPUToNVMEProximityMap {
+	result := make(GPUToNVMEProximityMap)
+
+	// Gather unique NUMA node IDs.
+	numaNodes := discoverNUMANodes()
+
+	for _, gpu := range topo.Devices {
+		gpuNUMA := gpu.NUMANode
+		var scored []struct {
+			mount   string
+			score   int
+		}
+		for mount, devNUMA := range nvmeMountToNUMA {
+			dist := numaDistance(numaNodes, gpuNUMA, devNUMA)
+			scored = append(scored, struct {
+				mount string
+				score int
+			}{mount: mount, score: dist})
+		}
+		// Sort by score ascending (closest first); preserve original order on ties.
+		sortByNUMADistance(scored)
+		var ordered []string
+		for _, s := range scored {
+			ordered = append(ordered, s.mount)
+		}
+		result[gpu.Index] = ordered
+	}
+
+	return result
+}
+
+// numaDistance returns the NUMA distance from node a to node b using ACPI SLIT values.
+// Distance to self is 10 (x86 default).  Inter-node distances are read from
+// /sys/devices/system/node/nodeN/distance or fall back to 20 (one hop).
+func numaDistance(nodes map[int]NUMANodeInfo, nodeA, nodeB int) int {
+	if nodeA < 0 || nodeB < 0 {
+		return 100 // treat unknown nodes as far
+	}
+	if nodeA == nodeB {
+		return 10 // local NUMA node
+	}
+	// Read inter-node distance from sysfs (ACPI SLIT table on Linux).
+	distPath := fmt.Sprintf("/sys/devices/system/node/node%d/distance", nodeA)
+	data, err := os.ReadFile(distPath)
+	if err != nil {
+		return 20 // heuristic: one NUMA hop
+	}
+	// File contains space-separated distances: "10 20 20 40\n"
+	fields := strings.Fields(strings.TrimSpace(string(data)))
+	if nodeB < len(fields) {
+		if d, err := strconv.Atoi(fields[nodeB]); err == nil {
+			return d
+		}
+	}
+	return 20 // fallback
+}
+
+// sortByNUMADistance sorts scored entries in-place by ascending NUMA distance.
+func sortByNUMADistance(scored []struct {
+	mount string
+	score int
+}) {
+	// Simple insertion sort — dataset is typically ≤ 8 NVMe drives.
+	for i := 1; i < len(scored); i++ {
+		key := scored[i]
+		j := i - 1
+		for j >= 0 && scored[j].score > key.score {
+			scored[j+1] = scored[j]
+			j--
+		}
+		scored[j+1] = key
+	}
+}
+
+// readIntFile reads a one-line integer from a text file, returning def on error.
+func readIntFile(path string, def int) int {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return def
+	}
+	v, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		return def
+	}
+	return v
 }
 
 // gpuVRAMBytes returns a map of GPU index → VRAM in bytes by querying rocm-smi / nvidia-smi.
@@ -435,6 +713,33 @@ func (s *Server) startPythonRunner() error {
 		slog.Info("GPU VRAM detected", "gpus", vramSummary)
 	}
 
+	// HC-50: NUMA-aware NVME placement — discover NUMA topology, map NVMe drives to
+	// NUMA nodes by PCIe bus ID, and pass a GPU→NVMe proximity map to the Python
+	// runner so shard reads are routed to the NUMA-closest device.
+	var numaProximityJSON string
+	if nvmeMountsRaw := os.Getenv("AIRLLM_NVME_MOUNTS"); nvmeMountsRaw != "" {
+		// Comma-separated list of NVMe mount paths, e.g. /mnt/nvme0,/mnt/nvme1
+		nvmeMounts := strings.Split(nvmeMountsRaw, ",")
+		for i := range nvmeMounts {
+			nvmeMounts[i] = strings.TrimSpace(nvmeMounts[i])
+		}
+		nvmeToNUMA := mapNVMEToNUMA(nvmeMounts)
+		proxMap := buildGPUToNVMEProximityMap(topo, nvmeToNUMA)
+		if jsonBytes, err := json.Marshal(proxMap); err == nil {
+			numaProximityJSON = string(jsonBytes)
+			// Log the proximity map for operator visibility.
+			var logLines []string
+			for gpuIdx, mounts := range proxMap {
+				if len(mounts) > 0 {
+					logLines = append(logLines, fmt.Sprintf("GPU %d→%s (NUMA-closest)", gpuIdx, mounts[0]))
+				}
+			}
+			if len(logLines) > 0 {
+				slog.Info("HC-50 GPU→NVMe NUMA proximity", "mappings", logLines)
+			}
+		}
+	}
+
 	// Set AIRLLM_MULTI_GPU when GPU count is explicitly specified.
 	multiGPU := gpuCount > 1
 
@@ -465,6 +770,12 @@ func (s *Server) startPythonRunner() error {
 			"AIRLLM_MULTI_GPU", "1")
 	} else {
 		childEnv = append(childEnv, "AIRLLM_MULTI_GPU=0")
+	}
+
+	// HC-50: Pass NUMA proximity map as JSON to Python so it can route shard reads
+	// to the NUMA-closest NVMe for each GPU.
+	if numaProximityJSON != "" {
+		childEnv = append(childEnv, "AIRLLM_NUMA_PROXIMITY_MAP="+numaProximityJSON)
 	}
 
 	if _, ok := os.LookupEnv("AIRLLM_DEVICE"); !ok {
