@@ -182,10 +182,21 @@ func TestHardwareCPUInfo(t *testing.T) {
 }
 
 func TestHardwareNVMePerformance(t *testing.T) {
-	nvmePaths := []string{
-		"/nvme3",
-		"/run/media/piotro/CACHE",
-		"/run/media/piotro/CACHE1",
+	// Collect paths from env var (colon-separated), then fall back to common mount points.
+	nvmePaths := []string{}
+	if envPaths := os.Getenv("OLLAMA_TEST_NVME_PATHS"); envPaths != "" {
+		for _, p := range strings.Split(envPaths, ":") {
+			if p != "" {
+				nvmePaths = append(nvmePaths, p)
+			}
+		}
+	}
+	if len(nvmePaths) == 0 {
+		nvmePaths = []string{
+			"/nvme3",
+			"/run/media/piotro/CACHE",
+			"/run/media/piotro/CACHE1",
+		}
 	}
 
 	for _, path := range nvmePaths {

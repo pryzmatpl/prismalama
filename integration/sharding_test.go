@@ -23,10 +23,19 @@ var (
 		"nouscoder-14b-q4_k_m.gguf",
 	}
 
-	largeSafetensorsPaths = []string{
-		"/nvme3/AI Models/MiniMaxM2.5",
-		"/run/media/piotro/CACHE/airllm/Qwen2.5-Coder-32B-Instruct",
-	}
+	// Path to large safetensors model for sharding tests.
+	// Override via OLLAMA_TEST_SHARDING_MODEL_PATH env var.
+	// Falls back to OLLAMA_TEST_MODEL_PATH, then checks common local ollama paths.
+	largeSafetensorsPaths = func() []string {
+		if p := os.Getenv("OLLAMA_TEST_SHARDING_MODEL_PATH"); p != "" {
+			return []string{p}
+		}
+		if p := os.Getenv("OLLAMA_TEST_MODEL_PATH"); p != "" {
+			return []string{p}
+		}
+		// Fall back to checking default paths — tests will skip gracefully if not found.
+		return []string{}
+	}()
 )
 
 func getSystemMemory() (uint64, error) {
@@ -93,9 +102,12 @@ func TestLargeGGUFModelOffloading(t *testing.T) {
 	client, _, cleanup := InitServerConnection(ctx, t)
 	defer cleanup()
 
-	ggufPath := "/nvme3/ollama-models"
+	ggufPath := os.Getenv("OLLAMA_TEST_GGUF_MODEL_PATH")
+	if ggufPath == "" {
+		ggufPath = "/nvme3/ollama-models"
+	}
 	if _, err := os.Stat(ggufPath); os.IsNotExist(err) {
-		t.Skip("GGUF model path not found")
+		t.Skip("GGUF model path not found (set OLLAMA_TEST_GGUF_MODEL_PATH to override default /nvme3/ollama-models)")
 	}
 
 	for _, model := range largeGGUFModels {

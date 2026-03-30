@@ -419,10 +419,13 @@ func TestAirLLMModelDetection(t *testing.T) {
 		}
 	}
 	// If no env var, use defaults (will be skipped gracefully by the dir check below).
+	// Env override: OLLAMA_TEST_AIRLLM_MODEL_DIR — semicolon-separated list of paths.
 	if modelDirs == nil {
-		modelDirs = []string{
-			"/nvme3/AI Models/MiniMaxM2.5",
-			"/run/media/piotro/CACHE/airllm/Qwen2.5-Coder-32B-Instruct",
+		envPath := os.Getenv("OLLAMA_TEST_AIRLLM_MODEL_DIR")
+		if envPath != "" {
+			modelDirs = strings.Split(envPath, ";")
+		} else {
+			modelDirs = []string{}
 		}
 	}
 

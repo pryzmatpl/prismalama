@@ -503,9 +503,12 @@ func TestLargeModelSharding(t *testing.T) {
 }
 
 func TestNVMeModelLoading(t *testing.T) {
-	nvmePath := "/nvme3/ollama-models"
+	nvmePath := os.Getenv("OLLAMA_TEST_GGUF_MODEL_PATH")
+	if nvmePath == "" {
+		nvmePath = "/nvme3/ollama-models"
+	}
 	if _, err := os.Stat(nvmePath); os.IsNotExist(err) {
-		t.Skip("NVMe model path not found")
+		t.Skip("NVMe model path not found (set OLLAMA_TEST_GGUF_MODEL_PATH to override default /nvme3/ollama-models)")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
