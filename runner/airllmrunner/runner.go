@@ -169,12 +169,22 @@ func (s *Server) startPythonRunner() error {
 		"--port", strconv.Itoa(s.pythonPort),
 	)
 	// Inherit full parent env (HIP_VISIBLE_DEVICES, HSA_*, AIRLLM_DEVICE, etc.) for GPU visibility in PyTorch.
+	// ROCR_VISIBLE_DEVICES is set by the Ollama scheduler to select AMD GPU(s).
+	// We pass it through so the Python runner can map ROCr indices → HIP device indices.
 	childEnv := append(os.Environ(),
 		"AIRLLM_COMPRESSION="+os.Getenv("AIRLLM_COMPRESSION"),
 		"PYTHONPATH="+airllmPythonPath(pythonRunnerPath),
+		"ROCR_VISIBLE_DEVICES="+os.Getenv("ROCR_VISIBLE_DEVICES"),
 	)
 	if _, ok := os.LookupEnv("AIRLLM_DEVICE"); !ok {
-		childEnv = append(childEnv, "AIRLLM_DEVICE=cuda:0")
+		// On ROCm, HIP uses device indices that are independent of rocr-visible-devices order.
+		// Use hip:0 as the safe default (first visible HIP device); the Python runner will
+		// probe torch.cuda to confirm the device is actually usable.
+		if os.Getenv("ROCR_VISIBLE_DEVICES") != "" {
+			childEnv = append(childEnv, "AIRLLM_DEVICE=hip:0")
+		} else {
+			childEnv = append(childEnv, "AIRLLM_DEVICE=cuda:0")
+		}
 	}
 	cmd.Env = childEnv
 	adev := os.Getenv("AIRLLM_DEVICE")
