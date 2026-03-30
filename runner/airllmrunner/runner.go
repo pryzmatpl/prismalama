@@ -125,6 +125,89 @@ func discoverGPUTopology() GPUTopology {
 	return topo
 }
 
+// gpuVRAMBytes returns a map of GPU index → VRAM in bytes by querying rocm-smi / nvidia-smi.
+// It always returns a map even when no GPUs are found.
+func gpuVRAMBytes() map[int]int64 {
+	vram := make(map[int]int64)
+
+	// ── AMD ROCm ──────────────────────────────────────────────────────────────
+	// rocm-smi --showmeminfo vram --json returns: { "card$i": { "vram": "16384MiB", ... } }
+	out, err := exec.Command("rocm-smi", "--showmeminfo", "vram", "--json").Output()
+	if err == nil {
+		var m map[string]map[string]string
+		if err := json.Unmarshal(out, &m); err == nil {
+			for i := 0; ; i++ {
+				key := fmt.Sprintf("card%d", i)
+				card, ok := m[key]
+				if !ok {
+					break
+				}
+				raw, ok := card["vram"]
+				if !ok {
+					continue
+				}
+				// Format: "16384MiB" or "16384 MiB"
+				raw = strings.TrimSpace(raw)
+				raw = strings.ReplaceAll(raw, " ", "")
+				raw = strings.TrimSuffix(raw, "MiB")
+				if mb, err := strconv.ParseInt(raw, 10, 64); err == nil {
+					vram[i] = mb * 1024 * 1024
+				}
+			}
+		}
+	}
+
+	// ── NVIDIA CUDA ────────────────────────────────────────────────────────────
+	// nvidia-smi --query-gpu=index,memory.total --format=csv,noheader
+	// Output: "0, 16384 MiB\n1, 24576 MiB\n"
+	out, err = exec.Command("nvidia-smi", "--query-gpu=index,memory.total", "--format=csv,noheader").Output()
+	if err == nil {
+		reader := csv.NewReader(bytes.NewReader(out))
+		records, err := reader.ReadAll()
+		if err == nil {
+			for _, rec := range records {
+				if len(rec) < 2 {
+					continue
+				}
+				idx, err := strconv.Atoi(strings.TrimSpace(rec[0]))
+				if err != nil {
+					continue
+				}
+				raw := strings.TrimSpace(rec[1])
+				raw = strings.ReplaceAll(raw, " ", "")
+				raw = strings.TrimSuffix(raw, "MiB")
+				if mb, err := strconv.ParseInt(raw, 10, 64); err == nil {
+					vram[idx] = mb * 1024 * 1024
+				}
+			}
+		}
+	}
+
+	return vram
+}
+
+// parseVRAMBudget parses a comma-separated string of GB values (e.g. "24,48,24,48")
+// into a slice of byte values. Returns nil if the string is empty.
+func parseVRAMBudget(raw string) []int64 {
+	if raw == "" {
+		return nil
+	}
+	var budgets []int64
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		gb, err := strconv.ParseFloat(part, 64)
+		if err != nil {
+			slog.Warn("AIRLLM_VRAM_BUDGET_GB: non-numeric value, skipping", "value", part)
+			continue
+		}
+		budgets = append(budgets, int64(gb*1024*1024*1024))
+	}
+	return budgets
+}
+
 // gpuVisibleDevices builds ROCR_VISIBLE_DEVICES and CUDA_VISIBLE_DEVICES strings
 // from the detected topology, honouring any AIRLLM_GPU_TOPOLOGY override.
 // topologyOverride is the raw AIRLLM_GPU_TOPOLOGY env value (may be empty).
@@ -323,6 +406,38 @@ func (s *Server) startPythonRunner() error {
 	topoOverride := os.Getenv("AIRLLM_GPU_TOPOLOGY")
 	rocrVisible, cudaVisible := gpuVisibleDevices(topo, topoOverride)
 
+	// HC-49: Multi-GPU weight streaming orchestration.
+	// Detect number of GPUs to use and per-GPU VRAM budgets.
+	gpuCountStr := os.Getenv("AIRLLM_GPU_COUNT")
+	gpuCount := 0
+	if gpuCountStr != "" {
+		if n, err := strconv.Atoi(gpuCountStr); err == nil && n > 0 {
+			gpuCount = n
+		}
+	}
+
+	vramBudgetGB := os.Getenv("AIRLLM_VRAM_BUDGET_GB")
+	vramBudgets := parseVRAMBudget(vramBudgetGB)
+
+	// Detect VRAM per GPU via rocm-smi / nvidia-smi for logging.
+	detectedVRAM := gpuVRAMBytes()
+	var vramSummary []string
+	for i, bytes := range detectedVRAM {
+		gb := float64(bytes) / 1024 / 1024 / 1024
+		budgetStr := ""
+		if i < len(vramBudgets) {
+			budgetGb := float64(vramBudgets[i]) / 1024 / 1024 / 1024
+			budgetStr = fmt.Sprintf(" (budget=%.0f GB)", budgetGb)
+		}
+		vramSummary = append(vramSummary, fmt.Sprintf("GPU %d: %.1f GB%s", i, gb, budgetStr))
+	}
+	if len(vramSummary) > 0 {
+		slog.Info("GPU VRAM detected", "gpus", vramSummary)
+	}
+
+	// Set AIRLLM_MULTI_GPU when GPU count is explicitly specified.
+	multiGPU := gpuCount > 1
+
 	cmd := exec.Command("python3", pythonRunnerPath,
 		"--model", s.modelPath,
 		"--port", strconv.Itoa(s.pythonPort),
@@ -336,6 +451,22 @@ func (s *Server) startPythonRunner() error {
 		"ROCR_VISIBLE_DEVICES="+rocrVisible,
 		"CUDA_VISIBLE_DEVICES="+cudaVisible,
 	)
+	// HC-49: Pass multi-GPU configuration to the Python runner.
+	if multiGPU {
+		childEnv = append(childEnv, "AIRLLM_MULTI_GPU=1")
+		childEnv = append(childEnv, fmt.Sprintf("AIRLLM_GPU_COUNT=%d", gpuCount))
+		// Pass per-GPU VRAM budgets as AIRLLM_GPU_VRAM_BUDGET_<N>.
+		for i, budget := range vramBudgets {
+			childEnv = append(childEnv, fmt.Sprintf("AIRLLM_GPU_VRAM_BUDGET_%d=%d", i, budget))
+		}
+		slog.Info("HC-49 multi-GPU mode enabled",
+			"gpu_count", gpuCount,
+			"vram_budget_gb", vramBudgetGB,
+			"AIRLLM_MULTI_GPU", "1")
+	} else {
+		childEnv = append(childEnv, "AIRLLM_MULTI_GPU=0")
+	}
+
 	if _, ok := os.LookupEnv("AIRLLM_DEVICE"); !ok {
 		// On ROCm, HIP uses device indices that are independent of rocr-visible-devices order.
 		// Default to the first visible AMD device when AMD GPUs are detected;
