@@ -1,0 +1,34 @@
+# Fast path: install a package already built on Arch (e.g. `makepkg -sf` in repo root).
+# 1) cp prismalama-ollama-*.pkg.tar.zst docker/arch/prismalama.pkg.tar.zst
+# 2) docker build -f docker/arch/Dockerfile.prebuilt -t prismalama-arch docker/arch
+#
+# Same runtime layout as docker/arch/Dockerfile; skips ROCm compile in CI/registry.
+
+FROM archlinux:latest
+
+RUN pacman -Syu --noconfirm \
+	&& pacman -S --needed --noconfirm systemd \
+	&& pacman -Scc --noconfirm || true
+
+COPY prismalama.pkg.tar.zst /tmp/prismalama.pkg.tar.zst
+
+RUN pacman -U --noconfirm /tmp/prismalama.pkg.tar.zst \
+	&& rm -f /tmp/prismalama.pkg.tar.zst
+
+RUN getent passwd ollama >/dev/null 2>&1 || useradd -r -d /var/lib/ollama -s /usr/sbin/nologin ollama
+RUN install -d -m 0755 -o ollama -g ollama /var/lib/ollama
+
+COPY entrypoint.sh /usr/local/bin/prismalama-entrypoint.sh
+RUN chmod +x /usr/local/bin/prismalama-entrypoint.sh
+
+ENV OLLAMA_HOST=0.0.0.0:11434
+ENV OLLAMA_MODELS=/var/lib/ollama
+ENV OLLAMA_LIBRARY_PATH=/usr/lib/ollama/rocm
+ENV LD_LIBRARY_PATH=/usr/lib/ollama/rocm:/opt/rocm/lib
+
+EXPOSE 11434
+
+WORKDIR /var/lib/ollama
+
+ENTRYPOINT ["/usr/local/bin/prismalama-entrypoint.sh"]
+CMD ["serve"]

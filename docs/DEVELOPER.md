@@ -112,9 +112,10 @@ The **default GGUF path** is **llama.cpp** embedded under `llama/` (Go bindings 
 | Image / target | Dockerfile | Role |
 |----------------|------------|------|
 | `prismalama-test` | `docker/test/Dockerfile` | **CPU-only** GGML + `ollama` for CI and **`make ship-check-fast`** (no GPU). |
-| `prismalama-gpu` | `docker/gpu/Dockerfile` | **AMD ROCm (HIP) + Vulkan + CPU** GGML under `/usr/lib/ollama/rocm`, same layout as the Arch package; for bare-metal GPU or Kubernetes with an AMD GPU device plugin. |
+| `prismalama-gpu` | `docker/gpu/Dockerfile` | **AMD ROCm (HIP) + Vulkan + CPU** GGML under `/usr/lib/ollama/rocm`, Ubuntu/ROCm dev base; for GPU without Arch on the host. |
+| `prismalama-arch` | `docker/arch/Dockerfile` | **Arch Linux** image: **`makepkg`** the root **`PKGBUILD`** inside Docker (or **`Dockerfile.prebuilt`** + `docker/arch/prismalama.pkg.tar.zst`) so the container matches a native **`pacman -U prismalama-ollama`** install. |
 
-Build/run: **`make docker-test-build`** / **`make docker-test`** vs **`make docker-gpu-build`** / **`make docker-gpu-run`**. Kubernetes notes and example manifests: **`docker/gpu/README.md`**, **`docker/gpu/k8s/example-deployment.yaml`**.
+Build/run: **`make docker-test-build`** / **`make docker-test`** vs **`make docker-gpu-build`** / **`make docker-gpu-run`** vs **`make docker-arch-build`** / **`make docker-arch-prebuilt-build`** / **`make docker-arch-run`**. Kubernetes notes and example manifests: **`docker/gpu/README.md`**, **`docker/gpu/k8s/example-deployment.yaml`**. Arch package image: **`docker/arch/README.md`**.
 
 ## Related docs
 
@@ -124,4 +125,5 @@ Build/run: **`make docker-test-build`** / **`make docker-test`** vs **`make dock
 - `llama/README.md` — vendoring **prismallama.cpp** into `llama/`.
 - `integration/TEST_README.md` — test tags and hardware expectations.
 - `docker/gpu/README.md` — AMD GPU container (ROCm HIP + Vulkan) and Kubernetes.
+- `docker/arch/README.md` — Arch **`prismalama-ollama`** package as a container (same files as `pacman -U`).
 - `docs/RUNTIME_DISPATCH.md` — which runner (**llama** vs **AirLLM**) handles a model; read **`runner dispatch`** logs.

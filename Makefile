@@ -18,12 +18,16 @@ help:
 	@echo "  docker-test-shell    Interactive shell in test image"
 	@echo "  docker-gpu-build     Build docker/gpu image (AMD ROCm HIP + Vulkan GGML, prismalama-gpu)"
 	@echo "  docker-gpu-run       Run prismalama-gpu with GPU devices (see docker/gpu/README.md)"
+	@echo "  docker-arch-build    Build docker/arch from PKGBUILD (Arch base, matches pacman install; long build)"
+	@echo "  docker-arch-prebuilt-build  Build docker/arch from docker/arch/prismalama.pkg.tar.zst (fast)"
+	@echo "  docker-arch-run      Run prismalama-arch with AMD GPU devices (see docker/arch/README.md)"
 	@echo
 	@echo "Examples:"
 	@echo "  make build"
 	@echo "  make build-pkg"
 	@echo "  make update-subrepos"
 	@echo "  make docker-gpu-build   # AMD GPU image (long build)"
+	@echo "  make docker-arch-build  # Arch PKGBUILD image (matches pacman install; long build)"
 
 .PHONY: build
 build:
@@ -104,3 +108,20 @@ docker-gpu-run:
 		--group-add video --group-add render \
 		-e HIP_VISIBLE_DEVICES=0 \
 		prismalama-gpu
+
+.PHONY: docker-arch-build
+docker-arch-build:
+	docker build -f docker/arch/Dockerfile -t prismalama-arch .
+
+.PHONY: docker-arch-prebuilt-build
+docker-arch-prebuilt-build:
+	@test -f docker/arch/prismalama.pkg.tar.zst || (echo "Missing docker/arch/prismalama.pkg.tar.zst — run: cp prismalama-ollama-*.pkg.tar.zst docker/arch/prismalama.pkg.tar.zst" >&2; exit 1)
+	docker build -f docker/arch/Dockerfile.prebuilt -t prismalama-arch docker/arch
+
+.PHONY: docker-arch-run
+docker-arch-run:
+	docker run --rm -p 11434:11434 \
+		--device /dev/kfd --device /dev/dri \
+		--group-add video --group-add render \
+		-e HIP_VISIBLE_DEVICES=0 \
+		prismalama-arch
