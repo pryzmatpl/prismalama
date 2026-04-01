@@ -31,6 +31,13 @@ type Backend interface {
 	BackendDevices() []DeviceInfo
 }
 
+// StreamingBackend is an optional interface for backends that support
+// layer-by-layer weight streaming (AirLLM-like loading for large GGUF models).
+// When OLLAMA_LAYER_STREAMING=1, the runner uses LoadStreaming instead of Load.
+type StreamingBackend interface {
+	LoadStreaming(ctx context.Context, progress func(float32)) error
+}
+
 // BackendCacheConfig should be implemented by backends that need special output
 // from the cache to meet specific requirements. It is frequently implemented in
 // conjunction with ScaledDotProductAttention.

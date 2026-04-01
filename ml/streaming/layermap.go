@@ -79,10 +79,10 @@ func BuildLayerMap(g *ggml.GGML) (*LayerMap, error) {
 
 func buildLayerInfo(index int, name string, layer ggml.Layer) LayerInfo {
 	li := LayerInfo{Index: index, Name: name}
-	for tName, t := range layer {
+	for _, t := range layer {
 		sz := t.Size()
 		ref := TensorRef{
-			Name:   tName,
+			Name:   t.Name,
 			Offset: t.Offset,
 			Size:   sz,
 		}
@@ -103,10 +103,10 @@ func buildOutputLayer(blockCount int, grouped map[string]ggml.Layer) LayerInfo {
 		if !ok {
 			continue
 		}
-		for tName, t := range layer {
+		for _, t := range layer {
 			sz := t.Size()
 			ref := TensorRef{
-				Name:   key + "." + tName,
+				Name:   t.Name,
 				Offset: t.Offset,
 				Size:   sz,
 			}

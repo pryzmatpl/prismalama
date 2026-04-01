@@ -16,7 +16,8 @@ Treating those as the same product feature causes **wrong expectations** and **w
 | **`runner.DecideEngine`** (`runner/dispatch.go`) | Single, testable decision: **GGML** vs **AirLLM** for a model directory + reason string. |
 | **`GET /api/prismalama/capabilities`** | Operator-facing JSON: **GGML vs AirLLM vs layer streaming** semantics, env state, doc pointers. |
 | **`ml/streaming`** package | **Layer map**, **budget tracker**, **NVMe prefetcher**, **streamer orchestrator** — the infrastructure for AirLLM-like GGUF streaming inside the native Go + GGML stack. Controlled by **`OLLAMA_LAYER_STREAMING`** and **`OLLAMA_STREAMING_BUDGET`**. |
-| **Integration + unit tests** | Ship bar covers dispatch, streaming env, budget defaults, and orchestrator behavior. |
+| **`ml.StreamingBackend`** + **`Backend.LoadStreaming`** | Optional backend interface: when `OLLAMA_LAYER_STREAMING=1`, the GGML backend loads weights **block-by-block** (sequential NVMe, format transforms, per-layer progress) instead of the default concurrent all-at-once load. The runner detects the interface at load time. |
+| **Integration + unit tests** | Ship bar covers dispatch, streaming env, budget defaults, orchestrator behavior, GGUF tensor name fidelity, and backend interface detection. |
 
 ## Target: GGUF models, AirLLM-like streaming, prismallama compute
 

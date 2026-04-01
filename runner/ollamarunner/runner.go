@@ -1248,12 +1248,25 @@ func (s *Server) closeModel() {
 }
 
 // loadModel loads the weights for a model. The memory must already
-// have been allocated with allocModel
+// have been allocated with allocModel.
+// When OLLAMA_LAYER_STREAMING=1 and the backend supports it, weights are
+// loaded layer-by-layer (sequential NVMe reads, bounded I/O) instead of
+// the default concurrent all-at-once load.
 func (s *Server) loadModel() {
-	err := s.model.Backend().Load(context.TODO(),
-		func(progress float32) {
-			s.progress = progress
-		})
+	progressFn := func(progress float32) { s.progress = progress }
+
+	var err error
+	if envconfig.LayerStreaming() {
+		if sb, ok := s.model.Backend().(ml.StreamingBackend); ok {
+			slog.Info("loadModel: using layer streaming load")
+			err = sb.LoadStreaming(context.TODO(), progressFn)
+		} else {
+			slog.Warn("loadModel: OLLAMA_LAYER_STREAMING=1 but backend does not support streaming, falling back to standard load")
+			err = s.model.Backend().Load(context.TODO(), progressFn)
+		}
+	} else {
+		err = s.model.Backend().Load(context.TODO(), progressFn)
+	}
 	if err != nil {
 		panic(fmt.Errorf("failed to load model: %v", err))
 	}
