@@ -114,6 +114,56 @@ class AirLLMModel:
         self.compression = "4bit"
         self._model_loaded = False
         
+        # HC-50: NUMA-aware NVME placement — load GPU→NVMe proximity map from env.
+        # Format: JSON {"gpu_idx": ["/mnt/nvme0", "/mnt/nvme1", ...], ...}
+        # NVMe mounts are ordered by NUMA proximity (closest first).
+        self.numa_proximity_map: Dict[int, List[str]] = {}
+        self._load_numa_proximity()
+    
+    def _load_numa_proximity(self):
+        """Parse AIRLLM_NUMA_PROXIMITY_MAP from environment and log GPU→NVMe proximity."""
+        raw = os.environ.get("AIRLLM_NUMA_PROXIMITY_MAP", "")
+        if not raw:
+            return
+        try:
+            self.numa_proximity_map = json.loads(raw)
+            # Log GPU→NVMe proximity at startup.
+            for gpu_idx_str, mounts in self.numa_proximity_map.items():
+                if not mounts:
+                    continue
+                gpu_idx = int(gpu_idx_str) if isinstance(gpu_idx_str, str) else gpu_idx_str
+                closest = mounts[0]
+                logger.info(
+                    "HC-50 GPU→NVMe NUMA proximity: GPU %d → %s (NUMA-closest)",
+                    gpu_idx,
+                    closest,
+                )
+                if len(mounts) > 1:
+                    others = ", ".join(mounts[1:])
+                    logger.info(
+                        "HC-50 GPU→NVMe secondary paths for GPU %d: %s",
+                        gpu_idx,
+                        others,
+                    )
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.warning(
+                "HC-50: failed to parse AIRLLM_NUMA_PROXIMITY_MAP: %s — NUMA-aware placement disabled",
+                e,
+            )
+    
+    def get_numa_closest_nvme(self, gpu_idx: int) -> Optional[str]:
+        """Return the NUMA-closest NVMe mount path for the given GPU index, or None."""
+        if not self.numa_proximity_map:
+            return None
+        mounts = self.numa_proximity_map.get(gpu_idx, [])
+        return mounts[0] if mounts else None
+    
+    def get_nvme_priority_list(self, gpu_idx: int) -> List[str]:
+        """Return all NVMe mounts for a GPU, ordered by NUMA proximity (closest first)."""
+        if not self.numa_proximity_map:
+            return []
+        return self.numa_proximity_map.get(gpu_idx, [])
+        
     def load(self, model_path: str, options: dict):
         """Load model using AirLLM with layer-by-layer loading."""
         self.status = ServerStatus.LOADING_MODEL
@@ -149,6 +199,28 @@ class AirLLMModel:
                     n_dev,
                     device,
                 )
+                
+                # HC-50: Log NUMA-aware NVMe placement information.
+                numa_closest = self.get_numa_closest_nvme(main_gpu)
+                if numa_closest:
+                    logger.info(
+                        "HC-50 NUMA-aware placement: GPU %d will prefer NVMe at %s for shard reads",
+                        main_gpu,
+                        numa_closest,
+                    )
+                    nvme_list = self.get_nvme_priority_list(main_gpu)
+                    if len(nvme_list) > 1:
+                        logger.info(
+                            "HC-50 NVMe fallback chain for GPU %d: %s",
+                            main_gpu,
+                            " → ".join(nvme_list),
+                        )
+                else:
+                    logger.info(
+                        "HC-50: no NUMA proximity map available for GPU %d — shard routing uses defaults",
+                        main_gpu,
+                    )
+                
                 if not cuda_ok:
                     logger.warning(
                         "PyTorch reports no CUDA/ROCm GPU; AirLLM will run on CPU unless you install "
