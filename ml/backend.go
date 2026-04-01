@@ -38,6 +38,18 @@ type StreamingBackend interface {
 	LoadStreaming(ctx context.Context, progress func(float32)) error
 }
 
+// StreamingComputeBackend is an optional interface for backends that support
+// streaming inference: loading/evicting block weights DURING graph compute
+// via an eval callback. The runner sets up inference streaming around Compute.
+type StreamingComputeBackend interface {
+	// PrepareStreamingCompute scans the graph in ctx, sets the eval callback,
+	// and returns (block count, cleanup func, error). The onBlockDone callback
+	// is invoked at each block boundary during compute with the block index
+	// whose last node just completed. It should load the next block's weights
+	// and evict the current block's. Return false from onBlockDone to cancel.
+	PrepareStreamingCompute(ctx Context, onBlockDone func(blockIdx int) bool) (blocks int, cleanup func(), err error)
+}
+
 // BackendCacheConfig should be implemented by backends that need special output
 // from the cache to meet specific requirements. It is frequently implemented in
 // conjunction with ScaledDotProductAttention.

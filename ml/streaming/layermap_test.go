@@ -8,18 +8,21 @@ import (
 	"github.com/ollama/ollama/fs/ggml"
 )
 
+func tensorBuf() *bytes.Buffer {
+	return bytes.NewBuffer(make([]byte, 2*3*4))
+}
+
 func writeTestGGUF(t *testing.T) string {
 	t.Helper()
-	data := bytes.NewBuffer(make([]byte, 7*2*3*4)) // 7 tensors × 2×3 float32 = 168 bytes
 
 	ts := []*ggml.Tensor{
-		{Name: "token_embd.weight", Kind: uint32(ggml.TensorTypeF32), Shape: []uint64{2, 3}, WriterTo: data},
-		{Name: "blk.0.attn_q.weight", Kind: uint32(ggml.TensorTypeF32), Shape: []uint64{2, 3}, WriterTo: data},
-		{Name: "blk.0.attn_v.weight", Kind: uint32(ggml.TensorTypeF32), Shape: []uint64{2, 3}, WriterTo: data},
-		{Name: "blk.1.attn_q.weight", Kind: uint32(ggml.TensorTypeF32), Shape: []uint64{2, 3}, WriterTo: data},
-		{Name: "blk.1.attn_v.weight", Kind: uint32(ggml.TensorTypeF32), Shape: []uint64{2, 3}, WriterTo: data},
-		{Name: "output_norm.weight", Kind: uint32(ggml.TensorTypeF32), Shape: []uint64{3, 2}, WriterTo: data},
-		{Name: "output.weight", Kind: uint32(ggml.TensorTypeF32), Shape: []uint64{3, 2}, WriterTo: data},
+		{Name: "token_embd.weight", Kind: uint32(ggml.TensorTypeF32), Shape: []uint64{2, 3}, WriterTo: tensorBuf()},
+		{Name: "blk.0.attn_q.weight", Kind: uint32(ggml.TensorTypeF32), Shape: []uint64{2, 3}, WriterTo: tensorBuf()},
+		{Name: "blk.0.attn_v.weight", Kind: uint32(ggml.TensorTypeF32), Shape: []uint64{2, 3}, WriterTo: tensorBuf()},
+		{Name: "blk.1.attn_q.weight", Kind: uint32(ggml.TensorTypeF32), Shape: []uint64{2, 3}, WriterTo: tensorBuf()},
+		{Name: "blk.1.attn_v.weight", Kind: uint32(ggml.TensorTypeF32), Shape: []uint64{2, 3}, WriterTo: tensorBuf()},
+		{Name: "output_norm.weight", Kind: uint32(ggml.TensorTypeF32), Shape: []uint64{3, 2}, WriterTo: tensorBuf()},
+		{Name: "output.weight", Kind: uint32(ggml.TensorTypeF32), Shape: []uint64{3, 2}, WriterTo: tensorBuf()},
 	}
 
 	f, err := os.CreateTemp(t.TempDir(), "test-*.gguf")

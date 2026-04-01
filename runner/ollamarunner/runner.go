@@ -33,6 +33,7 @@ import (
 	"github.com/ollama/ollama/logutil"
 	"github.com/ollama/ollama/ml"
 	"github.com/ollama/ollama/ml/nn/pooling"
+	"github.com/ollama/ollama/ml/streaming"
 	"github.com/ollama/ollama/model"
 	"github.com/ollama/ollama/model/input"
 	"github.com/ollama/ollama/runner/common"
@@ -385,6 +386,9 @@ type Server struct {
 	// multimodalHash generates hashes for comparing equality
 	// of non-text data
 	multimodalHash maphash.Hash
+
+	// inferenceStreamer manages per-block weight loading/eviction during streaming inference
+	inferenceStreamer *streaming.InferenceStreamer
 }
 
 func (s *Server) allNil() bool {
@@ -713,12 +717,29 @@ func (s *Server) computeBatch(activeBatch batchState) {
 	s.mu.Unlock()
 
 	activeBatch.batch.Inputs.FromInts(batchInputs)
+
+	var streamCleanup func()
+	if s.inferenceStreamer != nil {
+		if scb, ok := s.model.Backend().(ml.StreamingComputeBackend); ok {
+			_, cleanup, err := scb.PrepareStreamingCompute(activeBatch.ctx, s.inferenceStreamer.OnBlockDone)
+			if err != nil {
+				slog.Warn("streaming inference: prepare failed for batch, falling back", "error", err)
+			} else {
+				streamCleanup = cleanup
+			}
+		}
+	}
+
 	activeBatch.ctx.ComputeWithNotify(
 		func() {
 			logutil.Trace("computeBatch: signaling computeStartedCh", "batchID", activeBatch.id)
 			activeBatch.computeStartedCh <- struct{}{}
 		},
 		activeBatch.modelOutput)
+
+	if streamCleanup != nil {
+		streamCleanup()
+	}
 
 	outputs := activeBatch.modelOutput.Floats()
 	t := time.Now()
@@ -1239,6 +1260,10 @@ func (s *Server) allocModel(
 
 // closeModel frees all memory associated with a model
 func (s *Server) closeModel() {
+	if s.inferenceStreamer != nil {
+		s.inferenceStreamer.Close()
+		s.inferenceStreamer = nil
+	}
 	s.cache.Close()
 	s.cache = nil
 	if s.model != nil {
@@ -1264,6 +1289,7 @@ func (s *Server) loadModel() {
 			slog.Warn("loadModel: OLLAMA_LAYER_STREAMING=1 but backend does not support streaming, falling back to standard load")
 			err = s.model.Backend().Load(context.TODO(), progressFn)
 		}
+		s.initInferenceStreamer()
 	} else {
 		err = s.model.Backend().Load(context.TODO(), progressFn)
 	}
@@ -1273,6 +1299,36 @@ func (s *Server) loadModel() {
 
 	s.status = llm.ServerStatusReady
 	s.ready.Done()
+}
+
+func (s *Server) initInferenceStreamer() {
+	f, err := os.Open(s.modelPath)
+	if err != nil {
+		slog.Warn("streaming inference: could not open model for LayerMap", "error", err)
+		return
+	}
+	defer f.Close()
+
+	g, err := ggml.Decode(f, 0)
+	if err != nil {
+		slog.Warn("streaming inference: could not decode GGUF for LayerMap", "error", err)
+		return
+	}
+
+	lm, err := streaming.BuildLayerMap(g)
+	if err != nil {
+		slog.Warn("streaming inference: could not build LayerMap", "error", err)
+		return
+	}
+
+	is := streaming.NewInferenceStreamer(s.model.Backend(), s.modelPath, lm)
+	if err := is.PrepareForInference(context.TODO()); err != nil {
+		slog.Warn("streaming inference: prepare failed", "error", err)
+		is.Close()
+		return
+	}
+	s.inferenceStreamer = is
+	slog.Info("streaming inference: initialized", "blocks", lm.BlockCount, "total_weight_bytes", lm.TotalWeightBytes)
 }
 
 // load is the handler called by the Ollama server to process different

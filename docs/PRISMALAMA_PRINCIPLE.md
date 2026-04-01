@@ -17,7 +17,9 @@ Treating those as the same product feature causes **wrong expectations** and **w
 | **`GET /api/prismalama/capabilities`** | Operator-facing JSON: **GGML vs AirLLM vs layer streaming** semantics, env state, doc pointers. |
 | **`ml/streaming`** package | **Layer map**, **budget tracker**, **NVMe prefetcher**, **streamer orchestrator** — the infrastructure for AirLLM-like GGUF streaming inside the native Go + GGML stack. Controlled by **`OLLAMA_LAYER_STREAMING`** and **`OLLAMA_STREAMING_BUDGET`**. |
 | **`ml.StreamingBackend`** + **`Backend.LoadStreaming`** | Optional backend interface: when `OLLAMA_LAYER_STREAMING=1`, the GGML backend loads weights **block-by-block** (sequential NVMe, format transforms, per-layer progress) instead of the default concurrent all-at-once load. The runner detects the interface at load time. |
-| **Integration + unit tests** | Ship bar covers dispatch, streaming env, budget defaults, orchestrator behavior, GGUF tensor name fidelity, and backend interface detection. |
+| **`ml.StreamingComputeBackend`** + **GGML eval callback** | Streaming inference: the GGML scheduler's **eval callback** pauses compute at each block boundary (`ScanBlockBoundaries`), invokes `InferenceStreamer.OnBlockDone` to **load the next block's weights** from NVMe and **evict the previous block's**. Peak memory during inference = **1 block + KV cache + activations**. |
+| **`ml/streaming.InferenceStreamer`** | Runtime coordinator: opens the GGUF file, loads initial block + output weights, then drives block-by-block weight rotation via `OnBlockDone`. The runner creates it at model-load time and installs it around every `ComputeWithNotify` call. |
+| **Integration + unit tests** | Ship bar covers dispatch, streaming env, budget defaults, orchestrator behavior, GGUF tensor name fidelity, backend interface detection, inference streamer lifecycle, and streaming compute interface. |
 
 ## Target: GGUF models, AirLLM-like streaming, prismallama compute
 
