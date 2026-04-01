@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/ollama/ollama/api"
+	"github.com/ollama/ollama/envconfig"
 	"github.com/ollama/ollama/version"
 )
 
@@ -26,11 +27,17 @@ func buildPrismalamaCapabilities() api.PrismalamaCapabilitiesResponse {
 	resp.AirLLM.WeightSemantics = "Hugging Face–style checkpoints: layer-wise execution and NVMe-oriented streaming where AirLLM supports the architecture"
 	resp.AirLLM.OptInEnv = "OLLAMA_USE_AIRLLM"
 
+	resp.LayerStreaming.Enabled = envconfig.LayerStreaming()
+	resp.LayerStreaming.BudgetBytes = envconfig.StreamingBudgetBytes()
+	resp.LayerStreaming.Semantics = "GGUF layer-by-layer: load block from NVMe, compute on GPU, evict, prefetch next — AirLLM-like behavior for native GGUF"
+	resp.LayerStreaming.EnableEnv = "OLLAMA_LAYER_STREAMING"
+
 	resp.Environment.OLLAMA_USE_AIRLLM = os.Getenv("OLLAMA_USE_AIRLLM")
+	resp.Environment.OLLAMA_LAYER_STREAMING = os.Getenv("OLLAMA_LAYER_STREAMING")
 
 	resp.Enterprise.CapabilitiesPath = "/api/prismalama/capabilities"
 	resp.Enterprise.DispatchDocs = "docs/RUNTIME_DISPATCH.md"
-	resp.Enterprise.Note = "GGUF default path does not replicate AirLLM streaming inside GGML; use AirLLM path for HF layouts when opted in, or see prismallama.cpp for GGUF engine evolution"
+	resp.Enterprise.Note = "Layer streaming (OLLAMA_LAYER_STREAMING=1) brings AirLLM-like semantics to GGUF via native prismallama compute; see docs/PRISMALAMA_PRINCIPLE.md"
 
 	return resp
 }

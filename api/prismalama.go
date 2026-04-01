@@ -16,8 +16,16 @@ type PrismalamaCapabilitiesResponse struct {
 		OptInEnv        string `json:"opt_in_environment_variable"`
 	} `json:"airllm"`
 
+	LayerStreaming struct {
+		Enabled         bool   `json:"enabled"`
+		BudgetBytes     uint64 `json:"budget_bytes"`
+		Semantics       string `json:"semantics"`
+		EnableEnv       string `json:"enable_environment_variable"`
+	} `json:"layer_streaming"`
+
 	Environment struct {
-		OLLAMA_USE_AIRLLM string `json:"ollama_use_airllm"`
+		OLLAMA_USE_AIRLLM      string `json:"ollama_use_airllm"`
+		OLLAMA_LAYER_STREAMING string `json:"ollama_layer_streaming"`
 	} `json:"environment"`
 
 	Enterprise struct {

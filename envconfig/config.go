@@ -298,6 +298,15 @@ var GpuOverhead = Uint64("OLLAMA_GPU_OVERHEAD", 3*format.GibiByte)
 // from disk instead of being fully resident in RAM.
 var MmapAllowLowRamLinux = Bool("OLLAMA_MMAP_ALLOW_LOW_RAM")
 
+// LayerStreaming enables AirLLM-like layer-by-layer weight streaming for GGUF models that
+// exceed VRAM. When enabled, the orchestrator loads/evicts transformer blocks from NVMe
+// within a fixed budget instead of requiring the full model in memory.
+var LayerStreaming = Bool("OLLAMA_LAYER_STREAMING")
+
+// StreamingBudgetBytes overrides the default 4 GiB streaming buffer budget (bytes) used when
+// OLLAMA_LAYER_STREAMING is enabled. Set to tune for your VRAM / NVMe throughput.
+var StreamingBudgetBytes = Uint64("OLLAMA_STREAMING_BUDGET", 4*format.GibiByte)
+
 type EnvVar struct {
 	Name        string
 	Value       any
@@ -311,6 +320,8 @@ func AsMap() map[string]EnvVar {
 		"OLLAMA_KV_CACHE_TYPE":     {"OLLAMA_KV_CACHE_TYPE", KvCacheType(), "Quantization type for the K/V cache (default: f16)"},
 		"OLLAMA_GPU_OVERHEAD":         {"OLLAMA_GPU_OVERHEAD", GpuOverhead(), "Reserve VRAM per GPU for non-Ollama use (bytes; default 2 GiB; 0 disables)"},
 		"OLLAMA_MMAP_ALLOW_LOW_RAM":   {"OLLAMA_MMAP_ALLOW_LOW_RAM", MmapAllowLowRamLinux(), "Linux: keep mmap when free RAM < model size (NVMe streaming)"},
+		"OLLAMA_LAYER_STREAMING":      {"OLLAMA_LAYER_STREAMING", LayerStreaming(), "Enable AirLLM-like layer streaming for GGUF (loads/evicts blocks from NVMe)"},
+		"OLLAMA_STREAMING_BUDGET":     {"OLLAMA_STREAMING_BUDGET", StreamingBudgetBytes(), "Byte budget for streaming buffer pool (default 4 GiB)"},
 		"OLLAMA_VULKAN_MMAP":          {"OLLAMA_VULKAN_MMAP", VulkanMmap(true), "Linux: mmap GGUF with Vulkan (default true; false copies weights to RAM first)"},
 		"OLLAMA_HOST":              {"OLLAMA_HOST", Host(), "IP Address for the ollama server (default 127.0.0.1:11434)"},
 		"OLLAMA_KEEP_ALIVE":        {"OLLAMA_KEEP_ALIVE", KeepAlive(), "The duration that models stay loaded in memory (default \"5m\")"},
