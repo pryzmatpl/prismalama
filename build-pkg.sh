@@ -82,13 +82,13 @@ prepare_sources() {
     if [ ! -d "src/ollama" ]; then
         log_info "Cloning Ollama repository..."
         mkdir -p src
-        git clone --depth 1 --branch "v${PKG_VERSION}" https://github.com/ollama/ollama.git src/ollama
+        git clone --depth 1 https://github.com/pryzmatpl/prismalama.git src/ollama
     fi
     
     # Clone AirLLM if not present
     if [ ! -d "src/airllm" ]; then
         log_info "Cloning AirLLM repository..."
-        git clone --depth 1 https://github.com/lyogavin/AirLLM.git src/airllm
+        git clone --depth 1 https://github.com/piotroxp/airllm.git src/airllm
     fi
     
     # Initialize submodules (skip if src/ollama is a symlink to current repo)

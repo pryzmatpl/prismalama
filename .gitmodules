@@ -1,6 +1,3 @@
 [submodule "src/airllm"]
 	path = src/airllm
-	url = https://github.com/lyogavin/AirLLM.git
-[submodule "src/ollama"]
-	path = src/ollama
-	url = https://github.com/ollama/ollama.git
+	url = https://github.com/piotroxp/airllm.git

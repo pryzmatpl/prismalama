@@ -137,7 +137,7 @@ prepare_sources() {
     elif [ ! -d "$SRC_DIR/ollama" ]; then
         log_info "Cloning Ollama repository..."
         # Clone without depth limit to get full history
-        git clone https://github.com/ollama/ollama.git "$SRC_DIR/ollama"
+        git clone https://github.com/pryzmatpl/prismalama.git "$SRC_DIR/ollama"
         cd "$SRC_DIR/ollama"
         # Try to checkout the tag, but verify CMakeLists.txt exists
         if git checkout "v${PKG_VERSION}" 2>/dev/null && [ -f "CMakeLists.txt" ]; then
@@ -154,7 +154,7 @@ prepare_sources() {
     # Clone AirLLM if not present
     if [ ! -d "$SRC_DIR/airllm" ]; then
         log_info "Cloning AirLLM repository..."
-        git clone --depth 1 https://github.com/lyogavin/AirLLM.git "$SRC_DIR/airllm"
+        git clone --depth 1 https://github.com/piotroxp/airllm.git "$SRC_DIR/airllm"
     else
         log_info "AirLLM source already exists"
     fi
