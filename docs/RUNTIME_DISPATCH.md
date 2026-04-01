@@ -8,7 +8,7 @@ When a model loads, the server spawns a subprocess: `ollama runner --model <path
 | **airllm** | Python `airllm_runner.py` + PyTorch | `AIRLLM_DEVICE` (e.g. `cuda:0` on ROCm) |
 | **ollama** | New Ollama engine path | As configured |
 
-Selection is implemented in `runner/runner.go` (`airLLMModelAndReason`). The **Modelfile name** (e.g. `qwopus`) does not select the engine; **on-disk layout** and **env** do (see table below). The **Prismalama Arch package** defaults to **`OLLAMA_USE_AIRLLM=0`**: GGUF inference uses **GGML** without PyTorch/transformers unless the user opts in.
+Selection is implemented in **`runner/dispatch.go`** (`DecideEngine`). The **Modelfile name** (e.g. `qwopus`) does not select the engine; **on-disk layout** and **env** do (see table below). The **Prismalama Arch package** defaults to **`OLLAMA_USE_AIRLLM=0`**: GGUF inference uses **GGML** without PyTorch/transformers unless the user opts in. **Product principle:** **`docs/PRISMALAMA_PRINCIPLE.md`** (GGML vs AirLLM is the key architectural fact). **Operators:** **`GET /api/prismalama/capabilities`** documents semantics on a running server.
 
 ## AirLLM runner: two ports (Go proxy + Python)
 

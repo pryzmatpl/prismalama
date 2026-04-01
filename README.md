@@ -15,6 +15,8 @@ This repo contains two AirLLM directories:
 
 Prismalama is an enhanced version of Ollama designed for fast, optimal inference of local LLM models in GGUF format using Vulkan. For models larger than VRAM, Prismalama offers two paths: (1) GGUF with mmap + partial GPU offload (limited by VRAM), and (2) AirLLM with true NVME-based weight streaming for models that exceed GPU memory entirely.
 
+**Architectural key (large-project north star):** AirLLM-style streaming is **not** implemented inside llama.cpp/GGML; GGUF and AirLLM are **two engines** with different semantics. Read **[docs/PRISMALAMA_PRINCIPLE.md](docs/PRISMALAMA_PRINCIPLE.md)** and use **`GET /api/prismalama/capabilities`** on a running server for operator-visible documentation.
+
 The system uses Vulkan to avoid fragmentation issues between CUDA and ROCm, providing hardware-agnostic GPU acceleration. Prismalama is packaged as a single Arch Linux package for easy deployment.
 
 ## Key Features

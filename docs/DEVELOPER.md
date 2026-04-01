@@ -4,6 +4,7 @@ This document describes how the repository is wired so humans and automation can
 
 ## Goals (product)
 
+- **Architectural key:** GGUF goes through **llama.cpp / GGML**; **AirLLM-style** layer / NVMe streaming for HF layouts is a **separate** Python stack — not replicated inside GGML. See **`docs/PRISMALAMA_PRINCIPLE.md`** and **`GET /api/prismalama/capabilities`** on a running server.
 - **Ollama-like UX** for local inference on modest hardware (“potato machine”), **without** requiring heavy external Python ML stacks for the default path.
 - **Vulkan** via llama.cpp / GGML for broad GPU support (see `ml/backend/ggml`) — **first-class**; packaged defaults (`OLLAMA_USE_AIRLLM=0`) assume **GGUF + GGML** only.
 - **Weight streaming** for models larger than VRAM: GGUF uses llama.cpp mmap/offload/streaming semantics where enabled. PyTorch **AirLLM** streams Hugging Face–style checkpoints only when **`OLLAMA_USE_AIRLLM=1`** (and deps installed); with **`OLLAMA_USE_AIRLLM=0`** (package default), **only GGUF** is routed to the native runner — HF safetensors trees require opting in.
@@ -119,6 +120,7 @@ Build/run: **`make docker-test-build`** / **`make docker-test`** vs **`make dock
 
 ## Related docs
 
+- `PRISMALAMA_PRINCIPLE.md` — **north star**: GGML vs AirLLM, dispatch, capabilities endpoint.
 - `ARCHITECTURE.md` — diagrams and component list.
 - `README.md` — user-facing overview.
 - `README-PKGBUILD.md` — Arch **`prismalama-ollama`** package build.

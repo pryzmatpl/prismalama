@@ -15,7 +15,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -231,7 +230,9 @@ func discoverNUMANodes() map[int]NUMANodeInfo {
 				}
 			}
 		}
-		nodes[nodeID].BusIDs = busIDs
+		n := nodes[nodeID]
+		n.BusIDs = busIDs
+		nodes[nodeID] = n
 	}
 
 	// ── Summary log ─────────────────────────────────────────────────────────────

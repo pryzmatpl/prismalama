@@ -72,7 +72,7 @@ ship-check:
 
 .PHONY: ship-check-fast
 ship-check-fast:
-	SHIP_GO_TEST_EXTRA='-run=TestBlueSky|TestShipMemoryPolicyEnv|TestShipAdaptiveMemoryEnv|TestShipGpuOverheadDefault|TestShipVulkanMmapDefault' SHIP_INTEGRATION_TIMEOUT=5m SHIP_SKIP_PKG=1 ./scripts/ship-check.sh
+	SHIP_GO_TEST_EXTRA='-run=TestBlueSky|TestShipMemoryPolicyEnv|TestShipAdaptiveMemoryEnv|TestShipGpuOverheadDefault|TestShipVulkanMmapDefault|TestShipEngineDispatchOptOut|TestShipEngineDispatchMultipartAirLLM|TestShipEngineKindString' SHIP_INTEGRATION_TIMEOUT=5m SHIP_SKIP_PKG=1 ./scripts/ship-check.sh
 
 .PHONY: docker-test-build
 docker-test-build:
