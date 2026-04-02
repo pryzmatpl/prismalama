@@ -1,172 +1,169 @@
 # Prismalama
 
-Powered-up Ollama with Vulkan-accelerated inference for GGUF models, with optional true NVME weight streaming via AirLLM for models larger than VRAM.
+Prismalama is an **Ollama-compatible** server built on Vulkan-accelerated GGML (prismallama.cpp) with **layer streaming** enabled by default. It runs GGUF models efficiently on AMD/NVIDIA/Intel GPUs and handles models larger than VRAM via AirLLM-style NVMe weight streaming.
 
-## AirLLM Variants
+## Key Defaults
 
-This repo contains two AirLLM directories:
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `OLLAMA_LAYER_STREAMING` | `1` | Layer-by-layer GGUF loading from NVMe (saves RAM) |
+| `OLLAMA_KEEP_ALIVE` | `5m` | Models unload after 5 minutes idle (no auto-loading) |
+| Backend | GGML/Vulkan | GPU-accelerated inference via Vulkan compute |
 
-| Path | Variant | Platform | Used by |
-|------|---------|----------|---------|
-| `src/airllm/air_llm/` | Full (NVME streaming, CUDA/ROCm) | Linux + ROCm/CUDA | `PKGBUILD`, `build-pkg.sh` |
-| `airllm-clean/air_llm/` | MLX only | Apple Silicon (macOS) | Not for Linux/ROCm |
-
-**Only `src/airllm/air_llm` should be used for the Linux/ROCm build.** If you have `airllm-clean` locally, do not copy it into the build path — it is not compatible with Linux ROCm backends.
-
-Prismalama is an enhanced version of Ollama designed for fast, optimal inference of local LLM models in GGUF format using Vulkan. For models larger than VRAM, Prismalama offers two paths: (1) GGUF with mmap + partial GPU offload (limited by VRAM), and (2) AirLLM with true NVME-based weight streaming for models that exceed GPU memory entirely.
-
-**Architectural key (large-project north star):** AirLLM-style streaming is **not** implemented inside llama.cpp/GGML; GGUF and AirLLM are **two engines** with different semantics. Read **[docs/PRISMALAMA_PRINCIPLE.md](docs/PRISMALAMA_PRINCIPLE.md)** and use **`GET /api/prismalama/capabilities`** on a running server for operator-visible documentation.
-
-The system uses Vulkan to avoid fragmentation issues between CUDA and ROCm, providing hardware-agnostic GPU acceleration. Prismalama is packaged as a single Arch Linux package for easy deployment.
-
-## Key Features
-
-### Core Capabilities
-- **Vulkan-based inference** for efficient GPU utilization across AMD, NVIDIA, and Intel GPUs
-- **GGUF format support** with mmap and partial GPU offload (llama.cpp/prismallama.cpp)
-- **Multiple runner interfaces** supporting different inference backends
-- **Hardware-agnostic inference** using Vulkan to avoid CUDA/ROCm fragmentation
-- **True NVME weight streaming** via AirLLM for models larger than GPU VRAM
-- **Arch Linux packaging** for streamlined installation and updates
-
-### For Developers
-- Technical layout, runners, tests, and memory behavior: [docs/DEVELOPER.md](docs/DEVELOPER.md); for automation, see [AGENTS.md](AGENTS.md).
-- **GGUF engine:** [prismallama.cpp](https://github.com/piotroxp/prismallama.cpp) is the maintained fork of llama.cpp/ggml; sync into this repo via `Makefile.sync` and [llama/README.md](llama/README.md).
-- Vulkan backend with compute shader optimizations
-- Modular runner system supporting Llama.cpp, AirLLM, and custom backends
-- Comprehensive test coverage for core components (attention mechanisms, device capabilities, quantization)
-- Clear separation between model loading, weight streaming, and inference execution
-- Extensible architecture for adding new model architectures and backends
-
-### For Users
-- Single Arch Linux package (`prismalama-ollama`)
-- Runs large language models exceeding VRAM capacity (tested with MiniMax2.5 Q4)
-- Optimized performance for both large and standard models
-- Reduced complexity compared to managing CUDA/ROCm dependencies
-- Designed for robustness and high-throughput inference
-- Compatible with existing Ollama workflows and tools
-
-## Architecture
-
-Prismalama enhances Ollama by integrating Vulkan-accelerated inference for GGUF models:
-
-1. **GGUF inference**: Memory-mapped access and partial GPU layer offload via prismallama.cpp; limited by available VRAM
-2. **Weight Streaming (AirLLM)**: True layer-by-layer NVME streaming for models larger than VRAM, via the AirLLM Python runner
-2. **Vulkan Backend**: Hardware-agnostic GPU compute using Vulkan API with compute shaders
-3. **Runner Interface**: Pluggable system supporting multiple inference methods (llama.cpp, AirLLM, etc.)
-4. **Memory Management**: Efficient VRAM utilization with dynamic weight loading/offloading
-5. **Model Handling**: GGUF format parsing with intelligent sharding for multi-part models
-
-## Installation
-
-Prismalama is distributed as an Arch Linux package:
+## Quick Start
 
 ```bash
-# Install the prismalama package
-pacman -U prismalama-ollama-*.pkg.tar.zst
+# Install (Arch Linux)
+sudo pacman -U prismalama-ollama-*.pkg.tar.zst
 
-# Start the service
-systemctl start prismalama-ollama
+# Start service
+sudo systemctl enable --now ollama
 
-# Or run directly
-prismalama serve
-```
+# Run a model (loads on-demand, unloads after 5m idle)
+ollama run qwen2.5:3b "Hello"
 
-## Usage
-
-Standard Ollama commands work with Prismalama:
-
-```bash
-# Pull a model
-prismalama pull minimax2.5:q4
-
-# Run a model
-prismalama run minimax2.5:q4 "Explain quantum computing"
-
-# API access (same as Ollama)
+# Or use the API directly
 curl http://localhost:11434/api/generate -d '{
-  "model": "minimax2.5:q4",
-  "prompt": "Explain quantum computing"
+  "model": "qwen2.5:3b",
+  "prompt": "Hello"
 }'
 ```
 
-## Performance & Testing
+## Configuration
 
-- **Test Coverage**: Unit tests for attention mechanisms (`ml/attention/paged_attention_test.go`), device capabilities (`ml/device_capability_test.go`), quantization (`ml/quantization/quantization_test.go`), and weight streaming integration (`integration/weight_streaming_test.go`)
-- **Benchmarks**: Performance validated against Llama, Qwen, and MiniMax model families
-- **Hardware Compatibility**: Tested on AMD (RADV), NVIDIA, and Intel GPUs via Vulkan
-- **Memory Efficiency**: GGUF with mmap + partial offload maximises VRAM utilisation; AirLLM NVME weight streaming handles models larger than VRAM by streaming layers on demand
-- **Vulkan Optimization**: Compute shader optimizations for attention and MLP operations
+### Environment Variables
+
+Edit `/etc/default/ollama`:
+
+```bash
+# Model storage (default: /nvme3/models)
+OLLAMA_MODELS=/path/to/models
+
+# Layer streaming: load GGUF blocks from NVMe on-demand (default: 1 = enabled)
+OLLAMA_LAYER_STREAMING=1
+
+# Keep models loaded for N seconds after last request (default: 5m)
+OLLAMA_KEEP_ALIVE=5m
+
+# GPU settings
+HIP_VISIBLE_DEVICES=0                    # AMD GPU selection
+OLLAMA_VULKAN=1                          # Enable Vulkan backend
+OLLAMA_LIBRARY_PATH=/usr/lib/ollama/rocm  # ROCm libraries
+
+# AirLLM (HF safetensors, multi-part GGUF) - opt-in
+OLLAMA_USE_AIRLLM=0
+```
+
+### Systemd Service Override
+
+For runtime changes that persist across package upgrades, create:
+`/etc/systemd/system/ollama.service.d/override.conf`
+
+```ini
+[Service]
+Environment=OLLAMA_KEEP_ALIVE=5m
+Environment=OLLAMA_LAYER_STREAMING=1
+```
+
+Then reload: `sudo systemctl daemon-reload && sudo systemctl restart ollama`
+
+## Architecture
+
+Prismalama has **two inference engines**:
+
+### 1. GGML (Default)
+- Vulkan-accelerated GGUF inference via prismallama.cpp
+- Memory-mapped file access with partial GPU layer offload
+- **Layer streaming** (`OLLAMA_LAYER_STREAMING=1`): loads GGUF blocks from NVMe on-demand during inference, evicting previous blocks to stay within budget
+- Best for: models that fit (or nearly fit) in VRAM+RAM
+
+### 2. AirLLM (Opt-in)
+- True layer-wise weight streaming for models exceeding GPU memory
+- Python-based runner for Hugging Face safetensors or multi-part GGUF
+- Enable with: `OLLAMA_USE_AIRLLM=1` + `python-pytorch-rocm` + `transformers`
+
+### Engine Selection
+
+| Model Format | Engine | Enable |
+|--------------|--------|--------|
+| GGUF (single/multi-part) | GGML | Default (layer streaming on) |
+| Hugging Face safetensors | AirLLM | `OLLAMA_USE_AIRLLM=1` |
+
+See [docs/RUNTIME_DISPATCH.md](docs/RUNTIME_DISPATCH.md) for details on how the runner selects the engine.
+
+## Memory Behavior
+
+With `OLLAMA_LAYER_STREAMING=1` and `OLLAMA_KEEP_ALIVE=5m`:
+
+1. **On request**: Model loads blocks from NVMe as needed, within streaming budget
+2. **After 5m idle**: Model unloads entirely, freeing RAM/VRAM
+3. **No model pre-loading**: Prismalama never loads a model at startup
+
+**Note**: Large models (143GB+ MiniMax) may still fail to load if they exceed total system memory even with streaming, or if GPU VRAM cannot accommodate the active working set.
+
+## Troubleshooting
+
+### Model fails to load with "model requires more system memory"
+- The model is too large even for layer streaming
+- Try a quantized variant (Q4, Q5) or smaller model
+
+### Vulkan buffer allocation errors
+- GPU memory exhausted by other models or processes
+- Reduce `OLLAMA_KEEP_ALIVE` or unload other models
+- Check `journalctl -u ollama` for details
+
+### Layer streaming not working
+- Ensure `OLLAMA_LAYER_STREAMING=1` is set
+- Verify NVMe path is correct in `OLLAMA_MODELS`
 
 ## Development
+
+See [docs/DEVELOPER.md](docs/DEVELOPER.md) for:
+- Build instructions
+- Code architecture
+- Test suite
+- Runner implementation details
 
 ### Building from Source
 
 ```bash
-# Clone repository
-git clone https://github.com/yourorg/prismalama.git
+git clone https://github.com/piotroxp/prismalama.git
 cd prismalama
-
-# Build package
-makepkg -s
-
-# Install locally
-sudo pacman -U prismalama-ollama-*.pkg.tar.zst
+makepkg -sfi
 ```
 
 ### Running Tests
 
 ```bash
-# Run unit tests
+# Unit tests
 go test ./...
 
-# Run specific test suites
-go test ./ml/attention/...
-go test ./ml/nn/...
-go test ./integration/weight_streaming_test.go
-go test ./ml/device_capability_test.go
+# Integration tests
+go test -tags=integration ./integration/...
+
+# Layer streaming tests
+go test -tags=integration,minimax ./integration/...
 ```
-
-### Vulkan Development
-
-Prismalama includes a Vulkan backend located in `ml/backend/vulkan/`:
-- `kernels.go`: Core Vulkan backend implementation
-- Vulkan compute pipelines for attention, MLP, and flash attention operations
-- Memory pooling for efficient GPU memory management
-- Kernel caching for reusable compute pipelines
-
-## Roadmap
-
-- [x] Vulkan-based weight streaming prototype
-- [x] Basic GGUF model support
-- [x] Arch Linux packaging
-- [x] Weight streaming integration tests
-- [ ] MiniMax2.5 Q4 optimization and validation
-- [ ] Multi-GPU scaling with Vulkan
-- [ ] Additional quantization format support (Q2, Q3, Q5, Q6, Q8)
-- [ ] Vulkan compute shader optimizations
-- [ ] Runner interface expansion for specialized backends
-- [ ] Cross-platform Vulkan validation layers integration
 
 ## Model Support
 
-Prismalama supports GGUF-format models including:
-- Llama series (Llama 2, 3, 3.1, 3.2, 3.3, 4)
-- Qwen series (Qwen, Qwen2, Qwen2.5, Qwen3, Qwen3.5)
-- MiniMax series (MiniMax, MiniMax2, MiniMax2.5)
-- Mistral series
-- Phi series
-- Gemma series
-- And many others through GGUF compatibility
+GGUF format models (Llama, Qwen, MiniMax, Mistral, Phi, Gemma, etc.) work out of the box.
+Hugging Face safetensors require `OLLAMA_USE_AIRLLM=1` and the PyTorch stack.
+
+## History
+
+Prismalama evolved from upstream Ollama with these key changes:
+- Vulkan backend as primary GPU path (not CUDA/ROCm-only)
+- Layer streaming via `OLLAMA_LAYER_STREAMING` for GGUF
+- AirLLM integration for true NVMe weight streaming
+- Arch Linux packaging via PKGBUILD
 
 ## License
 
-Prismalama is released under the MIT License. See [LICENSE](LICENSE) for details.
+MIT - See [LICENSE](LICENSE)
 
 ## Acknowledgments
 
-- Built upon [Ollama](https://github.com/ollama/ollama)
-- Inspired by [AirLLM](https://github.com/AIR-ML/AirLLM) for weight streaming concepts
-- Uses [Vulkan](https://www.vulkan.org/) for cross-platform GPU acceleration
-- GGUF format support via [prismallama.cpp](https://github.com/piotroxp/prismallama.cpp) (fork of [llama.cpp](https://github.com/ggml-org/llama.cpp))
-- Vulkan compute shader foundations from [ggml-vulkan](https://github.com/piotroxp/prismallama.cpp/tree/master/ggml/src/ggml-vulkan) (upstream: [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp))
+- [Ollama](https://github.com/ollama/ollama) - Base server
+- [prismallama.cpp](https://github.com/piotroxp/prismallama.cpp) - GGUF/Vulkan fork of llama.cpp
+- [AirLLM](https://github.com/AIR-ML/AirLLM) - Layer streaming concepts

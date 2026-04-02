@@ -45,7 +45,7 @@ Otherwise the **llama.cpp** runner is used (GGUF, Vulkan when built).
 | `AIRLLM_DEVICE` | PyTorch device string, default `cuda:0` (ROCm uses the same API). |
 | `PRISMALAMA_AIRLLM_PYTHONPATH` | Optional prepend for `PYTHONPATH` when automatic dev-tree detection does not match your layout (colon-separated). |
 | `AIRLLM_POST_INFER_CLEANUP` | If `0`, skip post-inference GPU cache flush in `airllm_runner.py` (default: on). |
-| `OLLAMA_LAYER_STREAMING` | AirLLM-like layer-by-layer GGUF streaming: load block from NVMe → compute → evict (default off; opt-in). See **`ml/streaming`** and **`docs/PRISMALAMA_PRINCIPLE.md`**. |
+| `OLLAMA_LAYER_STREAMING` | GGUF layer streaming: load block from NVMe → compute → evict (default **enabled** in package; `OLLAMA_LAYER_STREAMING=0` disables). See **`ml/streaming`** and **`docs/PRISMALAMA_PRINCIPLE.md`**. |
 | `OLLAMA_STREAMING_BUDGET` | Byte budget for the streaming buffer pool (default 4 GiB). |
 | `PYTORCH_CUDA_ALLOC_CONF` | e.g. `expandable_segments:True` to reduce allocator fragmentation (set by user; not modified by the repo). |
 

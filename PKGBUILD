@@ -10,7 +10,7 @@
 pkgname=prismalama-ollama
 epoch=1
 pkgver=0.4.1
-pkgrel=10
+pkgrel=11
 pkgdesc="Prismalama: Ollama-compatible server (ROCm HIP + Vulkan GGML primary; optional AirLLM for HF/PyTorch layouts)"
 arch=('x86_64')
 url="https://github.com/piotroxp/prismallama.cpp"
@@ -133,8 +133,11 @@ EOF
 OLLAMA_MODELS=${_model_dir}
 OLLAMA_HOST=127.0.0.1:11434
 OLLAMA_NUM_PARALLEL=1
+OLLAMA_KEEP_ALIVE=5m
 # GGML backends are installed under /usr/lib/ollama/rocm (see CMake OLLAMA_RUNNER_DIR)
 OLLAMA_LIBRARY_PATH=/usr/lib/ollama/rocm
+# Layer streaming: load GGUF blocks from NVMe on-demand instead of all at once (saves RAM)
+OLLAMA_LAYER_STREAMING=1
 
 # AMD
 HIP_VISIBLE_DEVICES=0
