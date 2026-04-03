@@ -1,5 +1,7 @@
 # Prismalama developer guide
 
+![Prismalama Logo](../logo.jpg)
+
 This document describes how the repository is wired so humans and automation can work on it without guessing. It is the source of truth for layout, runners, memory behavior, and tests.
 
 ## Goals (product)

@@ -1,5 +1,7 @@
 # Prismalama principle (north star)
 
+![Prismalama Logo](../logo.jpg)
+
 Prismalama is a **large, long-horizon** project: **Ollama-compatible UX** plus **Vulkan/ROCm GGML** for GGUF, and an **optional AirLLM path** for Hugging Face–style layouts and **true layer / NVMe–oriented streaming** where AirLLM applies.
 
 ## The key technical fact

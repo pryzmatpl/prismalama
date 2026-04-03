@@ -1,5 +1,7 @@
 # Agent and automation notes
 
+![Prismalama Logo](logo.jpg)
+
 When working in this repository:
 
 1. Read **`docs/DEVELOPER.md`** and **`docs/PRISMALAMA_PRINCIPLE.md`** first: **GGML vs AirLLM** is the key architectural fact; runner dispatch is **`runner/dispatch.go`** (`DecideEngine`). AirLLM vs llama.cpp, environment variables, GPU memory behavior, integration test tags, and **prismallama.cpp** as the vendored GGUF engine (`Makefile.sync`, `llama/README.md`). For **which engine actually ran** (logs, multipart vs safetensors, AirLLM ports), **`docs/RUNTIME_DISPATCH.md`** and **`GET /api/prismalama/capabilities`**.

@@ -1,5 +1,7 @@
 # API
 
+![Prismalama Logo](../logo.jpg)
+
 > Note: Ollama's API docs are moving to https://docs.ollama.com/api
 
 ## Endpoints

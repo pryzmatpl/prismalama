@@ -1,5 +1,7 @@
 # Prismalama Test Suite
 
+![Prismalama Logo](../logo.jpg)
+
 This directory contains comprehensive tests for the Prismalama project, which unifies ROCm, AirLLM (sharding/streaming), and Ollama for high-performance inference.
 
 ## Test Categories

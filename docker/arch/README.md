@@ -1,5 +1,7 @@
 # Prismalama Arch package image
 
+![Prismalama Logo](../../logo.jpg)
+
 Docker images that install the same **`prismalama-ollama`** pacman package as a native Arch host: files under `/usr/bin/ollama`, `/usr/lib/ollama/rocm`, `/usr/share/ollama/` (AirLLM assets), and the same defaults style as `PKGBUILD`.
 
 ## Which Dockerfile

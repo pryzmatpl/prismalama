@@ -1,5 +1,7 @@
 # Contributing to Ollama
 
+![Prismalama Logo](logo.jpg)
+
 Thank you for your interest in contributing to Ollama! Here are a few guidelines to help get you started.
 
 ## Set up

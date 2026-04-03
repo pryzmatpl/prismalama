@@ -1,5 +1,7 @@
 # Ollama with AirLLM Integration - Arch Linux Package
 
+![Prismalama Logo](../logo.jpg)
+
 ## Overview
 This package provides an Arch Linux compatible build of Ollama integrated with AirLLM, allowing you to run large language models on systems with limited GPU memory.
 

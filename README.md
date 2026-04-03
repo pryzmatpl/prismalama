@@ -1,5 +1,7 @@
 # Prismalama
 
+![Prismalama Logo](logo.jpg)
+
 Prismalama is an **Ollama-compatible** server built on Vulkan-accelerated GGML (prismallama.cpp) with **layer streaming** enabled by default. It runs GGUF models efficiently on AMD/NVIDIA/Intel GPUs and handles models larger than VRAM via AirLLM-style NVMe weight streaming.
 
 ## Key Defaults

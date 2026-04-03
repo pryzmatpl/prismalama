@@ -1,5 +1,7 @@
 # Prismalama GPU container (AMD ROCm + Vulkan + HIP)
 
+![Prismalama Logo](../../logo.jpg)
+
 Single image with **GGML CPU**, **HIP (ROCm)**, and **Vulkan** backends, plus the Prismalama `ollama` binary. Intended for **GPU inference** on AMD GPUs and **Kubernetes** workloads that need GPU isolation without installing Prismalama on the host.
 
 ## Build

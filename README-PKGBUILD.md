@@ -1,5 +1,7 @@
 # Prismalama Arch Package (`PKGBUILD`)
 
+![Prismalama Logo](../logo.jpg)
+
 Builds **this** Prismalama tree (prismallama.cpp/GGML via CMake, Go `ollama` binary, AirLLM assets) into an Arch Linux package — **not** upstream Ollama tarballs.
 
 ## What's Installed

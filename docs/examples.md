@@ -1,5 +1,7 @@
 # Examples
 
+![Prismalama Logo](../logo.jpg)
+
 This directory contains different examples of using Ollama.
 
 ## Python examples

@@ -1,5 +1,7 @@
 # Documentation
 
+![Prismalama Logo](../logo.jpg)
+
 ### Getting Started
 * [Quickstart](https://docs.ollama.com/quickstart)
 * [Examples](./examples.md)
