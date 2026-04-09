@@ -881,7 +881,7 @@ func (c *Context) Reserve() {
 	}
 
 	for i := range c.b.schedBackends {
-		bufferSize := C.ggml_backend_sched_get_attempted_buffer_size(c.b.sched, c.b.schedBackends[i])
+		bufferSize := C.ggml_backend_sched_get_buffer_size(c.b.sched, c.b.schedBackends[i])
 		c.b.btDeviceMemory[c.b.schedBufts[i]].Graph += uint64(bufferSize)
 
 		logutil.Trace("compute graph", "backend", C.GoString(C.ggml_backend_name(c.b.schedBackends[i])),
