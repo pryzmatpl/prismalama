@@ -89,16 +89,6 @@ enum mtmd_slice_tmpl {
     MTMD_SLICE_TMPL_LFM2,
 };
 
-mtmd_input_text* mtmd_input_text_init(const char * text, bool add_special, bool parse_special) {
-    return new mtmd_input_text{text, add_special, parse_special};
-}
-
-void mtmd_input_text_free(mtmd_input_text* input_text) {
-    if (input_text) {
-        delete input_text;
-    }
-}
-
 const char * mtmd_default_marker() {
     return "<__media__>";
 }
@@ -861,13 +851,15 @@ int32_t mtmd_encode(mtmd_context * ctx, const mtmd_image_tokens * image_tokens) 
         LOG_ERR("%s: this API does not support non-vision input, please use mtmd_encode_chunk instead\n", __func__);
         return 1;
     }
+    auto proj_type = clip_get_projector_type(ctx_clip);
     int n_mmproj_embd = clip_n_mmproj_embd(ctx_clip);
     ctx->image_embd_v.resize(image_tokens->n_tokens() * n_mmproj_embd);
     bool ok = false;
 
     if (clip_is_llava(ctx_clip)
         || clip_is_minicpmv(ctx_clip)
-        || clip_is_glm(ctx_clip)) {
+        || clip_is_glm(ctx_clip)
+        || proj_type == PROJECTOR_TYPE_INTERNVL) {
         // TODO @ngxson : llava does not support batched encoding ; this should be fixed inside clip_image_batch_encode()
         const auto & entries = image_tokens->batch_f32.entries;
         for (size_t i = 0; i < entries.size(); i++) {

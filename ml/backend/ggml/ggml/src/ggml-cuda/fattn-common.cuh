@@ -3,6 +3,7 @@
 #include "common.cuh"
 #include "convert.cuh"
 #include "vecdotq.cuh"
+#include "turbo-quant.cuh"
 
 #include <cstdint>
 
@@ -285,6 +286,387 @@ static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_q8_0(
         sum += vec_dot_q8_0_q8_1_impl<float, 1>(&v, &Q_q8[k_KQ_0/nthreads], K_q8_0[ib].d, Q_d);
     }
 
+    return sum;
+}
+
+// Turbo3 KQ dot product: dequantize K from turbo3 blocks, dot with Q (float2/half2)
+// Uses float Q path (like f16), not q8_1 integer path.
+// Q_v is half2[] or float2[] with D/2 pairs, partitioned nthreads-strided.
+//
+// Matches the f16 pattern: outer loop steps by nthreads*cpy_ne, inner loop
+// processes cpy_ne pairs per thread per iteration so Q_v and K indices stay aligned.
+// elem0 = 2*k_KQ is always even, so elem0 and elem0+1 always share the same
+// turbo3 block (ib), qs byte, and signs byte — loaded once per pair.
+template <int D, int nthreads>
+static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_turbo3_0(
+    const char * __restrict__ K_c, const void * __restrict__ Q_v, const int * __restrict__ Q_q8, const void * __restrict__ Q_ds_v) {
+
+    const block_turbo3_0 * K_turbo = (const block_turbo3_0 *) K_c;
+    GGML_UNUSED(Q_q8);
+    GGML_UNUSED(Q_ds_v);
+
+    constexpr int cpy_nb = ggml_cuda_get_max_cpy_bytes();
+    constexpr int cpy_ne = cpy_nb / 4;
+
+    float sum = 0.0f;
+
+#pragma unroll
+    for (int k_KQ_0 = 0; k_KQ_0 < D/2; k_KQ_0 += nthreads*cpy_ne) {
+#pragma unroll
+        for (int k_KQ_1 = 0; k_KQ_1 < cpy_ne; ++k_KQ_1) {
+            const int k_KQ = k_KQ_0 + (threadIdx.x % nthreads)*cpy_ne + k_KQ_1;
+
+            // elem0 is always even; elem0 and elem1 are always in the same block,
+            // the same qs byte (j0%4 ∈ {0,2}), and the same signs byte (j0%8 ∈ {0,2,4,6}).
+            const int elem0 = k_KQ * 2;                  // always even
+            const int ib    = elem0 / QK_TURBO3;          // shared block index
+            const int j0    = elem0 % QK_TURBO3;          // always even, 0..30
+
+            // Single loads for the shared block fields
+            const float     norm     = __half2float(K_turbo[ib].norm);
+            const uint8_t   qs_byte  = K_turbo[ib].qs[j0 / 4];      // covers both j0 and j0+1
+            const uint8_t   sgn_byte = K_turbo[ib].signs[j0 / 8];   // covers both j0 and j0+1
+
+            // Extract 3-bit indices for elem0 and elem1 from shared bytes
+            const int     shift  = (j0 % 4) * 2;                     // 0 or 4
+            const uint8_t idx0   = ((qs_byte >> shift)     & 0x3) | (((sgn_byte >> (j0 % 8))     & 0x1) << 2);
+            const uint8_t idx1   = ((qs_byte >> (shift+2)) & 0x3) | (((sgn_byte >> (j0 % 8 + 1)) & 0x1) << 2);
+
+            float2 kv;
+            kv.x = TURBO_CENTROIDS_3BIT[idx0] * norm;
+            kv.y = TURBO_CENTROIDS_3BIT[idx1] * norm;
+
+#ifdef V_DOT2_F32_F16_AVAILABLE
+            const half2 qv = ((const half2 *) Q_v)[k_KQ_0/nthreads + k_KQ_1];
+            ggml_cuda_mad(sum, make_float2(kv.x, kv.y), __half22float2(qv));
+#else
+            const float2 qv = ((const float2 *) Q_v)[k_KQ_0/nthreads + k_KQ_1];
+            sum += kv.x * qv.x + kv.y * qv.y;
+#endif // V_DOT2_F32_F16_AVAILABLE
+        }
+    }
+
+    return sum;
+}
+
+// Turbo2 KQ dot product: dequantize K from turbo2 blocks, dot with Q (float2/half2)
+// Same structure as turbo3 but reads 2-bit indices from qs only (no signs).
+template <int D, int nthreads>
+static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_turbo2_0(
+    const char * __restrict__ K_c, const void * __restrict__ Q_v, const int * __restrict__ Q_q8, const void * __restrict__ Q_ds_v) {
+
+    const block_turbo2_0 * K_turbo = (const block_turbo2_0 *) K_c;
+    GGML_UNUSED(Q_q8);
+    GGML_UNUSED(Q_ds_v);
+
+    constexpr int cpy_nb = ggml_cuda_get_max_cpy_bytes();
+    constexpr int cpy_ne = cpy_nb / 4;
+
+    float sum = 0.0f;
+
+#pragma unroll
+    for (int k_KQ_0 = 0; k_KQ_0 < D/2; k_KQ_0 += nthreads*cpy_ne) {
+#pragma unroll
+        for (int k_KQ_1 = 0; k_KQ_1 < cpy_ne; ++k_KQ_1) {
+            const int k_KQ = k_KQ_0 + (threadIdx.x % nthreads)*cpy_ne + k_KQ_1;
+
+            const int elem0 = k_KQ * 2;
+            const int ib    = elem0 / QK_TURBO2;
+            const int j0    = elem0 % QK_TURBO2;
+
+            const float     norm     = __half2float(K_turbo[ib].norm);
+            const uint8_t   qs_byte  = K_turbo[ib].qs[j0 / 4];
+
+            const int     shift  = (j0 % 4) * 2;
+            const uint8_t idx0   = (qs_byte >> shift)     & 0x3;
+            const uint8_t idx1   = (qs_byte >> (shift+2)) & 0x3;
+
+            float2 kv;
+            kv.x = TURBO_CENTROIDS_2BIT[idx0] * norm;
+            kv.y = TURBO_CENTROIDS_2BIT[idx1] * norm;
+
+#ifdef V_DOT2_F32_F16_AVAILABLE
+            const half2 qv = ((const half2 *) Q_v)[k_KQ_0/nthreads + k_KQ_1];
+            ggml_cuda_mad(sum, make_float2(kv.x, kv.y), __half22float2(qv));
+#else
+            const float2 qv = ((const float2 *) Q_v)[k_KQ_0/nthreads + k_KQ_1];
+            sum += kv.x * qv.x + kv.y * qv.y;
+#endif // V_DOT2_F32_F16_AVAILABLE
+        }
+    }
+
+    return sum;
+}
+
+// Turbo4 KQ dot product: dequantize K from turbo4 blocks, dot with Q (float2/half2)
+// 4-bit nibble packed: qs[j/2] >> ((j%2)*4) & 0xF
+template <int D, int nthreads>
+static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_turbo4_0(
+    const char * __restrict__ K_c, const void * __restrict__ Q_v, const int * __restrict__ Q_q8, const void * __restrict__ Q_ds_v) {
+
+    const block_turbo4_0 * K_turbo = (const block_turbo4_0 *) K_c;
+    GGML_UNUSED(Q_q8);
+    GGML_UNUSED(Q_ds_v);
+
+    constexpr int cpy_nb = ggml_cuda_get_max_cpy_bytes();
+    constexpr int cpy_ne = cpy_nb / 4;
+
+    float sum = 0.0f;
+
+#pragma unroll
+    for (int k_KQ_0 = 0; k_KQ_0 < D/2; k_KQ_0 += nthreads*cpy_ne) {
+#pragma unroll
+        for (int k_KQ_1 = 0; k_KQ_1 < cpy_ne; ++k_KQ_1) {
+            const int k_KQ = k_KQ_0 + (threadIdx.x % nthreads)*cpy_ne + k_KQ_1;
+
+            const int elem0 = k_KQ * 2;                   // always even
+            const int ib    = elem0 / QK_TURBO4;           // block index
+            const int j0    = elem0 % QK_TURBO4;           // always even
+
+            const float   norm    = __half2float(K_turbo[ib].norm);
+            // Both j0 and j0+1 are adjacent nibbles: j0/2 == (j0+1)/2 when j0 is even
+            const uint8_t qs_byte = K_turbo[ib].qs[j0 / 2];
+
+            const uint8_t idx0 = (qs_byte >> 0) & 0xF;    // low nibble = j0
+            const uint8_t idx1 = (qs_byte >> 4) & 0xF;    // high nibble = j0+1
+
+            float2 kv;
+            kv.x = TURBO_CENTROIDS_4BIT[idx0] * norm;
+            kv.y = TURBO_CENTROIDS_4BIT[idx1] * norm;
+
+#ifdef V_DOT2_F32_F16_AVAILABLE
+            const half2 qv = ((const half2 *) Q_v)[k_KQ_0/nthreads + k_KQ_1];
+            ggml_cuda_mad(sum, make_float2(kv.x, kv.y), __half22float2(qv));
+#else
+            const float2 qv = ((const float2 *) Q_v)[k_KQ_0/nthreads + k_KQ_1];
+            sum += kv.x * qv.x + kv.y * qv.y;
+#endif // V_DOT2_F32_F16_AVAILABLE
+        }
+    }
+
+    return sum;
+}
+
+// ── PlanarQuant3 KQ dot product: Givens inverse rotation + centroid lookup ──
+// Same structure as turbo3 but with per-pair inverse Givens rotation.
+#include "planar-iso-constants.cuh"
+
+template <int D, int nthreads>
+static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_planar3_0(
+    const char * __restrict__ K_c, const void * __restrict__ Q_v, const int * __restrict__ Q_q8, const void * __restrict__ Q_ds_v) {
+
+    const block_planar3_0 * K = (const block_planar3_0 *) K_c;
+    GGML_UNUSED(Q_q8); GGML_UNUSED(Q_ds_v);
+
+    constexpr int cpy_nb = ggml_cuda_get_max_cpy_bytes();
+    constexpr int cpy_ne = cpy_nb / 4;
+    float sum = 0.0f;
+
+#pragma unroll
+    for (int k_KQ_0 = 0; k_KQ_0 < D/2; k_KQ_0 += nthreads*cpy_ne) {
+#pragma unroll
+        for (int k_KQ_1 = 0; k_KQ_1 < cpy_ne; ++k_KQ_1) {
+            const int k_KQ = k_KQ_0 + (threadIdx.x % nthreads)*cpy_ne + k_KQ_1;
+            const int elem0 = k_KQ * 2;
+            const int ib = elem0 / QK_PLANAR3;
+            const int j0 = elem0 % QK_PLANAR3;
+
+            const float norm = __half2float(K[ib].norm);
+            const uint8_t qs_byte = K[ib].qs[j0/4];
+            const uint8_t sgn_byte = K[ib].signs[j0/8];
+            const int shift = (j0%4)*2;
+            const uint8_t idx0 = ((qs_byte >> shift) & 0x3) | (((sgn_byte >> (j0%8)) & 0x1) << 2);
+            const uint8_t idx1 = ((qs_byte >> (shift+2)) & 0x3) | (((sgn_byte >> (j0%8+1)) & 0x1) << 2);
+
+            float q0 = PI_CENTROIDS_3BIT[idx0];
+            float q1 = PI_CENTROIDS_3BIT[idx1];
+
+            // Inverse Givens rotation
+            int p = (ib * QK_PLANAR3 + j0) / 2;  // global pair index
+            float c = PI_COS[p % 64];
+            float s = PI_SIN[p % 64];
+            float2 kv;
+            kv.x = ( c * q0 + s * q1) * norm;
+            kv.y = (-s * q0 + c * q1) * norm;
+
+#ifdef V_DOT2_F32_F16_AVAILABLE
+            const half2 qv = ((const half2 *) Q_v)[k_KQ_0/nthreads + k_KQ_1];
+            ggml_cuda_mad(sum, make_float2(kv.x, kv.y), __half22float2(qv));
+#else
+            const float2 qv = ((const float2 *) Q_v)[k_KQ_0/nthreads + k_KQ_1];
+            sum += kv.x * qv.x + kv.y * qv.y;
+#endif
+        }
+    }
+    return sum;
+}
+
+// ── IsoQuant3 KQ dot product: quaternion inverse rotation ──
+template <int D, int nthreads>
+static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_iso3_0(
+    const char * __restrict__ K_c, const void * __restrict__ Q_v, const int * __restrict__ Q_q8, const void * __restrict__ Q_ds_v) {
+
+    const block_iso3_0 * K = (const block_iso3_0 *) K_c;
+    GGML_UNUSED(Q_q8); GGML_UNUSED(Q_ds_v);
+
+    constexpr int cpy_nb = ggml_cuda_get_max_cpy_bytes();
+    constexpr int cpy_ne = cpy_nb / 4;
+    float sum = 0.0f;
+
+#pragma unroll
+    for (int k_KQ_0 = 0; k_KQ_0 < D/2; k_KQ_0 += nthreads*cpy_ne) {
+#pragma unroll
+        for (int k_KQ_1 = 0; k_KQ_1 < cpy_ne; ++k_KQ_1) {
+            const int k_KQ = k_KQ_0 + (threadIdx.x % nthreads)*cpy_ne + k_KQ_1;
+            const int elem0 = k_KQ * 2;
+            const int ib = elem0 / QK_ISO3;
+            const int j0 = elem0 % QK_ISO3;
+
+            const float norm = __half2float(K[ib].norm);
+
+            // Need full 4-element quaternion group
+            int g = (ib * QK_ISO3 + j0) / 4;  // global group index
+            int offset = j0 % 4;
+
+            // Unpack all 4 elements of the group
+            int base = (g % 32) * 4;  // within block
+            float qvals[4];
+            for (int c = 0; c < 4; c++) {
+                int jj = base + c;
+                uint8_t low = (K[ib].qs[jj/4] >> ((jj%4)*2)) & 0x3;
+                uint8_t hi = (K[ib].signs[jj/8] >> (jj%8)) & 0x1;
+                qvals[c] = PI_CENTROIDS_3BIT[low | (hi << 2)];
+            }
+
+            // Inverse quaternion
+            int qg = g % 32;
+            float qw = PI_QW[qg], qx = -PI_QX[qg], qy = -PI_QY[qg], qz = -PI_QZ[qg];
+            float rw = qw*qvals[0] - qx*qvals[1] - qy*qvals[2] - qz*qvals[3];
+            float rx = qw*qvals[1] + qx*qvals[0] + qy*qvals[3] - qz*qvals[2];
+            float ry = qw*qvals[2] - qx*qvals[3] + qy*qvals[0] + qz*qvals[1];
+            float rz = qw*qvals[3] + qx*qvals[2] - qy*qvals[1] + qz*qvals[0];
+
+            float results[4] = {rw, rx, ry, rz};
+            float2 kv;
+            kv.x = results[offset] * norm;
+            kv.y = results[offset + 1] * norm;
+
+#ifdef V_DOT2_F32_F16_AVAILABLE
+            const half2 qv = ((const half2 *) Q_v)[k_KQ_0/nthreads + k_KQ_1];
+            ggml_cuda_mad(sum, make_float2(kv.x, kv.y), __half22float2(qv));
+#else
+            const float2 qv = ((const float2 *) Q_v)[k_KQ_0/nthreads + k_KQ_1];
+            sum += kv.x * qv.x + kv.y * qv.y;
+#endif
+        }
+    }
+    return sum;
+}
+
+// ── PlanarQuant4 KQ dot product: Givens inverse rotation + 4-bit centroids ──
+template <int D, int nthreads>
+static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_planar4_0(
+    const char * __restrict__ K_c, const void * __restrict__ Q_v, const int * __restrict__ Q_q8, const void * __restrict__ Q_ds_v) {
+
+    const block_planar4_0 * K = (const block_planar4_0 *) K_c;
+    GGML_UNUSED(Q_q8); GGML_UNUSED(Q_ds_v);
+
+    constexpr int cpy_nb = ggml_cuda_get_max_cpy_bytes();
+    constexpr int cpy_ne = cpy_nb / 4;
+    float sum = 0.0f;
+
+#pragma unroll
+    for (int k_KQ_0 = 0; k_KQ_0 < D/2; k_KQ_0 += nthreads*cpy_ne) {
+#pragma unroll
+        for (int k_KQ_1 = 0; k_KQ_1 < cpy_ne; ++k_KQ_1) {
+            const int k_KQ = k_KQ_0 + (threadIdx.x % nthreads)*cpy_ne + k_KQ_1;
+            const int elem0 = k_KQ * 2;
+            const int ib = elem0 / QK_PLANAR4;
+            const int j0 = elem0 % QK_PLANAR4;
+
+            const float norm = __half2float(K[ib].norm);
+            const uint8_t qs_byte = K[ib].qs[j0 / 2];
+            const uint8_t idx0 = (qs_byte >> 0) & 0xF;
+            const uint8_t idx1 = (qs_byte >> 4) & 0xF;
+
+            float q0 = PI_CENTROIDS_4BIT[idx0];
+            float q1 = PI_CENTROIDS_4BIT[idx1];
+
+            // Inverse Givens rotation
+            int p = (ib * QK_PLANAR4 + j0) / 2;
+            float c = PI_COS[p % 64];
+            float s = PI_SIN[p % 64];
+            float2 kv;
+            kv.x = ( c * q0 + s * q1) * norm;
+            kv.y = (-s * q0 + c * q1) * norm;
+
+#ifdef V_DOT2_F32_F16_AVAILABLE
+            const half2 qv = ((const half2 *) Q_v)[k_KQ_0/nthreads + k_KQ_1];
+            ggml_cuda_mad(sum, make_float2(kv.x, kv.y), __half22float2(qv));
+#else
+            const float2 qv = ((const float2 *) Q_v)[k_KQ_0/nthreads + k_KQ_1];
+            sum += kv.x * qv.x + kv.y * qv.y;
+#endif
+        }
+    }
+    return sum;
+}
+
+// ── IsoQuant4 KQ dot product: quaternion inverse rotation + 4-bit ──
+template <int D, int nthreads>
+static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_iso4_0(
+    const char * __restrict__ K_c, const void * __restrict__ Q_v, const int * __restrict__ Q_q8, const void * __restrict__ Q_ds_v) {
+
+    const block_iso4_0 * K = (const block_iso4_0 *) K_c;
+    GGML_UNUSED(Q_q8); GGML_UNUSED(Q_ds_v);
+
+    constexpr int cpy_nb = ggml_cuda_get_max_cpy_bytes();
+    constexpr int cpy_ne = cpy_nb / 4;
+    float sum = 0.0f;
+
+#pragma unroll
+    for (int k_KQ_0 = 0; k_KQ_0 < D/2; k_KQ_0 += nthreads*cpy_ne) {
+#pragma unroll
+        for (int k_KQ_1 = 0; k_KQ_1 < cpy_ne; ++k_KQ_1) {
+            const int k_KQ = k_KQ_0 + (threadIdx.x % nthreads)*cpy_ne + k_KQ_1;
+            const int elem0 = k_KQ * 2;
+            const int ib = elem0 / QK_ISO4;
+            const int j0 = elem0 % QK_ISO4;
+
+            const float norm = __half2float(K[ib].norm);
+
+            int g = (ib * QK_ISO4 + j0) / 4;
+            int offset = j0 % 4;
+
+            // Unpack all 4 elements of the quaternion group
+            int base = (g % 32) * 4;
+            float qvals[4];
+            for (int c = 0; c < 4; c++) {
+                int jj = base + c;
+                qvals[c] = PI_CENTROIDS_4BIT[(K[ib].qs[jj/2] >> ((jj%2)*4)) & 0xF];
+            }
+
+            int qg = g % 32;
+            float qw = PI_QW[qg], qx = -PI_QX[qg], qy = -PI_QY[qg], qz = -PI_QZ[qg];
+            float rw = qw*qvals[0] - qx*qvals[1] - qy*qvals[2] - qz*qvals[3];
+            float rx = qw*qvals[1] + qx*qvals[0] + qy*qvals[3] - qz*qvals[2];
+            float ry = qw*qvals[2] - qx*qvals[3] + qy*qvals[0] + qz*qvals[1];
+            float rz = qw*qvals[3] + qx*qvals[2] - qy*qvals[1] + qz*qvals[0];
+
+            float results[4] = {rw, rx, ry, rz};
+            float2 kv;
+            kv.x = results[offset] * norm;
+            kv.y = results[offset + 1] * norm;
+
+#ifdef V_DOT2_F32_F16_AVAILABLE
+            const half2 qv = ((const half2 *) Q_v)[k_KQ_0/nthreads + k_KQ_1];
+            ggml_cuda_mad(sum, make_float2(kv.x, kv.y), __half22float2(qv));
+#else
+            const float2 qv = ((const float2 *) Q_v)[k_KQ_0/nthreads + k_KQ_1];
+            sum += kv.x * qv.x + kv.y * qv.y;
+#endif
+        }
+    }
     return sum;
 }
 
@@ -577,6 +959,426 @@ static __device__ __forceinline__ void dequantize_V_q8_0(const void * __restrict
     }
 }
 
+// Turbo3 V dequantize: extract `ne` float/half values at position i0.
+//
+// Optimised for the ne==4 path (used by the VEC kernel with turbo3 V):
+// i0 is always a multiple of 4 from the VEC kernel access pattern, so all 4
+// elements share one qs byte and one signs byte — we load each once.
+template <typename T, int ne>
+static __device__ __forceinline__ void dequantize_V_turbo3_0(const void * __restrict__ vx, void * __restrict__ dst, const int64_t i0) {
+    const block_turbo3_0 * x = (const block_turbo3_0 *) vx;
+
+    const int64_t ib   = i0 / QK_TURBO3;
+    const int     j0   = i0 % QK_TURBO3;
+    const float   norm = __half2float(x[ib].norm);
+
+    static_assert(ne == 2 || ne == 4, "bad ne");
+
+    if constexpr (ne == 4) {
+        // When j0 % 4 == 0 (always true from VEC kernel), all 4 elements share one
+        // qs byte (4 elements per byte) and one signs byte (8 elements per byte).
+        const uint8_t qs_byte  = x[ib].qs[j0 / 4];
+        const uint8_t sgn_byte = x[ib].signs[j0 / 8];
+        const int     shift_s  = j0 % 8;   // 0 or 4
+
+        const uint8_t idx0 = ((qs_byte >> 0) & 0x3) | (((sgn_byte >> (shift_s+0)) & 0x1) << 2);
+        const uint8_t idx1 = ((qs_byte >> 2) & 0x3) | (((sgn_byte >> (shift_s+1)) & 0x1) << 2);
+        const uint8_t idx2 = ((qs_byte >> 4) & 0x3) | (((sgn_byte >> (shift_s+2)) & 0x1) << 2);
+        const uint8_t idx3 = ((qs_byte >> 6) & 0x3) | (((sgn_byte >> (shift_s+3)) & 0x1) << 2);
+
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            ((half2 *) dst)[0] = make_half2(
+                __float2half(TURBO_CENTROIDS_3BIT[idx0] * norm),
+                __float2half(TURBO_CENTROIDS_3BIT[idx1] * norm));
+            ((half2 *) dst)[1] = make_half2(
+                __float2half(TURBO_CENTROIDS_3BIT[idx2] * norm),
+                __float2half(TURBO_CENTROIDS_3BIT[idx3] * norm));
+        } else
+#endif // FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, float>) {
+            ((float2 *) dst)[0] = make_float2(
+                TURBO_CENTROIDS_3BIT[idx0] * norm,
+                TURBO_CENTROIDS_3BIT[idx1] * norm);
+            ((float2 *) dst)[1] = make_float2(
+                TURBO_CENTROIDS_3BIT[idx2] * norm,
+                TURBO_CENTROIDS_3BIT[idx3] * norm);
+        } else {
+            static_assert(std::is_same_v<T, void>, "unsupported type");
+        }
+    } else { // ne == 2
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            float v0 = turbo3_dequant_element(&x[ib], j0,   norm);
+            float v1 = turbo3_dequant_element(&x[ib], j0+1, norm);
+            ((half2 *) dst)[0] = make_half2(__float2half(v0), __float2half(v1));
+        } else
+#endif // FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, float>) {
+            ((float *) dst)[0] = turbo3_dequant_element(&x[ib], j0,   norm);
+            ((float *) dst)[1] = turbo3_dequant_element(&x[ib], j0+1, norm);
+        } else {
+            static_assert(std::is_same_v<T, void>, "unsupported type");
+        }
+    }
+}
+
+// Turbo2 V dequantize: extract `ne` float/half values at position i0.
+template <typename T, int ne>
+static __device__ __forceinline__ void dequantize_V_turbo2_0(const void * __restrict__ vx, void * __restrict__ dst, const int64_t i0) {
+    const block_turbo2_0 * x = (const block_turbo2_0 *) vx;
+
+    const int64_t ib   = i0 / QK_TURBO2;
+    const int     j0   = i0 % QK_TURBO2;
+    const float   norm = __half2float(x[ib].norm);
+
+    static_assert(ne == 2 || ne == 4, "bad ne");
+
+    if constexpr (ne == 4) {
+        const uint8_t qs_byte = x[ib].qs[j0 / 4];
+
+        const uint8_t idx0 = (qs_byte >> 0) & 0x3;
+        const uint8_t idx1 = (qs_byte >> 2) & 0x3;
+        const uint8_t idx2 = (qs_byte >> 4) & 0x3;
+        const uint8_t idx3 = (qs_byte >> 6) & 0x3;
+
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            ((half2 *) dst)[0] = make_half2(
+                __float2half(TURBO_CENTROIDS_2BIT[idx0] * norm),
+                __float2half(TURBO_CENTROIDS_2BIT[idx1] * norm));
+            ((half2 *) dst)[1] = make_half2(
+                __float2half(TURBO_CENTROIDS_2BIT[idx2] * norm),
+                __float2half(TURBO_CENTROIDS_2BIT[idx3] * norm));
+        } else
+#endif // FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, float>) {
+            ((float2 *) dst)[0] = make_float2(
+                TURBO_CENTROIDS_2BIT[idx0] * norm,
+                TURBO_CENTROIDS_2BIT[idx1] * norm);
+            ((float2 *) dst)[1] = make_float2(
+                TURBO_CENTROIDS_2BIT[idx2] * norm,
+                TURBO_CENTROIDS_2BIT[idx3] * norm);
+        } else {
+            static_assert(std::is_same_v<T, void>, "unsupported type");
+        }
+    } else { // ne == 2
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            float v0 = turbo2_dequant_element(&x[ib], j0,   norm);
+            float v1 = turbo2_dequant_element(&x[ib], j0+1, norm);
+            ((half2 *) dst)[0] = make_half2(__float2half(v0), __float2half(v1));
+        } else
+#endif // FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, float>) {
+            ((float *) dst)[0] = turbo2_dequant_element(&x[ib], j0,   norm);
+            ((float *) dst)[1] = turbo2_dequant_element(&x[ib], j0+1, norm);
+        } else {
+            static_assert(std::is_same_v<T, void>, "unsupported type");
+        }
+    }
+}
+
+// Turbo4 V dequantize: extract `ne` float/half values at position i0.
+// 4-bit nibble packed, block size 128.
+template <typename T, int ne>
+static __device__ __forceinline__ void dequantize_V_turbo4_0(const void * __restrict__ vx, void * __restrict__ dst, const int64_t i0) {
+    const block_turbo4_0 * x = (const block_turbo4_0 *) vx;
+
+    const int64_t ib   = i0 / QK_TURBO4;
+    const int     j0   = i0 % QK_TURBO4;
+    const float   norm = __half2float(x[ib].norm);
+
+    static_assert(ne == 2 || ne == 4, "bad ne");
+
+    if constexpr (ne == 4) {
+        // j0 is always a multiple of 4 from the VEC kernel access pattern.
+        // 4 consecutive elements span 2 qs bytes: j0/2 and j0/2+1.
+        const uint8_t qs_byte0 = x[ib].qs[j0 / 2];      // elements j0, j0+1
+        const uint8_t qs_byte1 = x[ib].qs[j0 / 2 + 1];  // elements j0+2, j0+3
+
+        const uint8_t idx0 = (qs_byte0 >> 0) & 0xF;
+        const uint8_t idx1 = (qs_byte0 >> 4) & 0xF;
+        const uint8_t idx2 = (qs_byte1 >> 0) & 0xF;
+        const uint8_t idx3 = (qs_byte1 >> 4) & 0xF;
+
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            ((half2 *) dst)[0] = make_half2(
+                __float2half(TURBO_CENTROIDS_4BIT[idx0] * norm),
+                __float2half(TURBO_CENTROIDS_4BIT[idx1] * norm));
+            ((half2 *) dst)[1] = make_half2(
+                __float2half(TURBO_CENTROIDS_4BIT[idx2] * norm),
+                __float2half(TURBO_CENTROIDS_4BIT[idx3] * norm));
+        } else
+#endif // FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, float>) {
+            ((float2 *) dst)[0] = make_float2(
+                TURBO_CENTROIDS_4BIT[idx0] * norm,
+                TURBO_CENTROIDS_4BIT[idx1] * norm);
+            ((float2 *) dst)[1] = make_float2(
+                TURBO_CENTROIDS_4BIT[idx2] * norm,
+                TURBO_CENTROIDS_4BIT[idx3] * norm);
+        } else {
+            static_assert(std::is_same_v<T, void>, "unsupported type");
+        }
+    } else { // ne == 2
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            float v0 = turbo4_dequant_element(&x[ib], j0,   norm);
+            float v1 = turbo4_dequant_element(&x[ib], j0+1, norm);
+            ((half2 *) dst)[0] = make_half2(__float2half(v0), __float2half(v1));
+        } else
+#endif // FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, float>) {
+            ((float *) dst)[0] = turbo4_dequant_element(&x[ib], j0,   norm);
+            ((float *) dst)[1] = turbo4_dequant_element(&x[ib], j0+1, norm);
+        } else {
+            static_assert(std::is_same_v<T, void>, "unsupported type");
+        }
+    }
+}
+
+// ── PlanarQuant3 V dequantize: centroid lookup + inverse Givens rotation ──
+// Unlike turbo3 (WHT), Givens rotation requires explicit inverse during V dequant.
+// Each pair (2p, 2p+1) undergoes inverse Givens: [c, s; -s, c] * [q0; q1] * norm
+template <typename T, int ne>
+static __device__ __forceinline__ void dequantize_V_planar3_0(const void * __restrict__ vx, void * __restrict__ dst, const int64_t i0) {
+    const block_planar3_0 * x = (const block_planar3_0 *) vx;
+    const int64_t ib = i0 / QK_PLANAR3;
+    const int     j0 = i0 % QK_PLANAR3;
+    const float   norm = __half2float(x[ib].norm);
+
+    static_assert(ne == 2 || ne == 4, "bad ne");
+
+    // Helper lambda: unpack 3-bit index from block
+    auto unpack3 = [&](int j) -> uint8_t {
+        uint8_t low = (x[ib].qs[j/4] >> ((j%4)*2)) & 0x3;
+        uint8_t hi  = (x[ib].signs[j/8] >> (j%8)) & 0x1;
+        return low | (hi << 2);
+    };
+
+    if constexpr (ne == 4) {
+        // 4 elements = 2 consecutive Givens pairs
+        float q0 = PI_CENTROIDS_3BIT[unpack3(j0)];
+        float q1 = PI_CENTROIDS_3BIT[unpack3(j0+1)];
+        float q2 = PI_CENTROIDS_3BIT[unpack3(j0+2)];
+        float q3 = PI_CENTROIDS_3BIT[unpack3(j0+3)];
+
+        // Inverse Givens for pair j0/2
+        int p0 = j0 / 2;
+        float c0 = PI_COS[p0], s0 = PI_SIN[p0];
+        float r0 = ( c0 * q0 + s0 * q1) * norm;
+        float r1 = (-s0 * q0 + c0 * q1) * norm;
+
+        // Inverse Givens for pair (j0+2)/2
+        int p1 = (j0 + 2) / 2;
+        float c1 = PI_COS[p1], s1 = PI_SIN[p1];
+        float r2 = ( c1 * q2 + s1 * q3) * norm;
+        float r3 = (-s1 * q2 + c1 * q3) * norm;
+
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            ((half2 *)dst)[0] = make_half2(__float2half(r0), __float2half(r1));
+            ((half2 *)dst)[1] = make_half2(__float2half(r2), __float2half(r3));
+        } else
+#endif
+        if constexpr (std::is_same_v<T, float>) {
+            ((float2 *)dst)[0] = make_float2(r0, r1);
+            ((float2 *)dst)[1] = make_float2(r2, r3);
+        }
+    } else { // ne == 2
+        float q0 = PI_CENTROIDS_3BIT[unpack3(j0)];
+        float q1 = PI_CENTROIDS_3BIT[unpack3(j0+1)];
+
+        int p = j0 / 2;
+        float c = PI_COS[p], s = PI_SIN[p];
+        float r0 = ( c * q0 + s * q1) * norm;
+        float r1 = (-s * q0 + c * q1) * norm;
+
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            ((half2 *)dst)[0] = make_half2(__float2half(r0), __float2half(r1));
+        } else
+#endif
+        if constexpr (std::is_same_v<T, float>) {
+            ((float *)dst)[0] = r0; ((float *)dst)[1] = r1;
+        }
+    }
+}
+
+// ── IsoQuant3 V dequantize: centroid lookup + inverse quaternion rotation ──
+// Each 4D group needs full inverse quaternion: conj(q) * v
+template <typename T, int ne>
+static __device__ __forceinline__ void dequantize_V_iso3_0(const void * __restrict__ vx, void * __restrict__ dst, const int64_t i0) {
+    const block_iso3_0 * x = (const block_iso3_0 *) vx;
+    const int64_t ib = i0 / QK_ISO3;
+    const int     j0 = i0 % QK_ISO3;
+    const float   norm = __half2float(x[ib].norm);
+
+    static_assert(ne == 2 || ne == 4, "bad ne");
+
+    // Helper: unpack 3-bit index (same block layout as planar3)
+    auto unpack3 = [&](int j) -> uint8_t {
+        uint8_t low = (((const block_planar3_0 *)&x[ib])->qs[j/4] >> ((j%4)*2)) & 0x3;
+        uint8_t hi  = (((const block_planar3_0 *)&x[ib])->signs[j/8] >> (j%8)) & 0x1;
+        return low | (hi << 2);
+    };
+
+    // Always do full 4D inverse quaternion for the group containing j0
+    int g = j0 / 4;
+    int offset = j0 % 4;
+
+    float qvals[4];
+    for (int c = 0; c < 4; c++) {
+        qvals[c] = PI_CENTROIDS_3BIT[unpack3(g*4 + c)];
+    }
+
+    // Inverse quaternion: conj(q) * v  (negate x,y,z)
+    float qw = PI_QW[g], qx = -PI_QX[g], qy = -PI_QY[g], qz = -PI_QZ[g];
+    float rw = qw*qvals[0] - qx*qvals[1] - qy*qvals[2] - qz*qvals[3];
+    float rx = qw*qvals[1] + qx*qvals[0] + qy*qvals[3] - qz*qvals[2];
+    float ry = qw*qvals[2] - qx*qvals[3] + qy*qvals[0] + qz*qvals[1];
+    float rz = qw*qvals[3] + qx*qvals[2] - qy*qvals[1] + qz*qvals[0];
+
+    float results[4] = {rw * norm, rx * norm, ry * norm, rz * norm};
+
+    if constexpr (ne == 4) {
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            ((half2 *)dst)[0] = make_half2(__float2half(results[0]), __float2half(results[1]));
+            ((half2 *)dst)[1] = make_half2(__float2half(results[2]), __float2half(results[3]));
+        } else
+#endif
+        if constexpr (std::is_same_v<T, float>) {
+            ((float2 *)dst)[0] = make_float2(results[0], results[1]);
+            ((float2 *)dst)[1] = make_float2(results[2], results[3]);
+        }
+    } else { // ne == 2
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            ((half2 *)dst)[0] = make_half2(__float2half(results[offset]), __float2half(results[offset+1]));
+        } else
+#endif
+        if constexpr (std::is_same_v<T, float>) {
+            ((float *)dst)[0] = results[offset]; ((float *)dst)[1] = results[offset+1];
+        }
+    }
+}
+
+// ── PlanarQuant4 V dequantize: 4-bit centroid + inverse Givens rotation ──
+template <typename T, int ne>
+static __device__ __forceinline__ void dequantize_V_planar4_0(const void * __restrict__ vx, void * __restrict__ dst, const int64_t i0) {
+    const block_planar4_0 * x = (const block_planar4_0 *) vx;
+    const int64_t ib = i0 / QK_PLANAR4;
+    const int     j0 = i0 % QK_PLANAR4;
+    const float   norm = __half2float(x[ib].norm);
+
+    static_assert(ne == 2 || ne == 4, "bad ne");
+
+    auto unpack4 = [&](int j) -> uint8_t {
+        return (x[ib].qs[j/2] >> ((j%2)*4)) & 0xF;
+    };
+
+    if constexpr (ne == 4) {
+        float q0 = PI_CENTROIDS_4BIT[unpack4(j0)];
+        float q1 = PI_CENTROIDS_4BIT[unpack4(j0+1)];
+        float q2 = PI_CENTROIDS_4BIT[unpack4(j0+2)];
+        float q3 = PI_CENTROIDS_4BIT[unpack4(j0+3)];
+
+        int p0 = j0 / 2;
+        float c0 = PI_COS[p0], s0 = PI_SIN[p0];
+        float r0 = ( c0 * q0 + s0 * q1) * norm;
+        float r1 = (-s0 * q0 + c0 * q1) * norm;
+
+        int p1 = (j0 + 2) / 2;
+        float c1 = PI_COS[p1], s1 = PI_SIN[p1];
+        float r2 = ( c1 * q2 + s1 * q3) * norm;
+        float r3 = (-s1 * q2 + c1 * q3) * norm;
+
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            ((half2 *)dst)[0] = make_half2(__float2half(r0), __float2half(r1));
+            ((half2 *)dst)[1] = make_half2(__float2half(r2), __float2half(r3));
+        } else
+#endif
+        if constexpr (std::is_same_v<T, float>) {
+            ((float2 *)dst)[0] = make_float2(r0, r1);
+            ((float2 *)dst)[1] = make_float2(r2, r3);
+        }
+    } else {
+        float q0 = PI_CENTROIDS_4BIT[unpack4(j0)];
+        float q1 = PI_CENTROIDS_4BIT[unpack4(j0+1)];
+
+        int p = j0 / 2;
+        float c = PI_COS[p], s = PI_SIN[p];
+        float r0 = ( c * q0 + s * q1) * norm;
+        float r1 = (-s * q0 + c * q1) * norm;
+
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            ((half2 *)dst)[0] = make_half2(__float2half(r0), __float2half(r1));
+        } else
+#endif
+        if constexpr (std::is_same_v<T, float>) {
+            ((float *)dst)[0] = r0; ((float *)dst)[1] = r1;
+        }
+    }
+}
+
+// ── IsoQuant4 V dequantize: 4-bit centroid + inverse quaternion rotation ──
+template <typename T, int ne>
+static __device__ __forceinline__ void dequantize_V_iso4_0(const void * __restrict__ vx, void * __restrict__ dst, const int64_t i0) {
+    const block_iso4_0 * x = (const block_iso4_0 *) vx;
+    const int64_t ib = i0 / QK_ISO4;
+    const int     j0 = i0 % QK_ISO4;
+    const float   norm = __half2float(x[ib].norm);
+
+    static_assert(ne == 2 || ne == 4, "bad ne");
+
+    auto unpack4 = [&](int j) -> uint8_t {
+        return (x[ib].qs[j/2] >> ((j%2)*4)) & 0xF;
+    };
+
+    int g = j0 / 4;
+    int offset = j0 % 4;
+
+    float qvals[4];
+    for (int c = 0; c < 4; c++) {
+        qvals[c] = PI_CENTROIDS_4BIT[unpack4(g*4 + c)];
+    }
+
+    float qw = PI_QW[g], qx = -PI_QX[g], qy = -PI_QY[g], qz = -PI_QZ[g];
+    float rw = qw*qvals[0] - qx*qvals[1] - qy*qvals[2] - qz*qvals[3];
+    float rx = qw*qvals[1] + qx*qvals[0] + qy*qvals[3] - qz*qvals[2];
+    float ry = qw*qvals[2] - qx*qvals[3] + qy*qvals[0] + qz*qvals[1];
+    float rz = qw*qvals[3] + qx*qvals[2] - qy*qvals[1] + qz*qvals[0];
+
+    float results[4] = {rw * norm, rx * norm, ry * norm, rz * norm};
+
+    if constexpr (ne == 4) {
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            ((half2 *)dst)[0] = make_half2(__float2half(results[0]), __float2half(results[1]));
+            ((half2 *)dst)[1] = make_half2(__float2half(results[2]), __float2half(results[3]));
+        } else
+#endif
+        if constexpr (std::is_same_v<T, float>) {
+            ((float2 *)dst)[0] = make_float2(results[0], results[1]);
+            ((float2 *)dst)[1] = make_float2(results[2], results[3]);
+        }
+    } else {
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            ((half2 *)dst)[0] = make_half2(__float2half(results[offset]), __float2half(results[offset+1]));
+        } else
+#endif
+        if constexpr (std::is_same_v<T, float>) {
+            ((float *)dst)[0] = results[offset]; ((float *)dst)[1] = results[offset+1];
+        }
+    }
+}
+
 template <ggml_type type_K, int D, int nthreads>
 constexpr __device__ vec_dot_KQ_t get_vec_dot_KQ() {
     if constexpr (type_K == GGML_TYPE_F16) {
@@ -593,6 +1395,20 @@ constexpr __device__ vec_dot_KQ_t get_vec_dot_KQ() {
         return vec_dot_fattn_vec_KQ_q8_0<D, nthreads>;
     } else if constexpr (type_K == GGML_TYPE_BF16) {
         return vec_dot_fattn_vec_KQ_bf16<D, nthreads>;
+    } else if constexpr (type_K == GGML_TYPE_TURBO3_0) {
+        return vec_dot_fattn_vec_KQ_turbo3_0<D, nthreads>;
+    } else if constexpr (type_K == GGML_TYPE_TURBO2_0) {
+        return vec_dot_fattn_vec_KQ_turbo2_0<D, nthreads>;
+    } else if constexpr (type_K == GGML_TYPE_TURBO4_0) {
+        return vec_dot_fattn_vec_KQ_turbo4_0<D, nthreads>;
+    } else if constexpr (type_K == GGML_TYPE_PLANAR3_0) {
+        return vec_dot_fattn_vec_KQ_planar3_0<D, nthreads>;
+    } else if constexpr (type_K == GGML_TYPE_ISO3_0) {
+        return vec_dot_fattn_vec_KQ_iso3_0<D, nthreads>;
+    } else if constexpr (type_K == GGML_TYPE_PLANAR4_0) {
+        return vec_dot_fattn_vec_KQ_planar4_0<D, nthreads>;
+    } else if constexpr (type_K == GGML_TYPE_ISO4_0) {
+        return vec_dot_fattn_vec_KQ_iso4_0<D, nthreads>;
     } else {
         static_assert(type_K == -1, "bad type");
         return nullptr;
@@ -615,6 +1431,20 @@ constexpr __device__ dequantize_V_t get_dequantize_V() {
         return dequantize_V_q8_0<T, ne>;
     } else if constexpr (type_V == GGML_TYPE_BF16) {
         return dequantize_V_bf16<float, ne>;
+    } else if constexpr (type_V == GGML_TYPE_TURBO3_0) {
+        return dequantize_V_turbo3_0<T, ne>;
+    } else if constexpr (type_V == GGML_TYPE_TURBO2_0) {
+        return dequantize_V_turbo2_0<T, ne>;
+    } else if constexpr (type_V == GGML_TYPE_TURBO4_0) {
+        return dequantize_V_turbo4_0<T, ne>;
+    } else if constexpr (type_V == GGML_TYPE_PLANAR3_0) {
+        return dequantize_V_planar3_0<T, ne>;
+    } else if constexpr (type_V == GGML_TYPE_ISO3_0) {
+        return dequantize_V_iso3_0<T, ne>;
+    } else if constexpr (type_V == GGML_TYPE_PLANAR4_0) {
+        return dequantize_V_planar4_0<T, ne>;
+    } else if constexpr (type_V == GGML_TYPE_ISO4_0) {
+        return dequantize_V_iso4_0<T, ne>;
     } else {
         static_assert(type_V == -1, "bad type");
         return nullptr;

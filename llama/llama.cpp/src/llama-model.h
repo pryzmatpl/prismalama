@@ -81,7 +81,6 @@ enum llm_type {
     LLM_TYPE_15B,
     LLM_TYPE_16B,
     LLM_TYPE_20B,
-    LLM_TYPE_22B,
     LLM_TYPE_26B,
     LLM_TYPE_27B,
     LLM_TYPE_30B,
@@ -415,6 +414,27 @@ struct llama_layer {
     struct ggml_tensor * ssm_alpha_s = nullptr;
     struct ggml_tensor * ssm_beta_s  = nullptr;
 
+    // input scales
+    struct ggml_tensor * wq_in_s            = nullptr;
+    struct ggml_tensor * wk_in_s            = nullptr;
+    struct ggml_tensor * wv_in_s            = nullptr;
+    struct ggml_tensor * wo_in_s            = nullptr;
+    struct ggml_tensor * wqkv_in_s          = nullptr;
+    struct ggml_tensor * wqkv_gate_in_s     = nullptr;
+    struct ggml_tensor * ffn_gate_in_s      = nullptr;
+    struct ggml_tensor * ffn_up_in_s        = nullptr;
+    struct ggml_tensor * ffn_down_in_s      = nullptr;
+    struct ggml_tensor * ffn_gate_exps_in_s = nullptr;
+    struct ggml_tensor * ffn_down_exps_in_s = nullptr;
+    struct ggml_tensor * ffn_up_exps_in_s   = nullptr;
+    struct ggml_tensor * ffn_gate_shexp_in_s= nullptr;
+    struct ggml_tensor * ffn_up_shexp_in_s  = nullptr;
+    struct ggml_tensor * ffn_down_shexp_in_s= nullptr;
+    struct ggml_tensor * ssm_in_in_s        = nullptr;
+    struct ggml_tensor * ssm_out_in_s       = nullptr;
+    struct ggml_tensor * ssm_alpha_in_s     = nullptr;
+    struct ggml_tensor * ssm_beta_in_s      = nullptr;
+
     // altup & laurel
     struct ggml_tensor * per_layer_inp_gate   = nullptr;
     struct ggml_tensor * per_layer_proj       = nullptr;
@@ -462,8 +482,6 @@ struct llama_layer {
     struct ggml_tensor * indexer_proj     = nullptr;
     struct ggml_tensor * indexer_attn_k   = nullptr;
     struct ggml_tensor * indexer_attn_q_b = nullptr; // note: for lora a/b, not bias
-
-    struct ggml_tensor * bskcn_tv = nullptr;
 
     struct llama_layer_posnet posnet;
 

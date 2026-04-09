@@ -110,7 +110,7 @@ struct ggml_backend_reg_entry {
 
 struct ggml_backend_registry {
     std::vector<ggml_backend_reg_entry> backends;
-    std::vector<std::pair<ggml_backend_dev_t, int>> devices;
+    std::vector<ggml_backend_dev_t> devices;
 
     ggml_backend_registry() {
 #ifdef GGML_USE_CUDA
@@ -176,7 +176,7 @@ struct ggml_backend_registry {
         }
     }
 
-    void register_backend(ggml_backend_reg_t reg, int score = -1, dl_handle_ptr handle = nullptr) {
+    void register_backend(ggml_backend_reg_t reg, dl_handle_ptr handle = nullptr) {
         if (!reg) {
             return;
         }
@@ -187,20 +187,15 @@ struct ggml_backend_registry {
 #endif
         backends.push_back({ reg, std::move(handle) });
         for (size_t i = 0; i < ggml_backend_reg_dev_count(reg); i++) {
-            register_device(ggml_backend_reg_dev_get(reg, i), score);
+            register_device(ggml_backend_reg_dev_get(reg, i));
         }
     }
 
-    void register_device(ggml_backend_dev_t device, int score = -1) {
+    void register_device(ggml_backend_dev_t device) {
 #ifndef NDEBUG
         GGML_LOG_DEBUG("%s: registered device %s (%s)\n", __func__, ggml_backend_dev_name(device), ggml_backend_dev_description(device));
 #endif
-        devices.push_back({device, score});
-        std::stable_sort(devices.begin(), devices.end(),
-            [](const auto & a, const auto & b) {
-                return a.second > b.second;
-            }
-        );
+        devices.push_back(device);
     }
 
     ggml_backend_reg_t load_backend(const fs::path & path, bool silent) {
@@ -244,7 +239,7 @@ struct ggml_backend_registry {
 
         GGML_LOG_INFO("%s: loaded %s backend from %s\n", __func__, ggml_backend_reg_name(reg), path_str(path).c_str());
 
-        register_backend(reg, score_fn ? score_fn() : -1, std::move(handle));
+        register_backend(reg, std::move(handle));
 
         return reg;
     }
@@ -267,7 +262,7 @@ struct ggml_backend_registry {
         // remove devices
         devices.erase(
             std::remove_if(devices.begin(), devices.end(),
-                            [reg](std::pair<ggml_backend_dev_t, int> dev) { return ggml_backend_dev_backend_reg(dev.first) == reg; }),
+                            [reg](ggml_backend_dev_t dev) { return ggml_backend_dev_backend_reg(dev) == reg; }),
             devices.end());
 
         // remove backend
@@ -325,7 +320,7 @@ size_t ggml_backend_dev_count() {
 
 ggml_backend_dev_t ggml_backend_dev_get(size_t index) {
     GGML_ASSERT(index < ggml_backend_dev_count());
-    return get_reg().devices[index].first;
+    return get_reg().devices[index];
 }
 
 ggml_backend_dev_t ggml_backend_dev_by_name(const char * name) {

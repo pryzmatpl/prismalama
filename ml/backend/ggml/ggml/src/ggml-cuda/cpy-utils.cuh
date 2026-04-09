@@ -215,9 +215,3 @@ template<typename src_t, typename dst_t>
 static __device__ void cpy_1_scalar(const char * cxi, char * cdsti) {
     *(dst_t *) cdsti = ggml_cuda_cast<dst_t>(*(const src_t *) cxi);
 }
-
-static __device__ void cpy_1_i32_i32(const char * cxi, char * cdsti) {
-    const int32_t * src = (const int32_t *)cxi;
-    int32_t * dst = (int32_t *)cdsti;
-    *dst = *src;
-}

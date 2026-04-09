@@ -82,8 +82,16 @@ set(GGML_CPU ON)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ml/backend/ggml/ggml/src)
 set_property(TARGET ggml PROPERTY EXCLUDE_FROM_ALL TRUE)
 
-get_target_property(CPU_VARIANTS ggml-cpu MANUALLY_ADDED_DEPENDENCIES)
-if(NOT CPU_VARIANTS)
+# Determine CPU variants: when GGML_CPU_ALL_VARIANTS is ON, the base target is ggml-cpu-x64, not ggml-cpu
+# Check for ggml-cpu first, fall back to ggml-cpu-x64 if the named target doesn't exist
+if(TARGET ggml-cpu)
+    get_target_property(CPU_VARIANTS ggml-cpu MANUALLY_ADDED_DEPENDENCIES)
+    if(NOT CPU_VARIANTS OR CPU_VARIANTS STREQUAL "NOTFOUND")
+        set(CPU_VARIANTS "ggml-cpu")
+    endif()
+elseif(TARGET ggml-cpu-x64)
+    set(CPU_VARIANTS "ggml-cpu-x64")
+else()
     set(CPU_VARIANTS "ggml-cpu")
 endif()
 

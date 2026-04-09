@@ -315,7 +315,7 @@ private:
     friend std::string build_grammar(const std::function<void(const common_grammar_builder &)> & cb, const common_grammar_options & options);
     std::function<json(const std::string &)> _fetch_json;
     bool _dotall;
-    std::unordered_map<std::string, std::string> _rules;
+    std::map<std::string, std::string> _rules;
     std::unordered_map<std::string, json> _refs;
     std::unordered_set<std::string> _refs_being_resolved;
     std::vector<std::string> _errors;

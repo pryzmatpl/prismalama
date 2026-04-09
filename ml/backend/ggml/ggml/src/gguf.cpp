@@ -394,7 +394,11 @@ bool gguf_read_emplace_helper(const struct gguf_reader & gr, std::vector<struct 
     return true;
 }
 
-struct gguf_context * gguf_init_from_file_impl(FILE * file, struct gguf_init_params params) {
+struct gguf_context * gguf_init_from_file_ptr(FILE * file, struct gguf_init_params params) {
+    if (!file) {
+        return nullptr;
+    }
+
     const struct gguf_reader gr(file);
     struct gguf_context * ctx = new gguf_context;
 
@@ -848,7 +852,7 @@ struct gguf_context * gguf_init_from_file(const char * fname, struct gguf_init_p
         return nullptr;
     }
 
-    struct gguf_context * result = gguf_init_from_file_impl(file, params);
+    struct gguf_context * result = gguf_init_from_file_ptr(file, params);
     fclose(file);
     return result;
 }
@@ -915,12 +919,8 @@ enum gguf_type gguf_get_arr_type(const struct gguf_context * ctx, int64_t key_id
 
 const void * gguf_get_arr_data(const struct gguf_context * ctx, int64_t key_id) {
     GGML_ASSERT(key_id >= 0 && key_id < gguf_get_n_kv(ctx));
+    GGML_ASSERT(ctx->kv[key_id].get_type() != GGUF_TYPE_STRING);
     return ctx->kv[key_id].data.data();
-}
-
-size_t gguf_get_arr_data_n(const struct gguf_context * ctx, int64_t key_id) {
-    GGML_ASSERT(key_id >= 0 && key_id < gguf_get_n_kv(ctx));
-    return ctx->kv[key_id].data.size();
 }
 
 const char * gguf_get_arr_str(const struct gguf_context * ctx, int64_t key_id, size_t i) {
@@ -1016,6 +1016,7 @@ const char * gguf_get_val_str(const struct gguf_context * ctx, int64_t key_id) {
 const void * gguf_get_val_data(const struct gguf_context * ctx, int64_t key_id) {
     GGML_ASSERT(key_id >= 0 && key_id < gguf_get_n_kv(ctx));
     GGML_ASSERT(ctx->kv[key_id].get_ne() == 1);
+    GGML_ASSERT(ctx->kv[key_id].get_type() != GGUF_TYPE_STRING);
     return ctx->kv[key_id].data.data();
 }
 
@@ -1511,6 +1512,19 @@ void gguf_write_to_buf(const struct gguf_context * ctx, std::vector<int8_t> & bu
     gguf_write_out(ctx, gw, only_meta);
 }
 
+bool gguf_write_to_file_ptr(const struct gguf_context * ctx, FILE * file, bool only_meta) {
+    GGML_ASSERT(file);
+
+    try {
+        gguf_writer_file gw(file);
+        gguf_write_out(ctx, gw, only_meta);
+    } catch (const std::runtime_error& ex) {
+        GGML_LOG_ERROR("%s: failed to write GGUF data: %s\n", __func__, ex.what());
+        return false;
+    }
+    return true;
+}
+
 bool gguf_write_to_file(const struct gguf_context * ctx, const char * fname, bool only_meta) {
     FILE * file = ggml_fopen(fname, "wb");
 
@@ -1519,17 +1533,13 @@ bool gguf_write_to_file(const struct gguf_context * ctx, const char * fname, boo
         return false;
     }
 
-    try {
-        gguf_writer_file gw(file);
-        gguf_write_out(ctx, gw, only_meta);
-    } catch (const std::runtime_error& ex) {
-        GGML_LOG_ERROR("%s: failed to write GGUF data into '%s': %s\n", __func__, fname, ex.what());
-        fclose(file);
-        return false;
+    const bool success = gguf_write_to_file_ptr(ctx, file, only_meta);
+    if (!success) {
+        GGML_LOG_ERROR("%s: failed to write GGUF data into '%s'\n", __func__, fname);
     }
 
     fclose(file);
-    return true;
+    return success;
 }
 
 size_t gguf_get_meta_size(const struct gguf_context * ctx) {

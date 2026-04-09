@@ -17,6 +17,94 @@ from dataclasses import dataclass, field, asdict
 from enum import Enum
 import traceback
 
+# ─────────────────────────────────────────────────────────────────────────────
+# HC-49: Multi-GPU weight streaming helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+def get_gpu_vram() -> list[int]:
+    """
+    Query each visible GPU's total VRAM via torch.cuda.get_device_properties.
+    Returns a list of VRAM bytes per GPU index; empty list on error.
+    """
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            return []
+        n = torch.cuda.device_count()
+        return [torch.cuda.get_device_properties(i).total_memory for i in range(n)]
+    except Exception as e:
+        logger.warning("get_gpu_vram: failed to query GPU VRAM: %s", e)
+        return []
+
+
+def _get_vram_budgets() -> list[int]:
+    """
+    Read per-GPU VRAM budgets from env vars AIRLLM_GPU_VRAM_BUDGET_0, _1, … .
+    Values are bytes (written as int strings by runner.go).
+    Returns [] if any var is missing or invalid.
+    """
+    budgets = []
+    i = 0
+    while True:
+        key = f"AIRLLM_GPU_VRAM_BUDGET_{i}"
+        val = os.environ.get(key)
+        if val is None:
+            break
+        try:
+            budgets.append(int(val))
+        except ValueError:
+            logger.warning("%s=%s is not a valid integer; ignoring", key, val)
+            return []
+        i += 1
+    return budgets
+
+
+def _compute_layer_buckets(num_layers: int, gpu_budgets: list[int]) -> dict[int, list[int]]:
+    """
+    Assign each layer index to a GPU bucket based on proportional VRAM budgets.
+
+    Args:
+        num_layers: total number of transformer layers.
+        gpu_budgets: VRAM bytes per GPU (from _get_vram_budgets).
+
+    Returns:
+        Dict mapping GPU index → list of layer indices assigned to it.
+
+    If gpu_budgets is shorter than the number of GPUs or has zero length,
+    falls back to equal-weight distribution.
+    """
+    if not gpu_budgets:
+        return {}
+
+    # Normalise: cap each budget at the smallest budget (avoid one GPU getting
+    # disproportionate layers in heterogeneous pools).
+    min_budget = min(gpu_budgets)
+    if min_budget == 0:
+        return {}
+
+    weights = [min(b, min_budget) for b in gpu_budgets]
+    total_weight = sum(weights)
+    n_gpus = len(gpu_budgets)
+
+    buckets: dict[int, list[int]] = {i: [] for i in range(n_gpus)}
+    for layer_idx in range(num_layers):
+        # Cumulative weight threshold
+        threshold = (layer_idx + 1) / float(num_layers) * total_weight
+        cumulative = 0
+        assigned = 0
+        for g, w in enumerate(weights):
+            cumulative += w
+            if cumulative >= threshold:
+                assigned = g
+                break
+        buckets[assigned].append(layer_idx)
+
+    return buckets
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Dataclasses
+# ─────────────────────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -102,7 +190,7 @@ class EmbeddingResponse:
 
 
 class AirLLMModel:
-    """Wrapper for AirLLM models with ROCm support."""
+    """Wrapper for AirLLM models with ROCm and multi-GPU support (HC-49)."""
     
     def __init__(self):
         self.model: Any = None
@@ -113,6 +201,117 @@ class AirLLMModel:
         self.lock = threading.Lock()
         self.compression = "4bit"
         self._model_loaded = False
+
+        # HC-49: multi-GPU weight streaming
+        self.multi_gpu: bool = False
+        self.gpu_count: int = 0
+        self.gpu_vram_budgets: list[int] = []      # bytes per GPU
+        self.gpu_detected_vram: list[int] = []      # bytes per GPU
+        self.layer_buckets: dict[int, list[int]] = {}  # gpu_idx → [layer_indices]
+        self._device_contexts: list[Any] = []       # torch.device contexts
+        
+    def _init_multi_gpu(self, num_layers: int):
+        """
+        Initialise multi-GPU mode: detect VRAM, compute layer buckets,
+        log assignments, and set up per-GPU torch.device contexts.
+        """
+        import torch
+
+        self.gpu_count = int(os.environ.get("AIRLLM_GPU_COUNT", "0"))
+        self.multi_gpu = os.environ.get("AIRLLM_MULTI_GPU", "0") == "1"
+
+        if not self.multi_gpu:
+            logger.info("Single-GPU mode (AIRLLM_MULTI_GPU != 1)")
+            return
+
+        logger.info("HC-49 multi-GPU weight streaming — initialising")
+        logger.info("  AIRLLM_GPU_COUNT=%d  AIRLLM_MULTI_GPU=1", self.gpu_count)
+
+        # Query detected VRAM per GPU
+        self.gpu_detected_vram = get_gpu_vram()
+        for i, vram in enumerate(self.gpu_detected_vram):
+            gb = vram / 1024**3
+            logger.info("  GPU %d: %.1f GB detected VRAM", i, gb)
+
+        # Read operator-specified VRAM budgets (bytes, from runner.go)
+        self.gpu_vram_budgets = _get_vram_budgets()
+        if self.gpu_vram_budgets:
+            for i, budget in enumerate(self.gpu_vram_budgets):
+                gb = budget / 1024**3
+                logger.info("  GPU %d: VRAM budget set to %.1f GB (AIRLLM_GPU_VRAM_BUDGET_%d)", i, gb, i)
+        else:
+            # Fall back to detected VRAM if no explicit budget
+            self.gpu_vram_budgets = self.gpu_detected_vram.copy()
+            if self.gpu_vram_budgets:
+                logger.info("  No AIRLLM_GPU_VRAM_BUDGET_N set; using detected VRAM as budget")
+            else:
+                logger.warning("  No VRAM budget available; multi-GPU may not function correctly")
+
+        # Compute layer-to-GPU bucket assignments
+        self.layer_buckets = _compute_layer_buckets(num_layers, self.gpu_vram_budgets)
+        total_assigned = sum(len(v) for v in self.layer_buckets.values())
+        logger.info("  Layer assignment across %d GPU(s):", len(self.layer_buckets))
+        for gpu_idx, layers in sorted(self.layer_buckets.items()):
+            logger.info(
+                "    GPU %d: %d layers  %s",
+                gpu_idx,
+                len(layers),
+                str(layers[:5]) + (" ..." if len(layers) > 5 else ""),
+            )
+
+        if total_assigned != num_layers:
+            logger.error(
+                "HC-49: layer bucket mismatch — assigned %d != num_layers %d",
+                total_assigned, num_layers,
+            )
+
+        # Create torch.device context for each GPU so the Python runner can
+        # target each device explicitly during weight streaming.
+        self._device_contexts = []
+        if self.gpu_count > 0 and torch.cuda.is_available():
+            for i in range(self.gpu_count):
+                if i < torch.cuda.device_count():
+                    ctx = torch.device(f"cuda:{i}")
+                    self._device_contexts.append(ctx)
+                    # Warm up the device to catch early errors
+                    try:
+                        _ = torch.zeros(1, device=ctx)
+                        logger.info("  GPU %d device context created (cuda:%d)", i, i)
+                    except Exception as ex:
+                        logger.error("  GPU %d: failed to create device context: %s", i, ex)
+                else:
+                    logger.warning("  GPU %d requested but only %d GPUs visible",
+                                   i, torch.cuda.device_count())
+
+        # NCCL init: set up distributed process group when NCCL is available.
+        # This is deferred to model load time because ncclFileCommInitRank
+        # requires knowing the world size and rank up front; the runner sets
+        # NCCL world size to gpu_count and rank from AIRLLM_RANK env var.
+        self._nccl_initialised = False
+        try:
+            import torch.distributed as dist
+            if dist.is_available() and dist.is_nccl_available():
+                rank_str = os.environ.get("AIRLLM_RANK", "0")
+                world_size_str = os.environ.get("AIRLLM_WORLD_SIZE", str(self.gpu_count))
+                rank = int(rank_str)
+                world_size = int(world_size_str)
+                if world_size > 1:
+                    dist.init_process_group(backend="nccl")
+                    dist.barrier()
+                    self._nccl_initialised = True
+                    logger.info(
+                        "  NCCL process group initialised: rank=%d world_size=%d",
+                        rank, world_size,
+                    )
+                else:
+                    logger.info("  NCCL: world_size=1, skipping distributed init")
+            else:
+                logger.warning("  torch.distributed NCCL not available; tensor-parallel "
+                               "communication will fall back to torch.cuda.synchronize")
+        except Exception as ex:
+            logger.warning("  NCCL init failed (non-fatal): %s", ex)
+        
+        logger.info("HC-49 multi-GPU initialisation complete")
         
     def load(self, model_path: str, options: dict):
         """Load model using AirLLM with layer-by-layer loading."""
@@ -127,6 +326,17 @@ class AirLLMModel:
                 logger.info(f"Loading AirLLM model from {model_path}")
                 self.progress = 0.1
                 
+                # HC-52: inject NVME striping persister BEFORE AutoModel import
+                # so that subsequent AutoModel.load calls use multi-NVME parallel reads.
+                self._nvme_striped_persister = None
+                try:
+                    from prismalama.nvme_striping import inject_striped_persister
+                    striped = inject_striped_persister(model_path)
+                    if striped:
+                        self._nvme_striped_persister = striped
+                except Exception as ex:
+                    logger.warning("HC-52: failed to inject NVME striped persister (non-fatal): %s", ex)
+
                 from airllm import AutoModel
                 import torch
                 
@@ -145,6 +355,17 @@ class AirLLMModel:
 
                 # Detect ROCm runtime: torch.version.hip is set when PyTorch is built for AMD.
                 is_rocm = getattr(torch, 'version', None) and getattr(torch.version, 'hip', None)
+
+                # HC-51: Honour AIRLLM_GPU_TOPOLOGY to force a specific device ordering
+                # across a mixed AMD+NVIDIA pool.  Format: "amd:0,nvidia:0,amd:1"
+                gpu_topology_raw = os.environ.get("AIRLLM_GPU_TOPOLOGY", "")
+                if gpu_topology_raw:
+                    topo_parts = [p.strip() for p in gpu_topology_raw.split(",") if p.strip()]
+                    logger.info(
+                        "AIRLLM_GPU_TOPOLOGY=%s  (%d device slots)", gpu_topology_raw, len(topo_parts)
+                    )
+                else:
+                    topo_parts = []
 
                 # Map AIRLLM_DEVICE to the appropriate backend:
                 # - ROCm: "hip:X" or "cuda:X" both work via HIP; prefer "cuda:X" as the
@@ -188,13 +409,17 @@ class AirLLMModel:
                             "HIP_VISIBLE_DEVICES / AIRLLM_DEVICE correctly for GPU inference."
                         )
                 logger.info(
-                    "PyTorch: is_rocm=%s cuda.is_available=%s device_count=%s device=%s AIRLLM_DEVICE=%s ROCR_VISIBLE_DEVICES=%s",
+                    "PyTorch: is_rocm=%s cuda.is_available=%s device_count=%s device=%s "
+                    "AIRLLM_DEVICE=%s ROCR_VISIBLE_DEVICES=%s CUDA_VISIBLE_DEVICES=%s "
+                    "AIRLLM_GPU_TOPOLOGY=%s",
                     is_rocm,
                     cuda_ok,
                     n_dev,
                     device,
                     os.environ.get("AIRLLM_DEVICE", "(not set)"),
                     rocr_devices,
+                    os.environ.get("CUDA_VISIBLE_DEVICES", "(not set)"),
+                    gpu_topology_raw or "(auto)",
                 )
                 
                 self.progress = 0.3
@@ -210,6 +435,21 @@ class AirLLMModel:
                 )
                 self.progress = 0.5
                 logger.info("AutoModel initialized")
+                
+                # HC-49: Multi-GPU init after model structure is known (layer count available).
+                # Extract layer count from the model before multi-GPU bucket assignment.
+                num_layers = 0
+                try:
+                    # Walk model.layers to count transformer layers.
+                    model_attr = self.model
+                    for attr_name in ['model', 'model', 'layers']:
+                        model_attr = getattr(model_attr, attr_name)
+                    num_layers = len(model_attr)
+                    logger.info("AutoModel has %d transformer layers", num_layers)
+                except Exception as ex:
+                    logger.warning("Could not detect layer count for HC-49 bucketing: %s", ex)
+
+                self._init_multi_gpu(num_layers)
                 
                 # Tokenizer and model are already loaded by from_pretrained
                 self.tokenizer = self.model.tokenizer
@@ -499,6 +739,12 @@ def main():
         server.serve_forever()
     except KeyboardInterrupt:
         logger.info("Shutting down...")
+        # HC-52: close NVME mount file handles
+        if runner and runner._nvme_striped_persister:
+            try:
+                runner._nvme_striped_persister.close_all_handles()
+            except Exception:
+                pass
         server.shutdown()
 
 

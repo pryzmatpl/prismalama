@@ -77,6 +77,7 @@ extern "C" {
     };
 
     GGML_API struct gguf_context * gguf_init_empty(void);
+    GGML_API struct gguf_context * gguf_init_from_file_ptr(FILE * file, struct gguf_init_params params);
     GGML_API struct gguf_context * gguf_init_from_file(const char * fname, struct gguf_init_params params);
     //GGML_API struct gguf_context * gguf_init_from_buffer(..);
 
@@ -114,7 +115,6 @@ extern "C" {
     // get raw pointer to the first element of the array with the given key_id
     // for bool arrays, note that they are always stored as int8 on all platforms (usually this makes no difference)
     GGML_API const void * gguf_get_arr_data(const struct gguf_context * ctx, int64_t key_id);
-    GGML_API size_t       gguf_get_arr_data_n(const struct gguf_context * ctx, int64_t key_id);
 
     // get ith C string from array with given key_id
     GGML_API const char * gguf_get_arr_str (const struct gguf_context * ctx, int64_t key_id, size_t i);
@@ -190,6 +190,7 @@ extern "C" {
     //
 
     // write the entire context to a binary file
+    GGML_API bool gguf_write_to_file_ptr(const struct gguf_context * ctx, FILE * file, bool only_meta);
     GGML_API bool gguf_write_to_file(const struct gguf_context * ctx, const char * fname, bool only_meta);
 
     // get the size in bytes of the meta data (header, kv pairs, tensor info) including padding

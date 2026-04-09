@@ -671,11 +671,6 @@ struct llm_build_smollm3 : public llm_graph_context {
     llm_build_smollm3(const llama_model & model, const llm_graph_params & params);
 };
 
-struct llm_build_solar : public llm_graph_context {
-    llm_build_solar(const llama_model & model, const llm_graph_params & params);
-};
-
-
 struct llm_build_stablelm : public llm_graph_context {
     llm_build_stablelm(const llama_model & model, const llm_graph_params & params);
 };
