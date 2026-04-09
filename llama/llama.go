@@ -20,19 +20,6 @@ package llama
 
 #include "sampling_ext.h"
 
-// mtmd_input_text helper functions (from patch 0016)
-struct mtmd_input_text * mtmd_input_text_init(const char * text, bool add_special, bool parse_special) {
-    struct mtmd_input_text * t = (struct mtmd_input_text *)malloc(sizeof(struct mtmd_input_text));
-    t->text = text;
-    t->add_special = add_special;
-    t->parse_special = parse_special;
-    return t;
-}
-
-void mtmd_input_text_free(struct mtmd_input_text * input_text) {
-    free(input_text);
-}
-
 extern bool llamaProgressCallback(float progress, void *user_data);
 extern void llamaLog(int level, char* text, void* user_data);
 */

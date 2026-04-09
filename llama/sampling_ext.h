@@ -38,6 +38,9 @@ extern "C"
     void grammar_apply(struct llama_grammar *g, struct llama_token_data_array *tokens);
     void grammar_accept(struct llama_grammar *g, llama_token id);
 
+    struct mtmd_input_text * mtmd_input_text_init(const char * text, bool add_special, bool parse_special);
+    void mtmd_input_text_free(struct mtmd_input_text * input_text);
+
 
 #ifdef __cplusplus
 }
