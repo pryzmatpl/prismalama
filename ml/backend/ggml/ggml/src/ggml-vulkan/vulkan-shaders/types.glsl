@@ -1696,6 +1696,68 @@ struct block_mxfp4
 #define A_TYPE block_mxfp4
 #endif
 
+// PlanarQuant 3-bit: 2D Givens rotation + 2-bit quantized + 1-bit QJL
+#define QUANT_K_PLANAR3 128
+struct block_planar3_0
+{
+    float16_t norm;
+    uint8_t    qs[QUANT_K_PLANAR3 / 4];
+    uint8_t    signs[QUANT_K_PLANAR3 / 8];
+};
+
+#if defined(DATA_A_PLANAR3)
+#define QUANT_K QUANT_K_PLANAR3
+#define QUANT_R 1
+#define A_TYPE block_planar3_0
+#endif
+
+// IsoQuant 3-bit: quaternion 4D rotation + 2-bit quantized + 1-bit QJL
+#define QUANT_K_ISO3 128
+struct block_iso3_0
+{
+    float16_t norm;
+    uint8_t    qs[QUANT_K_ISO3 / 4];
+    uint8_t    signs[QUANT_K_ISO3 / 8];
+};
+
+#if defined(DATA_A_ISO3)
+#define QUANT_K QUANT_K_ISO3
+#define QUANT_R 1
+#define A_TYPE block_iso3_0
+#endif
+
+// PlanarQuant 4-bit: 2D Givens rotation + 3-bit nibble + 1-bit QJL
+// Reuses turbo4 block layout: norm + scales + nibbles
+#define QUANT_K_PLANAR4 128
+struct block_planar4_0
+{
+    float16_t norm;
+    uint8_t scales[3];
+    uint8_t qs[QUANT_K_PLANAR4 / 2];
+};
+
+#if defined(DATA_A_PLANAR4)
+#define QUANT_K QUANT_K_PLANAR4
+#define QUANT_R 1
+#define A_TYPE block_planar4_0
+#endif
+
+// IsoQuant 4-bit: quaternion 4D rotation + 3-bit nibble + 1-bit QJL
+// Reuses turbo4 block layout
+#define QUANT_K_ISO4 128
+struct block_iso4_0
+{
+    float16_t norm;
+    uint8_t scales[3];
+    uint8_t qs[QUANT_K_ISO4 / 2];
+};
+
+#if defined(DATA_A_ISO4)
+#define QUANT_K QUANT_K_ISO4
+#define QUANT_R 1
+#define A_TYPE block_iso4_0
+#endif
+
 #if defined(DATA_A_IQ4_NL) || defined(DATA_A_IQ4_XS)
 const int8_t kvalues_iq4nl_const[16] = {
     int8_t(-127), int8_t(-104), int8_t(-83), int8_t(-65), int8_t(-49), int8_t(-35), int8_t(-22), int8_t(-10),
