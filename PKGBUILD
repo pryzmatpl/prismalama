@@ -62,7 +62,7 @@ build() {
 		-DAMDGPU_TARGETS="${_AMDGPU_TARGETS}" \
 		-DOLLAMA_RUNNER_DIR=rocm
 
-	cmake --build build --parallel "$(nproc)" --target ggml-cpu ggml-hip
+	cmake --build build --parallel "$(nproc)" --target ggml ggml-hip
 
 	_vulkan=0
 	cmake --build build --parallel "$(nproc)" --target ggml-vulkan && _vulkan=1 || true
