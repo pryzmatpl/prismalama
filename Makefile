@@ -1,10 +1,11 @@
 .PHONY: help
 help:
 	@echo "Available targets:"
-	@echo "  build                Build ollama binaries"
+	@echo "  build                Build ollama binaries (ROCm/HIP)"
 	@echo "  build-all            Build all variants"
 	@echo "  build-rocm           Build ROCm variant"
-	@echo "  build-pkg            Build Arch package"
+	@echo "  build-cuda           Build CUDA variant (NVIDIA GPUs like RTX 3080)"
+	@echo "  build-pkg            Build Arch package (ROCm)"
 	@echo "  build-pkg-clean      Clean and build Arch package"
 	@echo "  clean                Remove build artifacts"
 	@echo "  clean-pkg            Remove package artifacts"
@@ -23,8 +24,9 @@ help:
 	@echo "  docker-arch-run      Run prismalama-arch with AMD GPU devices (see docker/arch/README.md)"
 	@echo
 	@echo "Examples:"
-	@echo "  make build"
-	@echo "  make build-pkg"
+	@echo "  make build           # ROCm build (default)"
+	@echo "  make build-cuda      # NVIDIA CUDA build"
+	@echo "  make build-pkg       # Arch package (ROCm)"
 	@echo "  make update-subrepos"
 	@echo "  make docker-gpu-build   # AMD GPU image (long build)"
 	@echo "  make docker-arch-build  # Arch PKGBUILD image (matches pacman install; long build)"
@@ -40,6 +42,10 @@ build-all:
 .PHONY: build-rocm
 build-rocm:
 	./build-rocm.sh
+
+.PHONY: build-cuda
+build-cuda:
+	./build-cuda.sh
 
 .PHONY: build-pkg
 build-pkg:
