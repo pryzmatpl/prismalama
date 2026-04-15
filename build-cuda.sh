@@ -26,6 +26,7 @@ if command -v nvcc &> /dev/null; then
         -DCMAKE_INSTALL_PREFIX=/usr \
         -DLLAMA_CUDA=ON \
         -DLLAMA_HIPBLAS=OFF \
+        -DCMAKE_DISABLE_FIND_PACKAGE_Vulkan=ON \
         -DOLLAMA_RUNNER_DIR=cuda
 
     cmake --build build --parallel "$(nproc)" --target ggml ggml-cuda
@@ -39,9 +40,10 @@ else
         -DCMAKE_INSTALL_PREFIX=/usr \
         -DLLAMA_CUDA=OFF \
         -DLLAMA_HIPBLAS=OFF \
+        -DLLAMA_VULKAN=OFF \
         -DOLLAMA_RUNNER_DIR=cuda
 
-    cmake --build build --parallel "$(nproc)" --target ggml ggml-vulkan
+    cmake --build build --parallel "$(nproc)" --target ggml
 fi
 
 # Build ollama binary
