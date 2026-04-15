@@ -109,6 +109,17 @@ var (
 	errBadTemplate = errors.New("template error")
 )
 
+func modelSupportsTools(modelName string) bool {
+	supportedPrefixes := []string{"qwen3", "qwen2.5", "llama3.1", "llama4", "devstral", "mistral-nemo", "firefunction-v2", "command-r+"}
+	lowerModel := strings.ToLower(modelName)
+	for _, prefix := range supportedPrefixes {
+		if strings.Contains(lowerModel, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Server) modelOptions(model *Model, requestOpts map[string]any) (api.Options, error) {
 	opts := api.DefaultOptions()
 	if opts.NumCtx == 0 {
@@ -2231,8 +2242,14 @@ func (s *Server) ChatHandler(c *gin.Context) {
 	}
 
 	var toolParser *tools.Parser
-	if len(req.Tools) > 0 && (builtinParser == nil || !builtinParser.HasToolSupport()) {
-		toolParser = tools.NewParser(m.Template.Template, req.Tools)
+	if len(req.Tools) > 0 {
+		if !modelSupportsTools(req.Model) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "model does not support tools"})
+			return
+		}
+		if builtinParser == nil || !builtinParser.HasToolSupport() {
+			toolParser = tools.NewParser(m.Template.Template, req.Tools)
+		}
 	}
 
 	type structuredOutputsState int
