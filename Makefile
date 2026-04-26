@@ -5,6 +5,7 @@ help:
 	@echo "  build-all            Build all variants"
 	@echo "  build-rocm           Build ROCm variant"
 	@echo "  build-cuda           Build CUDA variant (NVIDIA GPUs like RTX 3080)"
+	@echo "  install-cuda         Install CUDA variant on NVIDIA host"
 	@echo "  build-pkg            Build Arch package (ROCm)"
 	@echo "  build-pkg-clean      Clean and build Arch package"
 	@echo "  clean                Remove build artifacts"
@@ -124,7 +125,10 @@ docker-arch-prebuilt-build:
 	@test -f docker/arch/prismalama.pkg.tar.zst || (echo "Missing docker/arch/prismalama.pkg.tar.zst — run: cp prismalama-ollama-*.pkg.tar.zst docker/arch/prismalama.pkg.tar.zst" >&2; exit 1)
 	docker build -f docker/arch/Dockerfile.prebuilt -t prismalama-arch docker/arch
 
-.PHONY: docker-arch-run
+.PHONY: install-cuda
+install-cuda:
+	./install-cuda.sh
+
 docker-arch-run:
 	docker run --rm -p 11434:11434 \
 		--device /dev/kfd --device /dev/dri \
