@@ -1,8 +1,15 @@
 # Prismalama Technical Documentation
 
+> Status note: this file is a long-form technical map and may lag behind active refactors.
+> For current promise boundaries and runtime truth, verify against:
+> `docs/PRISMALAMA_PRINCIPLE.md`, `docs/RUNTIME_DISPATCH.md`, `docs/GOAL-GAPS.md`,
+> `server/prismalama_capabilities.go`, and `runner/dispatch.go`.
+
 ## Project Overview
 
-**Prismalama** is an enhanced Ollama distribution featuring Vulkan-accelerated weight streaming for GGUF models. It enables running large language models exceeding VRAM capacity through intelligent weight streaming from storage to GPU.
+**Prismalama** is an Ollama-compatible distribution focused on GGUF via GGML (including Vulkan/HIP
+build targets) plus optional AirLLM routing for HF-style layouts. Large-model behavior depends on
+engine dispatch, memory policy, and backend support for streaming interfaces.
 
 ### Key Capabilities
 - Vulkan compute backend for hardware-agnostic GPU acceleration (AMD, NVIDIA, Intel)
@@ -40,18 +47,20 @@ Core orchestration for model loading, scheduling, and response streaming.
 
 ### 3. Runner Layer (`runner/`)
 
-#### Runner Dispatch (`runner/runner.go`)
-The dispatcher selects the appropriate runner based on model characteristics:
+#### Runner Dispatch (`runner/dispatch.go`, `DecideEngine`)
+The dispatcher selects **GGML** vs **AirLLM** from directory layout and env (see **`docs/RUNTIME_DISPATCH.md`**). **`OLLAMA_USE_AIRLLM=0` / `false` / `no` is evaluated first** and forces **GGML for all layouts** (including safetensors and multipart GGUF). The Arch package ships **`OLLAMA_USE_AIRLLM=0`**.
 
 ```
-airLLMModelAndReason(modelPath) → Runner Selection Logic:
-├── OLLAMA_USE_AIRLLM=0/false/no → GGML (llama.cpp)
-├── safetensors.index.json → AirLLM
-├── *.safetensors files → AirLLM
-├── config.json (HF hints: safetensors/torch_dtype) → AirLLM
-├── *-00001-of-*.gguf (multipart) → AirLLM (default)
-├── OLLAMA_USE_AIRLLM=1/true → AirLLM
-└── otherwise → llama.cpp
+DecideEngine(modelPath):
+├── OLLAMA_USE_AIRLLM ∈ {0, false, no} → GGML (early exit)
+├── OLLAMA_MULTI_GGUF=1 → AirLLM
+├── model path missing → GGML
+├── model.safetensors.index.json → AirLLM
+├── *.safetensors shards → AirLLM
+├── config.json HF heuristic → AirLLM
+├── *-00001-of-*.gguf (multipart) → AirLLM
+├── OLLAMA_USE_AIRLLM ∈ {1, true} → AirLLM
+└── else → GGML (llama.cpp / GGUF)
 ```
 
 #### Runners
@@ -176,7 +185,7 @@ type BackendMemory struct {
 
 | Variable | Effect |
 |----------|--------|
-| `OLLAMA_USE_AIRLLM` | `0` = GGML only, `1` = AirLLM enabled |
+| `OLLAMA_USE_AIRLLM` | **`0`/`false`/`no`** ⇒ GGML only (**all** layouts). **`1`/`true`** ⇒ AirLLM when combined with layout/env rules. **Unset** ⇒ `DecideEngine` heuristics may pick AirLLM (safetensors, multipart GGUF). See **`docs/RUNTIME_DISPATCH.md`**. |
 | `OLLAMA_MULTI_GGUF` | `1` = treat as AirLLM-style |
 | `AIRLLM_COMPRESSION` | e.g., `4bit`, `8bit`, `none` |
 | `AIRLLM_DEVICE` | PyTorch device string (default `cuda:0`) |

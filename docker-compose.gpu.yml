@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  prismalama-gpu:
+    image: ollama/ollama:latest
+    container_name: prismalama-gpu
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,gpu
+      - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_MAX_LOADED_MODELS=2
+      - OLLAMA_NUM_PARALLEL=4
+      - OLLAMA_BATCH_SIZE=4096
+      - OLLAMA_FLASH_ATTENTION=true
+      - GODEBUG=cgocheck=0
+      - LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  jaisiu-gateway:
+    image: jaisiu:local
+    container_name: jaisiu-gateway
+    depends_on:
+      prismalama-gpu:
+        condition: service_healthy
+    environment:
+      - PRISMALAMA_URL=http://prismalama-gpu:11434
+      - OLLAMA_HOST=http://prismalama-gpu:11434
+    ports:
+      - "18789:18789"
+    volumes:
+      - /home/prizm/.openclaw:/home/node/.openclaw
+    restart: unless-stopped
+    networks:
+      - prismalama-net
+
+volumes:
+  ollama-data:
+
+networks:
+  prismalama-net:
+    driver: bridge

@@ -75,4 +75,5 @@ After changing **`runner/airllmrunner`**, **`llm/`**, or **`runner/runner.go`**,
 ## Related
 
 - `docs/WEIGHT_STREAMING_STRATEGY.md` — GGML vs AirLLM product tradeoffs.
+- `docs/GOAL-GAPS.md` — shipped defaults vs goals (routing, streaming env).
 - `llm/server.go` — mmap defaults; Vulkan disables mmap unless overridden; Linux may disable mmap when RAM is tight unless **`OLLAMA_MMAP_ALLOW_LOW_RAM`**.

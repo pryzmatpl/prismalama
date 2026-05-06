@@ -1,5 +1,10 @@
 # KIMI ON POTATO HARDWARE - Honest Assessment
 
+> **Deprecated historical note:** this file is machine-specific legacy guidance.
+> Current supported behavior is documented in `docs/DEVELOPER.md`,
+> `docs/RUNTIME_DISPATCH.md`, and `README-PKGBUILD.md`.
+> Statements below may be outdated or inaccurate for the current Prismalama codebase.
+
 ## The Real Problem
 
 We've been fighting Ollama's architecture. Here's what's actually happening:

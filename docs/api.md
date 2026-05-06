@@ -20,6 +20,12 @@
 - [Version](#version)
 - [Experimental: Image Generation](#image-generation-experimental)
 
+## Prismalama operator endpoint
+
+Prismalama adds a single **additive** HTTP route (standard clients may ignore it):
+
+- **`GET /api/prismalama/capabilities`** — JSON describing GGML vs AirLLM semantics, whether **`OLLAMA_LAYER_STREAMING`** is enabled in this process, streaming budget bytes, server version, and pointers to **`docs/RUNTIME_DISPATCH.md`** / **`docs/PRISMALAMA_PRINCIPLE.md`**. Response type: **`api/prismalama.go`** (`PrismalamaCapabilitiesResponse`).
+
 ## Conventions
 
 ### Model names

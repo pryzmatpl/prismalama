@@ -1,5 +1,9 @@
 # Using Kimi K2.5 "As Is" - Direct Inference Guide
 
+> **Deprecated historical note:** machine-specific draft from earlier experiments.
+> Use current docs in `docs/DEVELOPER.md`, `docs/RUNTIME_DISPATCH.md`, and `README.md`.
+> Statements below may be outdated or inaccurate for the current Prismalama codebase.
+
 ## Model Location
 - **Path**: `/nvme3/AI Models/Kimi/`
 - **Format**: GGUF (13 shards, Q4_K_M quantized)

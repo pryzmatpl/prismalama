@@ -2,15 +2,16 @@
 
 ![Prismalama Logo](logo.jpg)
 
-Prismalama is an **Ollama-compatible** server built on Vulkan-accelerated GGML (prismallama.cpp) with **layer streaming** enabled by default. It runs GGUF models efficiently on AMD/NVIDIA/Intel GPUs and handles models larger than VRAM via AirLLM-style NVMe weight streaming.
+Prismalama is an **Ollama-compatible** server built on Vulkan-capable GGML (prismallama.cpp). **Layer streaming** for GGUF is **enabled in the Arch package** (`OLLAMA_LAYER_STREAMING=1` in **`/etc/default/ollama`**); the bare Go binary defaults **`OLLAMA_LAYER_STREAMING` to off when unset** (see **`docs/GOAL-GAPS.md`**). It targets GGUF workloads on AMD/NVIDIA/Intel GPUs; behavior for larger-than-VRAM models depends on mmap/offload policy, backend support for streaming hooks, and whether AirLLM is enabled — see **`docs/RUNTIME_DISPATCH.md`**.
 
 ## Key Defaults
 
 | Setting | Default | Purpose |
 |---------|---------|---------|
-| `OLLAMA_LAYER_STREAMING` | `1` | Layer-by-layer GGUF loading from NVMe (saves RAM) |
-| `OLLAMA_KEEP_ALIVE` | `5m` | Models unload after 5 minutes idle (no auto-loading) |
-| Backend | GGML/Vulkan | GPU-accelerated inference via Vulkan compute |
+| `OLLAMA_LAYER_STREAMING` | **`1`** in **`/etc/default/ollama`** (package); **unset ⇒ off** in raw `envconfig` | Layer-by-layer GGUF load / streaming path when supported |
+| `OLLAMA_KEEP_ALIVE` | `5m` | Models unload after idle window (no startup preload) |
+| Compute stack | GGML (HIP / Vulkan / CPU per build) | **`OLLAMA_VULKAN=1`** needed for Vulkan backends on Linux — see RUNTIME_DISPATCH |
+| `OLLAMA_USE_AIRLLM` | **`0`** (Arch package) | **`0`/`false`/`no`** disables **all** AirLLM routing; set **`1`** for HF / forced AirLLM |
 
 ## Quick Start
 
@@ -86,12 +87,17 @@ Prismalama has **two inference engines**:
 
 ### Engine Selection
 
-| Model Format | Engine | Enable |
-|--------------|--------|--------|
-| GGUF (single/multi-part) | GGML | Default (layer streaming on) |
-| Hugging Face safetensors | AirLLM | `OLLAMA_USE_AIRLLM=1` |
+Dispatch is implemented in **`runner/dispatch.go`** (`DecideEngine`). Summary:
 
-See [docs/RUNTIME_DISPATCH.md](docs/RUNTIME_DISPATCH.md) for details on how the runner selects the engine.
+| On-disk layout | Engine when `OLLAMA_USE_AIRLLM` is **not** `0`/`false`/`no` |
+|----------------|---------------------------------------------------------------|
+| HF hints (`*.safetensors`, `model.safetensors.index.json`, typical `config.json`) | AirLLM |
+| Multi-part GGUF (`*-00001-of-*.gguf`) | AirLLM |
+| Single-file GGUF | GGML |
+
+If **`OLLAMA_USE_AIRLLM=0`** (Arch package default), **every** path stays on **GGML**, including safetensors and multipart heuristics — opt in with **`OLLAMA_USE_AIRLLM=1`** when you need AirLLM.
+
+See [docs/RUNTIME_DISPATCH.md](docs/RUNTIME_DISPATCH.md) for logs, mmap, and GPU stacks.
 
 ## Memory Behavior
 
@@ -99,7 +105,7 @@ With `OLLAMA_LAYER_STREAMING=1` and `OLLAMA_KEEP_ALIVE=5m`:
 
 1. **On request**: Model loads blocks from NVMe as needed, within streaming budget
 2. **After 5m idle**: Model unloads entirely, freeing RAM/VRAM
-3. **No model pre-loading**: Prismalama never loads a model at startup
+3. **No model pre-loading by default**: Prismalama does not preload models at startup in standard package/runtime configuration
 
 **Note**: Large models (143GB+ MiniMax) may still fail to load if they exceed total system memory even with streaming, or if GPU VRAM cannot accommodate the active working set.
 
@@ -137,7 +143,7 @@ makepkg -sfi
 ### Running Tests
 
 ```bash
-# Unit tests
+# Unit tests (large packages such as ./server may take minutes on first compile)
 go test ./...
 
 # Integration tests
@@ -147,9 +153,12 @@ go test -tags=integration ./integration/...
 go test -tags=integration,minimax ./integration/...
 ```
 
+Use **`-short`**, **`-timeout`**, or narrow packages (e.g. **`./envconfig`**, **`./runner -run DecideEngine`**) for fast feedback; **`go test ./server/...`** can exceed a few minutes when CGO builds cold cache.
+
 ## Model Support
 
-GGUF format models (Llama, Qwen, MiniMax, Mistral, Phi, Gemma, etc.) work out of the box.
+GGUF models are the default path. In practice, compatibility depends on architecture support,
+quantization variant, available memory, and backend/runtime setup.
 Hugging Face safetensors require `OLLAMA_USE_AIRLLM=1` and the PyTorch stack.
 
 ## History

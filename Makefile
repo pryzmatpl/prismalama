@@ -135,3 +135,7 @@ docker-arch-run:
 		--group-add video --group-add render \
 		-e HIP_VISIBLE_DEVICES=0 \
 		prismalama-arch
+
+.PHONY: gpu-help gpu-check gpu-build gpu-docker gpu-run gpu-docker-compose gpu-setup gpu-agents
+gpu-help gpu-check gpu-build gpu-docker gpu-run gpu-docker-compose gpu-setup gpu-agents:
+	make -f Makefile.prismalama-gpu $(MAKECMDGOALS)

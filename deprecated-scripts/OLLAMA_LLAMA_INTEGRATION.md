@@ -1,5 +1,9 @@
 # Kimi K2.5 Integration: Ollama + prismalama + llama.cpp
 
+> **Deprecated historical note:** conceptual write-up from earlier integration work.
+> Treat as background only; source-of-truth docs are in `docs/`.
+> Statements below may be outdated or inaccurate for the current Prismalama codebase.
+
 ## Architecture Overview
 
 ```

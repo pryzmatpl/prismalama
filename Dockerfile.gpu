@@ -1,0 +1,103 @@
+# GPU-Optimized Prismalama Dockerfile
+# Built for maximum LLM inference performance with NVIDIA GPUs
+# Supports CUDA 12 for RTX 3090/4090/4070 Ti
+
+ARG BASE_IMAGE=nvidia/cuda:12.2.0-devel-ubuntu22.04
+FROM ${BASE_IMAGE} AS builder
+
+# Prevent interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    build-essential \
+    cmake \
+    ninja-build \
+    ccache \
+    clang \
+    libopenblas-dev \
+    liblapack-dev \
+    pkg-config \
+    python3 \
+    python3-pip \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Go
+ARG GO_VERSION=1.22.2
+RUN curl -L https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar xz -C /usr/local
+ENV PATH=/usr/local/go/bin:${PATH}
+ENV GOPATH=/go
+ENV PATH=${GOPATH}/bin:${PATH}
+
+# CUDA paths
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+
+# Install cuDNN (for GPU acceleration)
+RUN apt-get update && apt-get install -y \
+    libcudnn8=8.9.4.25-1+cuda12.2 \
+    libcudnn8-dev=8.9.4.25-1+cuda12.2 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+# Clone prismalama
+COPY . /workspace/prismalama
+WORKDIR /workspace/prismalama
+
+# Build with GPU support
+ENV CGO_ENABLED=1
+ENV CUDA_HOME=/usr/local/cuda
+ENV CFLAGS="-O3 -march=native -mtune=native"
+ENV CXXFLAGS="-O3 -march=native -mtune=native"
+
+# Build the GPU-optimized ollama
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    go build \
+    -ldflags="-s -w" \
+    -tags="cuda" \
+    -o /usr/local/bin/ollama \
+    .
+
+# Runtime stage
+FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libopenblas0 \
+    liblapack3 \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy GPU libraries from builder
+COPY --from=builder /usr/local/bin/ollama /usr/local/bin/ollama
+COPY --from=builder /usr/local/cuda/lib64/libcudart* /usr/local/cuda/lib64/libcublas* /usr/local/cuda/lib64/libcudnn* /usr/local/lib/
+
+# Create ollama user and directories
+RUN useradd -m -s /bin/bash ollama \
+    && mkdir -p /root/.ollama /usr/lib/ollama \
+    && chown -R ollama:ollama /root/.ollama
+
+# GPU configuration
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+ENV LD_LIBRARY_PATH=/usr/local/lib:${LD_LIBRARY_PATH}
+ENV OLLAMA_HOST=0.0.0.0:11434
+ENV OLLAMA_MODELS=/root/.ollama
+ENV OLLAMA_MAX_LOADED_MODELS=2
+ENV OLLAMA_NUM_PARALLEL=4
+
+EXPOSE 11434
+
+USER ollama
+WORKDIR /home/ollama
+
+CMD ["serve"]

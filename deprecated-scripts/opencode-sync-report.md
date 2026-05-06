@@ -1,5 +1,8 @@
 # Prismalama Sync Report - /sda2 Migration
 
+> **Deprecated historical note:** one-time migration report.
+> Keep for audit/history; do not treat as current operational guidance.
+
 ## Current Status
 
 ### Models Found on /sda2

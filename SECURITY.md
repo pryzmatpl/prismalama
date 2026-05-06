@@ -1,25 +1,32 @@
 # Security
 
-The Ollama maintainer team takes security seriously and will actively work to resolve security issues.
+## Prismalama deployments
 
-## Reporting a vulnerability
+Prismalama inherits Ollama’s **unauthenticated local API** model. Treat any reachable **`OLLAMA_HOST`** like an **open inference endpoint**: bind to loopback on single-user machines (the Arch package defaults to **`127.0.0.1:11434`** for **`OLLAMA_HOST`**), use firewalls and VPNs on LANs, or terminate TLS and authenticate at a reverse proxy for remote access.
 
-If you discover a security vulnerability, please do not open a public issue. Instead, please report it by emailing hello@ollama.com. We ask that you give us sufficient time to investigate and address the vulnerability before disclosing it publicly.
+Report security issues for **this fork** through the maintainers’ preferred private channel for **[github.com/piotroxp/prismalama](https://github.com/piotroxp/prismalama)** (e.g. GitHub Security Advisories if enabled).
 
-Please include the following details in your report:
+---
+
+## Upstream Ollama disclosure
+
+The upstream Ollama maintainer team takes security seriously and will actively work to resolve security issues in the shared codebase.
+
+### Reporting a vulnerability (upstream)
+
+If you discover a vulnerability that belongs to **upstream Ollama**, please do not open a public issue there until coordinated disclosure. Instead, report by emailing **hello@ollama.com**. Include:
+
 - A description of the vulnerability
 - Steps to reproduce the issue
 - Your assessment of the potential impact
 - Any possible mitigations
 
-## Security best practices
+### Security best practices (upstream)
 
-While the maintainer team does its best to secure Ollama, users are encouraged to implement their own security best practices, such as:
-
-- Regularly updating to the latest version of Ollama
-- Securing access to hosted instances of Ollama
+- Regularly updating to the latest version of Ollama / Prismalama merge
+- Securing access to hosted instances (same surface as above)
 - Monitoring systems for unusual activity
 
-## Contact
+### Contact (upstream)
 
-For any other questions or concerns related to security, please contact us at hello@ollama.com
+Other upstream security questions: **hello@ollama.com**

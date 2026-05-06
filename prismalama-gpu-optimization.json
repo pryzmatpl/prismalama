@@ -1,0 +1,46 @@
+{
+  "optimization": {
+    "engine": "prismalama-cuda",
+    "target_tps": 221,
+    "gpu_configuration": {
+      "num_gpu_layers": 99,
+      "main_gpu": 0,
+      "split_mode": "layer",
+      "tensor_split": [0.25, 0.5, 0.75, 1.0],
+      "batch_size": 4096,
+      "context_size": 262144,
+      "flash_attention": true,
+      "cuda_graphs": true
+    },
+    "model_configs": {
+      "qwen3.6:27b": {
+        "quantization": "Q4_K_M",
+        "max_tokens": 8192,
+        "expected_tps_gpu": 200,
+        "vram_required_gb": 17,
+        "recommended_gpu": "RTX_3090_4090_A100_24GB"
+      },
+      "qwen2.5:14b": {
+        "quantization": "Q5_K_M",
+        "max_tokens": 8192,
+        "expected_tps_gpu": 250,
+        "vram_required_gb": 9,
+        "recommended_gpu": "RTX_4070_Ti_12GB"
+      }
+    },
+    "performance_tuning": {
+      "num_threads": 4,
+      "cpu_threads": 4,
+      "gpu_offload_ratio": 0.99,
+      "batch_max_tokens": 4096,
+      "matmul_precision": "high"
+    }
+  },
+  "deployment": {
+    "type": "docker-gpu",
+    "runtime": "nvidia",
+    "cuda_version": "12.2",
+    "cudnn_version": "8.9.4",
+    "base_image": "nvidia/cuda:12.2.0-devel-ubuntu22.04"
+  }
+}

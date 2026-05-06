@@ -1,5 +1,9 @@
 # Kimi K2.5 Setup for Ollama AirLLM ROCm
 
+> **Deprecated historical note:** this file captures an older host-specific setup.
+> Current behavior and defaults are documented in `docs/DEVELOPER.md` and `docs/GOAL-GAPS.md`.
+> Statements below may be outdated or inaccurate for the current Prismalama codebase.
+
 ## Model Information
 
 - **Model**: Kimi K2.5 (Moonshot AI)

@@ -1,5 +1,9 @@
 # Complete Setup Summary: GLM-4.7-Flash + AirLLM + Ollama
 
+> **Deprecated historical note:** environment-specific report, not current product documentation.
+> For supported paths, see `docs/DEVELOPER.md`, `README-PKGBUILD.md`, and `docs/RUNTIME_DISPATCH.md`.
+> Statements below may be outdated or inaccurate for the current Prismalama codebase.
+
 ## ✅ What Was Done
 
 ### 1. Arch Linux Package Created

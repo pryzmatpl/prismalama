@@ -1,5 +1,9 @@
 # GLM-4.7-Flash with AirLLM + Ollama Integration
 
+> **Deprecated historical note:** legacy setup instructions for a specific environment.
+> Use maintained docs in `docs/DEVELOPER.md`, `docs/RUNTIME_DISPATCH.md`, and `README-PKGBUILD.md`.
+> Statements below may be outdated or inaccurate for the current Prismalama codebase.
+
 ## Overview
 
 This setup allows you to run the **GLM-4.7-Flash-4bit** model (15.7GB, 4-bit quantized) on a GPU-poor system using:
