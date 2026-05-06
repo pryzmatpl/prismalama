@@ -77,7 +77,7 @@ Prismalama has **two inference engines**:
 ### 1. GGML (Default)
 - Vulkan-accelerated GGUF inference via prismallama.cpp
 - Memory-mapped file access with partial GPU layer offload
-- **Layer streaming** (`OLLAMA_LAYER_STREAMING=1`): loads GGUF blocks from NVMe on-demand during inference, evicting previous blocks to stay within budget
+- **Layer streaming** (`OLLAMA_LAYER_STREAMING=1`): enables GGUF streaming paths that load/evict blocks under budget **when the selected backend implements the streaming interfaces** (otherwise load falls back to standard behavior)
 - Best for: models that fit (or nearly fit) in VRAM+RAM
 
 ### 2. AirLLM (Opt-in)
@@ -103,7 +103,7 @@ See [docs/RUNTIME_DISPATCH.md](docs/RUNTIME_DISPATCH.md) for logs, mmap, and GPU
 
 With `OLLAMA_LAYER_STREAMING=1` and `OLLAMA_KEEP_ALIVE=5m`:
 
-1. **On request**: Model loads blocks from NVMe as needed, within streaming budget
+1. **On request**: Model loads using streaming-compatible behavior when supported by the active backend
 2. **After 5m idle**: Model unloads entirely, freeing RAM/VRAM
 3. **No model pre-loading by default**: Prismalama does not preload models at startup in standard package/runtime configuration
 

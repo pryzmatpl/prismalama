@@ -84,7 +84,7 @@ make -C build llama-server
 1. ✅ You have space now (1.2TB on /nvme3)
 2. ✅ It integrates with opencode
 3. ✅ Full API support
-4. ✅ One-time 20-minute wait, then works forever
+4. ✅ One-time wait in that environment, then repeatable there (not a universal guarantee)
 
 Run this:
 ```bash

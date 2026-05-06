@@ -1,6 +1,6 @@
 # Prismalama Arch Package (`PKGBUILD`)
 
-![Prismalama Logo](../logo.jpg)
+![Prismalama Logo](logo.jpg)
 
 Builds **this** Prismalama tree (prismallama.cpp/GGML via CMake, Go `ollama` binary, AirLLM assets) into an Arch Linux package — **not** upstream Ollama tarballs.
 
@@ -98,8 +98,8 @@ With **`PRISMALAMA_BACKENDS=nvidia`** or **`all`**, if **`nvcc`** is on **`PATH`
 
 `OLLAMA_LAYER_STREAMING=1` (default) enables GGUF layer streaming:
 
-- GGUF blocks are loaded from NVMe on-demand during inference
-- Previous blocks are evicted to stay within the 4 GiB streaming budget
+- Streaming-capable backends can load/evict GGUF blocks under budget during inference
+- If streaming interfaces are unavailable for a backend/model path, load falls back to standard behavior
 - Models larger than RAM can run without loading entirely into memory
 
 Disable by setting `OLLAMA_LAYER_STREAMING=0` if you want traditional mmap behavior.

@@ -36,7 +36,7 @@ This document describes how the repository is wired so humans and automation can
 
 Otherwise the **llama.cpp / GGML** runner is used (GGUF; Vulkan/HIP per build and env).
 
-**Important:** Full **143GB+ class** models in **Hugging Face safetensors** layout use AirLLM’s layer streaming. **MiniMax / Kimi “GGUF-only”** installs are not loaded by PyTorch AirLLM unless you also have an HF-compatible tree or you rely on the multi-part GGUF + `OLLAMA_USE_AIRLLM` path that routes to the AirLLM runner (see integration tests under `minimax` / `weight_streaming` tags—they assume local paths under `/nvme3/...`).
+**Important:** Full **143GB+ class** models in **Hugging Face safetensors** layout typically require the AirLLM path. **MiniMax / Kimi “GGUF-only”** installs are not loaded by PyTorch AirLLM unless you also have an HF-compatible tree or you rely on the multi-part GGUF + `OLLAMA_USE_AIRLLM` path that routes to the AirLLM runner (see integration tests under `minimax` / `weight_streaming` tags—they assume local paths under `/nvme3/...`).
 
 ## Environment variables (frequently used)
 

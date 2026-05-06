@@ -2,6 +2,7 @@
 
 > **Deprecated historical note:** one-time migration report.
 > Keep for audit/history; do not treat as current operational guidance.
+> Statements below may be outdated or inaccurate for the current Prismalama codebase.
 
 ## Current Status
 

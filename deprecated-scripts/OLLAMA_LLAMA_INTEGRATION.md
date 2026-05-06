@@ -64,7 +64,7 @@ func isAirLLMModel(modelPath string) bool {
 ### 3. Integration Points
 - **prismalama** adds AirLLM support to Ollama's runner selection
 - **Ollama** provides the API server and model management
-- **llama.cpp** does the actual inference (always used)
+- In the historical setup described here, llama.cpp performed the direct GGUF inference path.
 
 ## Three Ways to Use Kimi
 
