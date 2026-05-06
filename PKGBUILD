@@ -12,6 +12,10 @@
 # AMDGPU ISA: unset PRISMALAMA_AMDGPU_TARGETS on the target PC so PKGBUILD runs scripts/detect-prismalama-amdgpu-target.sh (rocminfo).
 # Override: PRISMALAMA_AMDGPU_TARGETS=gfx1030 makepkg -sf   Disable auto: PRISMALAMA_AMDGPU_AUTO=0
 #
+# CUDA + GCC 16+: nvcc cannot compile translation units that pull in libstdc++ from GCC 16 (C++23
+# "explicit object parameter" in headers). The PKGBUILD prefers g++-14 / g++-13 / g++-12 as
+# CMAKE_CUDA_HOST_COMPILER when present. Override: PRISMALAMA_CUDA_HOST_CXX=/usr/bin/g++-14
+#
 # epoch: pkgver here is the Prismalama snapshot (see README-PKGBUILD.md § Versioning). Older installs may have used
 # pkgver aligned with upstream Ollama (e.g. 0.18.x). Without epoch, pacman incorrectly reports a downgrade when
 # going from 0.18.* to 0.4.*. epoch=1 makes current packages sort after those legacy builds.
@@ -19,7 +23,7 @@
 pkgname=prismalama-ollama
 epoch=1
 pkgver=0.4.1
-pkgrel=14
+pkgrel=15
 pkgdesc="Prismalama: Ollama-compatible server (GGML: optional ROCm HIP / CUDA + Vulkan; optional AirLLM)"
 arch=('x86_64')
 url="https://github.com/piotroxp/prismallama.cpp"
@@ -122,6 +126,26 @@ build() {
 			_LLAMA_CUDA=ON
 			_cmake_cuda+=("-DCMAKE_CUDA_ARCHITECTURES=${PRISMALAMA_CUDA_ARCHITECTURES:-native}")
 			warning "Prismalama: LLAMA_CUDA=ON (nvcc=$(command -v nvcc)). Arch: PRISMALAMA_CUDA_ARCHITECTURES (default native). Disable: PRISMALAMA_CUDA_AUTO=0"
+			# NVCC + GCC 16 libstdc++: pin host C++ compiler for .cu host code (see PKGBUILD header).
+			local _cuda_host_compiler=""
+			if [[ -n "${PRISMALAMA_CUDA_HOST_CXX:-}" ]]; then
+				_cuda_host_compiler="${PRISMALAMA_CUDA_HOST_CXX}"
+				_cmake_cuda+=("-DCMAKE_CUDA_HOST_COMPILER=${_cuda_host_compiler}")
+				warning "Prismalama: CMAKE_CUDA_HOST_COMPILER=${_cuda_host_compiler} (PRISMALAMA_CUDA_HOST_CXX)"
+			else
+				local _cand=""
+				for _cand in g++-14 g++-13 g++-12; do
+					if command -v "${_cand}" >/dev/null 2>&1; then
+						_cuda_host_compiler="$(command -v "${_cand}")"
+						_cmake_cuda+=("-DCMAKE_CUDA_HOST_COMPILER=${_cuda_host_compiler}")
+						warning "Prismalama: CMAKE_CUDA_HOST_COMPILER=${_cuda_host_compiler} (work around NVCC vs GCC 16+ libstdc++; set PRISMALAMA_CUDA_HOST_CXX to override)"
+						break
+					fi
+				done
+				if [[ -z "${_cuda_host_compiler}" ]]; then
+					warning "Prismalama: no g++-12..14 on PATH — ggml-cuda may fail with GCC 16 headers. Install extra/gcc14 (or AUR gcc13) or export PRISMALAMA_CUDA_HOST_CXX=/usr/bin/g++-14"
+				fi
+			fi
 		elif [[ "${PRISMALAMA_CUDA_AUTO:-1}" != "0" ]]; then
 			warning "Prismalama: LLAMA_CUDA skipped — nvcc not found (install cuda). Silence: PRISMALAMA_CUDA_AUTO=0"
 		fi

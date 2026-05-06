@@ -88,6 +88,12 @@ With **`PRISMALAMA_BACKENDS=nvidia`** or **`all`**, if **`nvcc`** is on **`PATH`
 
 - **Architectures:** export **`PRISMALAMA_CUDA_ARCHITECTURES`** before building (default **`native`** via CMake when unset in PKGBUILD — same idea as upstream ggml-cuda).
 - **Disable CUDA even when nvcc exists:** **`PRISMALAMA_CUDA_AUTO=0 makepkg -sfi`**
+- **Host C++ compiler for CUDA:** GCC **16** ships libstdc++ headers that **nvcc** cannot parse (errors in `<functional>` around `operator()(this …)`). The PKGBUILD automatically uses **`g++-14`**, then **`g++-13`**, then **`g++-12`** if found on `PATH`. Install **`extra/gcc14`** on Arch for `/usr/bin/g++-14`, or set explicitly:
+  ```bash
+  export PRISMALAMA_CUDA_HOST_CXX=/usr/bin/g++-14
+  makepkg -sfi
+  ```
+  After a failed CUDA compile, remove the **`build/`** directory so CMake does not reuse a bad **`CMAKE_CUDA_HOST_COMPILER`** cache entry.
 - **Runtime:** if the package was built with CUDA, install **`cuda`** (or equivalent libcudart provider) on the target machine.
 
 ### Vulkan (built unconditionally by this PKGBUILD)
