@@ -56,14 +56,18 @@ COPY . .
 RUN cmake -B build -G Ninja \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DGGML_BUILD=ON \
+		-DGGML_SHARED=ON \
+		-DGGML_BACKEND_DL=ON \
+		-DGGML_BACKEND_SHARED=ON \
+		-DGGML_CPU_ALL_VARIANTS=ON \
 		-DLLAMA_HIPBLAS=ON \
 		-DLLAMA_CUDA=OFF \
+		-DGGML_CUDA=OFF \
 		-DAMDGPU_TARGETS="${AMDGPU_TARGETS}" \
 		-DOLLAMA_RUNNER_DIR=rocm \
-	&& cmake --build build --parallel "$(nproc)" --target ggml-cpu ggml-hip ggml-vulkan \
-	&& cmake --install build --prefix /usr --component CPU \
-	&& cmake --install build --prefix /usr --component HIP \
-	&& cmake --install build --prefix /usr --component Vulkan
+	&& cmake --build build --parallel "$(nproc)" \
+	&& cmake --install build --prefix /usr 2>&1 | tail -30
 
 RUN go build -trimpath -buildmode=pie -o /usr/bin/ollama \
 		-ldflags "-w -s -X=github.com/ollama/ollama/version.Version=prismalama-gpu" \
