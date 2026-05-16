@@ -1,0 +1,242 @@
+# GPU-Accelerated Prismalama Deployment Targets
+# Integrates with Jaisiu OpenClaw Gateway for agent network
+
+# GPU Configuration
+GPU_DEVICE ?= 0
+NUM_GPU_LAYERS ?= 99
+BATCH_SIZE ?= 4096
+GPU_VISIBLE_DEVICES ?= all
+
+# Registry/Image Configuration
+IMAGE_NAME ?= prismalama
+IMAGE_TAG ?= gpu-$(shell date +%Y%m%d)
+CONTAINER_NAME ?= prismalama-gpu
+PORT ?= 11434
+
+# Jaisiu Integration
+JAISIU_IMAGE ?= jaisiu:local
+JAISIU_CONTAINER ?= jaisiu-gateway
+JAISIU_PORT ?= 18789
+
+# Docker Compose Files
+GPU_COMPOSE ?= docker-compose.gpu.yml
+
+.PHONY: help-gpu
+gpu-help:
+	@echo "GPU-Accelerated Prismalama Targets:"
+	@echo "  make gpu-build            Build GPU-optimized prismalama (CUDA)"
+	@echo "  make gpu-run             Run prismalama with GPU passthrough"
+	@echo "  make gpu-docker          Build complete GPU Docker image"
+	@echo "  make gpu-docker-compose  Start with docker-compose (GPU + Jaisiu)"
+	@echo "  make gpu-setup           Full GPU setup (build, run, integrate)"
+	@echo "  make gpu-benchmark       Run TPS benchmark"
+	@echo "  make gpu-test            Test GPU inference"
+	@echo "  make gpu-status          Check GPU and container status"
+	@echo "  make gpu-stop            Stop GPU container"
+	@echo "  make gpu-clean           Remove GPU container"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make gpu-setup GPU_VISIBLE_DEVICES=0"
+	@echo "  make gpu-run BATCH_SIZE=2048 NUM_GPU_LAYERS=35"
+	@echo "  make gpu-docker-compose JAISIU_PORT=18790"
+
+.PHONY: gpu-check
+gpu-check:
+	@echo "🔍 Checking GPU..."
+	@nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader || (echo "❌ No NVIDIA GPU detected" && exit 1)
+	@echo "✅ GPU available"
+	@echo ""
+	@echo "🔍 Checking Docker..."
+	@docker info >/dev/null 2>&1 || (echo "❌ Docker not running" && exit 1)
+	@echo "✅ Docker available"
+	@echo ""
+	@echo "🔍 Checking NVIDIA Container Toolkit..."
+	@docker run --rm --gpus=all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi >/dev/null 2>&1 || (echo "⚠️  NVIDIA Container Toolkit may not be installed" || echo "✅ NVIDIA runtime available")
+
+.PHONY: gpu-build
+gpu-build: gpu-check
+	@echo "🏗️  Building GPU-optimized prismalama..."
+	@./build-cuda.sh || (echo "❌ CUDA build failed" && exit 1)
+	@echo "✅ GPU build complete"
+
+.PHONY: gpu-docker
+gpu-docker: gpu-check
+	@echo "🏗️  Building GPU Docker image..."
+	@docker build -f Dockerfile.gpu \
+		--build-arg BASE_IMAGE=nvidia/cuda:12.2.0-devel-ubuntu22.04 \
+		-t $(IMAGE_NAME):$(IMAGE_TAG) \
+		-t $(IMAGE_NAME):latest-gpu \
+		.
+	@echo "✅ GPU Docker image built: $(IMAGE_NAME):$(IMAGE_TAG)"
+
+.PHONY: gpu-run
+gpu-run: gpu-check
+	@echo "🚀 Starting prismalama with GPU acceleration..."
+	@docker stop $(CONTAINER_NAME) 2>/dev/null || true
+	@docker rm $(CONTAINER_NAME) 2>/dev/null || true
+	@docker run -d \
+		--gpus='"device=$(GPU_VISIBLE_DEVICES)"' \
+		--ipc=host \
+		--ulimit memlock=-1 \
+		--ulimit stack=67108864 \
+		-p $(PORT):$(PORT) \
+		-v ollama:/root/.ollama \
+		--name $(CONTAINER_NAME) \
+		--runtime=nvidia \
+		-e NVIDIA_VISIBLE_DEVICES=$(GPU_VISIBLE_DEVICES) \
+		-e NVIDIA_DRIVER_CAPABILITIES=compute,utility \
+		-e OLLAMA_MAX_LOADED_MODELS=2 \
+		-e OLLAMA_NUM_PARALLEL=4 \
+		-e OLLAMA_BATCH_SIZE=$(BATCH_SIZE) \
+		-e OLLAMA_FLASH_ATTENTION=true \
+		-e OLLAMA_MODELS=/root/.ollama \
+		-e GODEBUG=cgocheck=0 \
+		ollama/ollama:latest
+	@echo ""
+	@echo "✅ Container started: $(CONTAINER_NAME)"
+	@sleep 2
+	@$(MAKE) gpu-test
+
+.PHONY: gpu-docker-compose
+gpu-docker-compose: gpu-check
+	@echo "🚀 Starting GPU stack with Docker Compose..."
+	@docker compose -f $(GPU_COMPOSE) up -d --build --force-recreate
+	@echo ""
+	@echo "✅ GPU stack running!"
+	@echo "   Prismalama: http://localhost:$(PORT)"
+	@echo "   Jaisiu:     http://localhost:$(JAISIU_PORT)"
+	@$(MAKE) gpu-test
+
+.PHONY: gpu-setup
+gpu-setup: gpu-check
+	@echo "🚀 Full GPU setup starting..."
+	@echo ""
+	@$(MAKE) gpu-docker-compose
+	@echo ""
+	@echo "⚙️  Configuring Jaisiu OpenClaw..."
+	@bash setup-jaisiu-integration.sh
+	@echo ""
+	@echo "🎉 GPU setup complete!"
+	@$(MAKE) gpu-benchmark
+
+.PHONY: gpu-test
+gpu-test:
+	@echo "🧪 Testing GPU inference..."
+	@curl -s --max-time 10 http://localhost:$(PORT)/v1/models | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    print('✅ Models available:')
+    for m in data.get('data', []):
+        print(f'   • {m[\"id\"]}')
+except Exception as e:
+    print(f'❌ Error: {e}')
+    sys.exit(1)
+" 2>/dev/null || echo "⚠️  Service may still be starting..."
+
+.PHONY: gpu-benchmark
+gpu-benchmark:
+	@echo "📊 Running TPS benchmark..."
+	@python3 << 'PYEOF'
+import urllib.request, json, time, sys
+
+prompt = "Explain quantum computing briefly."
+data = json.dumps({
+    "model": "qwen2.5:14b",
+    "messages": [{"role": "user", "content": prompt}],
+    "max_tokens": 256,
+    "temperature": 0,
+    "stream": False
+}).encode()
+
+times = []
+for i in range(3):
+    start = time.time()
+    try:
+        req = urllib.request.Request('http://localhost:11434/v1/chat/completions',
+                                    data=data, headers={'Content-Type': 'application/json'})
+        resp = urllib.request.urlopen(req, timeout=30)
+        result = json.loads(resp.read())
+        end = time.time()
+        
+        tokens = result['usage']['completion_tokens']
+        elapsed = end - start
+        tps = tokens / elapsed
+        times.append(tps)
+        print(f"  Run {i+1}: {tokens} tokens in {elapsed:.2f}s = {tps:.1f} TPS")
+    except Exception as e:
+        print(f"  Run {i+1}: Error - {e}")
+
+if times:
+    avg = sum(times) / len(times)
+    print(f"\n  Average TPS: {avg:.1f}")
+    if avg >= 200:
+        print("  ✅ Target 221 TPS achieved!")
+    else:
+        print(f"  ⚠️  Target is 221 TPS, current: {avg:.1f}")
+PYEOF
+
+.PHONY: gpu-status
+gpu-status:
+	@echo "📊 GPU Status"
+	@nvidia-smi --query-gpu=name,memory.total,memory.free,driver_version --format=csv,noheader 2>/dev/null || echo "No NVIDIA GPU"
+	@echo ""
+	@echo "📦 Container Status"
+	@docker ps --filter "name=$(CONTAINER_NAME)" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null
+	@echo ""
+	@echo "🔍 API Health"
+	@curl -s --max-time 5 http://localhost:$(PORT)/v1/models | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    print(f'   Models loaded: {len(data.get(\"data\", []))}')
+except:
+    print('   No response (service may be down)')
+" 2>/dev/null || echo "   Service not responding"
+
+.PHONY: gpu-stop
+gpu-stop:
+	@echo "🛑 Stopping GPU container..."
+	@docker stop $(CONTAINER_NAME) 2>/dev/null || true
+	@echo "✅ Stopped"
+
+.PHONY: gpu-clean
+gpu-clean:
+	@echo "🧹 Cleaning GPU container..."
+	@docker stop $(CONTAINER_NAME) 2>/dev/null || true
+	@docker rm $(CONTAINER_NAME) 2>/dev/null || true
+	@docker volume rm ollama 2>/dev/null || true
+	@echo "✅ Cleaned"
+
+# Agent Network Integration
+.PHONY: gpu-agents
+gpu-agents:
+	@echo "🔗 Checking agent network..."
+	@docker compose -f $(GPU_COMPOSE) ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
+	@echo ""
+	@echo "Available models across agents:"
+	@curl -s --max-time 5 http://localhost:$(PORT)/v1/models | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    for m in data.get('data', []):
+        print(f'  ✅ {m[\"id\"]}')
+except:
+    print('  ❌ No models available')
+" 2>/dev/null || echo "  ⚠️  Service unavailable"
+
+# Auto-detect and configure
+gpu-auto-config:
+	@echo "🔧 Auto-configuring GPU stack..."
+	@NUM_GPU_LAYERS=$$(nvidia-smi --query-gpu=memory.total --format=csv,noheader | head -1 | grep -o '[0-9]*' || echo 12);
+	if [ $$NUM_GPU_LAYERS -ge 24 ]; then \
+		echo "   24GB+ VRAM detected: Using qwen3.6:27b"; \
+		MODEL="qwen3.6:27b"; \
+		BATCH=2048; \
+	else \
+		echo "   <24GB VRAM detected: Using qwen2.5:14b"; \
+		MODEL="qwen2.5:14b"; \
+		BATCH=4096; \
+	fi; \
+	echo "   Batch size: $$BATCH"; \
+	sed -i "s/BATCH_SIZE ?= 4096/BATCH_SIZE ?= $$BATCH/" Makefile.prismalama-gpu || true

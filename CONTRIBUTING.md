@@ -1,18 +1,20 @@
-# Contributing to Ollama
+# Contributing to Prismalama
 
 ![Prismalama Logo](logo.jpg)
 
-Thank you for your interest in contributing to Ollama! Here are a few guidelines to help get you started.
+Thank you for your interest in contributing. **Prismalama** is an Ollama-compatible fork ([github.com/piotroxp/prismalama](https://github.com/piotroxp/prismalama)); changes that touch runners, GGML/Vulkan, AirLLM, or packaging should align with **[docs/DEVELOPER.md](./docs/DEVELOPER.md)** and **[docs/PRISMALAMA_PRINCIPLE.md](./docs/PRISMALAMA_PRINCIPLE.md)**.
 
 ## Set up
 
-See the [development documentation](./docs/development.md) for instructions on how to build and run Ollama locally.
+See **[docs/DEVELOPER.md](./docs/DEVELOPER.md)** first. Generic upstream build notes live in [development documentation](./docs/development.md).
 
-### Ideal issues
+### Ideal issues (Prismalama)
 
-* [Bugs](https://github.com/ollama/ollama/issues?q=is%3Aissue+is%3Aopen+label%3Abug): issues where Ollama stops working or where it results in an unexpected error.
-* [Performance](https://github.com/ollama/ollama/issues?q=is%3Aissue+is%3Aopen+label%3Aperformance): issues to make Ollama faster at model inference, downloading or uploading.
-* [Security](https://github.com/ollama/ollama/blob/main/SECURITY.md): issues that could lead to a security vulnerability. As mentioned in [SECURITY.md](https://github.com/ollama/ollama/blob/main/SECURITY.md), please do not disclose security vulnerabilities publicly.
+* [Bugs](https://github.com/piotroxp/prismalama/issues): crashes, incorrect routing (GGML vs AirLLM), load failures, or API regressions.
+* Performance: throughput, VRAM use, or scheduling — include hardware and **`journalctl -u ollama`** snippets where useful.
+* [Security](./SECURITY.md): do **not** open public issues for undisclosed vulnerabilities; use the process in **SECURITY.md**.
+
+Upstream Ollama uses its own tracker for stock Ollama-only issues: [bugs](https://github.com/ollama/ollama/issues?q=is%3Aissue+is%3Aopen+label%3Abug), [performance](https://github.com/ollama/ollama/issues?q=is%3Aissue+is%3Aopen+label%3Aperformance).
 
 ### Issues that are harder to review
 
@@ -28,14 +30,11 @@ See the [development documentation](./docs/development.md) for instructions on h
 
 ## Proposing a (non-trivial) change
 
-> By "non-trivial", we mean a change that is not a bug fix or small
-> documentation update. If you are unsure, please ask us on our [Discord
-> server](https://discord.gg/ollama).
+> By "non-trivial", we mean a change that is not a bug fix or small documentation update.
 
-Before opening a non-trivial Pull Request, please open an issue to discuss the change and
-get feedback from the maintainers. This helps us understand the context of the
-change and how it fits into Ollama's roadmap and prevents us from duplicating
-work or you from spending time on a change that we may not be able to accept.
+Open an issue on **[github.com/piotroxp/prismalama](https://github.com/piotroxp/prismalama/issues)** before a large PR so maintainers can agree on scope (dispatch, GGML, packaging). For **upstream Ollama–only** topics, the [Ollama Discord](https://discord.gg/ollama) remains the upstream forum.
+
+Before opening a non-trivial Pull Request, discussion helps prevent duplicated work or changes that conflict with Prismalama’s architecture (**`docs/PRISMALAMA_PRINCIPLE.md`**).
 
 Tips for proposals:
 
@@ -62,7 +61,7 @@ file in the root directory may use the file name.
 The short description should start with a lowercase letter and be a
 continuation of the sentence:
 
-      "This changes Ollama to..."
+      "This changes Prismalama to..."
 
 Examples:
 
@@ -87,4 +86,4 @@ did not work without it.
 
 ## Need help?
 
-If you need help with anything, feel free to reach out to us on our [Discord server](https://discord.gg/ollama).
+Use **[Prismalama issues](https://github.com/piotroxp/prismalama/issues)** for this fork. For upstream Ollama behavior, see **[discord.gg/ollama](https://discord.gg/ollama)** and **[github.com/ollama/ollama](https://github.com/ollama/ollama)**.

@@ -288,7 +288,7 @@ func Uint64(key string, defaultValue uint64) func() uint64 {
 	}
 }
 
-// Set aside VRAM per GPU (bytes). Default 2 GiB so compositor/desktop (e.g. Plasma) keeps
+// Set aside VRAM per GPU (bytes). Default 3 GiB so compositor/desktop (e.g. Plasma) keeps
 // headroom on single-GPU workstations; set OLLAMA_GPU_OVERHEAD=0 to disable.
 var GpuOverhead = Uint64("OLLAMA_GPU_OVERHEAD", 3*format.GibiByte)
 

@@ -1,0 +1,22 @@
+# GPU-Accelerated Targets
+.PHONY: gpu gpu-build gpu-run gpu-test gpu-benchmark
+
+gpu: gpu-build gpu-run gpu-test
+
+gpu-build:
+	@echo "Building GPU-optimized ollama..."
+	./build-cuda.sh
+
+gpu-run:
+	@echo "Starting GPU container..."
+	docker compose -f docker-compose.gpu.yml up -d
+
+gpu-test:
+	@echo "Testing GPU inference..."
+	curl -s http://localhost:11434/v1/models | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for m in d['data']: print(f'  {m[\"id\"]}')"
+
+gpu-benchmark:
+	@python3 /home/prizm/prismalama/benchmark-gpu.py

@@ -1,7 +1,7 @@
-Ollama Benchmark Tool
----------------------
+Prismalama / Ollama benchmark tool
+------------------------------------
 
-A Go-based command-line tool for benchmarking Ollama models with configurable parameters and multiple output formats.
+Go CLI for benchmarking models served by **`ollama`** (same **`OLLAMA_HOST`** / **`api.ClientFromEnvironment`** as the stock CLI). Works against Prismalama or upstream Ollama on **`11434`**.
 
 ## Features
 

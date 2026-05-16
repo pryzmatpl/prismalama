@@ -1,5 +1,7 @@
 # Development
 
+> **Prismalama:** prefer **[DEVELOPER.md](./DEVELOPER.md)** for fork-specific runners, dispatch, Arch packaging, Docker targets, prismallama.cpp sync, and integration tags. The instructions below follow **upstream Ollama** and may not match every Prismalama build profile (e.g. Vulkan/ROCm CI images).
+
 Install prerequisites:
 
 - [Go](https://go.dev/doc/install)

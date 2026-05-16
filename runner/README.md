@@ -1,8 +1,10 @@
 # `runner`
 
+> **Prismalama:** production routing and **`DecideEngine`** (GGML vs AirLLM) live in **`dispatch.go`** and **`runner.go`** — see **`docs/RUNTIME_DISPATCH.md`**. This README describes the minimal subprocess HTTP runner shape.
+
 > Note: this is a work in progress
 
-A minimial runner for loading a model and running inference via a http web server.
+A minimal runner for loading a model and running inference via an HTTP server.
 
 ```shell
 ./runner -model <model binary>

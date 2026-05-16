@@ -1,6 +1,6 @@
 # Integration Tests
 
-This directory contains integration tests to exercise Ollama end-to-end to verify behavior
+This directory contains integration tests to exercise **Prismalama** (Ollama-compatible) end-to-end. Prismalama-specific ship tests (streaming defaults, dispatch, capabilities) also live here under **`//go:build integration`** — see **`TEST_README.md`** and **`docs/DEVELOPER.md`**.
 
 By default, these tests are disabled so `go test ./...` will exercise only unit tests.  To run integration tests you must pass the integration tag.  `go test -tags=integration ./...` Some tests require additional tags to enable to allow scoped testing to keep the duration reasonable.  For example, testing a broad set of models requires `-tags=integration,models` and a longer timeout (~60m or more depending on the speed of your GPU.). To view the current set of tag combinations use `find integration -type f | xargs grep "go:build"`
 

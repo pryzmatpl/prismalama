@@ -26,28 +26,29 @@ This document describes how the repository is wired so humans and automation can
 
 ## Which runner is used?
 
-`runner/runner.go` implements `isAirLLMModel(modelPath)`:
+`runner/dispatch.go` defines **`DecideEngine`** (and **`isAirLLMModel`** wraps it). **`runner/runner.go`** uses that result to spawn AirLLM vs GGML.
 
-- Directory contains `model.safetensors.index.json` or `*.safetensors` → **AirLLM**.
-- `config.json` mentions safetensors / `torch_dtype` / transformers-style hints → **AirLLM**.
-- Glob `*-00001-of-*.gguf` (multi-part GGUF) → **AirLLM** when **`OLLAMA_USE_AIRLLM` is not an explicit opt-out** (`0` / `false` / `no`); otherwise **GGML** (default package sets opt-out so multi-part uses native GGML).
-- `OLLAMA_USE_AIRLLM=1` or `true` → **AirLLM** even for plain `.gguf` (testing / overrides).
+- **`OLLAMA_USE_AIRLLM`** is **`0`**, **`false`**, or **`no`** → **always GGML** (Arch package default).
+- Else: directory contains `model.safetensors.index.json` or `*.safetensors` → **AirLLM**.
+- Else: `config.json` mentions safetensors / `torch_dtype` / transformers-style hints → **AirLLM**.
+- Else: glob `*-00001-of-*.gguf` → **AirLLM**.
+- Else: **`OLLAMA_USE_AIRLLM=1` or `true`** → **AirLLM** even for plain `.gguf`.
 
-Otherwise the **llama.cpp** runner is used (GGUF, Vulkan when built).
+Otherwise the **llama.cpp / GGML** runner is used (GGUF; Vulkan/HIP per build and env).
 
-**Important:** Full **143GB+ class** models in **Hugging Face safetensors** layout use AirLLM’s layer streaming. **MiniMax / Kimi “GGUF-only”** installs are not loaded by PyTorch AirLLM unless you also have an HF-compatible tree or you rely on the multi-part GGUF + `OLLAMA_USE_AIRLLM` path that routes to the AirLLM runner (see integration tests under `minimax` / `weight_streaming` tags—they assume local paths under `/nvme3/...`).
+**Important:** Full **143GB+ class** models in **Hugging Face safetensors** layout typically require the AirLLM path. **MiniMax / Kimi “GGUF-only”** installs are not loaded by PyTorch AirLLM unless you also have an HF-compatible tree or you rely on the multi-part GGUF + `OLLAMA_USE_AIRLLM` path that routes to the AirLLM runner (see integration tests under `minimax` / `weight_streaming` tags—they assume local paths under `/nvme3/...`).
 
 ## Environment variables (frequently used)
 
 | Variable | Effect |
 |----------|--------|
-| `OLLAMA_USE_AIRLLM` | **Arch package sets `0`**: GGML/llama.cpp for typical GGUF; no PyTorch deps. Set **`1`** / **`true`** to opt into AirLLM. **`0`** / **`false`** / **`no`** disables **all** AirLLM routing. If **unset**, layout heuristics may still pick AirLLM (e.g. multipart GGUF) — see `docs/RUNTIME_DISPATCH.md`. |
+| `OLLAMA_USE_AIRLLM` | **Arch package sets `0`**: GGML-only unless you opt in. Set **`1`** / **`true`** for AirLLM. **`0`** / **`false`** / **`no`** disables **all** AirLLM routing (including safetensors + multipart heuristics). If **unset**, layout heuristics may pick AirLLM for HF trees or multipart GGUF — see `docs/RUNTIME_DISPATCH.md`. |
 | `OLLAMA_MULTI_GGUF` | Treat as AirLLM-style when `1`. |
 | `AIRLLM_COMPRESSION` | e.g. `4bit`, `8bit`, `none` (passed to `AutoModel.from_pretrained`). |
 | `AIRLLM_DEVICE` | PyTorch device string, default `cuda:0` (ROCm uses the same API). |
 | `PRISMALAMA_AIRLLM_PYTHONPATH` | Optional prepend for `PYTHONPATH` when automatic dev-tree detection does not match your layout (colon-separated). |
 | `AIRLLM_POST_INFER_CLEANUP` | If `0`, skip post-inference GPU cache flush in `airllm_runner.py` (default: on). |
-| `OLLAMA_LAYER_STREAMING` | GGUF layer streaming: load block from NVMe → compute → evict (default **enabled** in package; `OLLAMA_LAYER_STREAMING=0` disables). See **`ml/streaming`** and **`docs/PRISMALAMA_PRINCIPLE.md`**. |
+| `OLLAMA_LAYER_STREAMING` | GGUF streaming hooks: **`LoadStreaming`**, **`InferenceStreamer`**, eval callback when backends support them (`OLLAMA_LAYER_STREAMING=0` disables). **Go default:** unset ⇒ **false** (`integration/ship_streaming_test.go`). **Arch `/etc/default/ollama`:** **`1`**. See **`ml/streaming`**, **`docs/PRISMALAMA_PRINCIPLE.md`**, **`docs/GOAL-GAPS.md`**. |
 | `OLLAMA_STREAMING_BUDGET` | Byte budget for the streaming buffer pool (default 4 GiB). |
 | `PYTORCH_CUDA_ALLOC_CONF` | e.g. `expandable_segments:True` to reduce allocator fragmentation (set by user; not modified by the repo). |
 
@@ -125,6 +126,7 @@ Build/run: **`make docker-test-build`** / **`make docker-test`** vs **`make dock
 ## Related docs
 
 - `PRISMALAMA_PRINCIPLE.md` — **north star**: GGML vs AirLLM, dispatch, capabilities endpoint.
+- `GOAL-GAPS.md` — goals vs current gaps (defaults, routing).
 - `ARCHITECTURE.md` — diagrams and component list.
 - `README.md` — user-facing overview.
 - `README-PKGBUILD.md` — Arch **`prismalama-ollama`** package build.
