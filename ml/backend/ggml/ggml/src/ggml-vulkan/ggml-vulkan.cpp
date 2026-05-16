@@ -689,6 +689,7 @@ struct vk_device_struct {
 
     vk_pipeline pipeline_matmul_split_k_reduce;
     vk_pipeline pipeline_quantize_q8_1_x4;
+    vk_pipeline pipeline_bc4_decompress;
 
     vk_pipeline pipeline_dequant[GGML_TYPE_COUNT];
     vk_pipeline pipeline_dequant_mul_mat_vec_f32_f32[DMMV_WG_SIZE_COUNT][GGML_TYPE_COUNT][mul_mat_vec_max_cols];
@@ -1584,6 +1585,11 @@ template <> void init_pushconst_fastdiv(vk_op_sum_rows_push_constants &p) {
 struct vk_quantize_q8_1_push_constants {
     uint32_t ne;
     uint32_t num_blocks;
+};
+
+struct vk_bc4_decompress_push_constants {
+    uint32_t num_blocks;
+    uint32_t output_stride;
 };
 
 struct vk_op_flash_attn_split_k_reduce_push_constants {
@@ -4241,6 +4247,8 @@ static void ggml_vk_load_shaders(vk_device& device) {
     } else {
         ggml_vk_create_pipeline(device, device->pipeline_quantize_q8_1_x4, "quantize_q8_1_x4", quantize_q8_1_x4_len, quantize_q8_1_x4_data, "main", 2, sizeof(vk_quantize_q8_1_push_constants), {32 * device->subgroup_size / 8, 1, 1}, { device->subgroup_size }, 1);
     }
+
+    ggml_vk_create_pipeline(device, device->pipeline_bc4_decompress, "bc4_decompress", bc4_decompress_len, bc4_decompress_data, "main", 2, sizeof(vk_bc4_decompress_push_constants), {64, 1, 1}, {}, 1);
 
     for (uint32_t i = 0; i < p021_max_gqa_ratio; ++i) {
         if (device->subgroup_arithmetic && device->subgroup_require_full_support) {
@@ -7349,6 +7357,20 @@ static void ggml_vk_quantize_q8_1(ggml_backend_vk_context * ctx, vk_context& sub
     };
 
     ggml_vk_dispatch_pipeline(ctx, subctx, pipeline, { in, out }, pc, { elements, 1, 1 });
+    ggml_vk_sync_buffers(ctx, subctx);
+}
+
+static void ggml_vk_bc4_decompress(ggml_backend_vk_context * ctx, vk_context& subctx, const vk_subbuffer & in, const vk_subbuffer & out, uint32_t num_blocks, uint32_t output_stride) {
+    VK_LOG_DEBUG("ggml_vk_bc4_decompress(num_blocks=" << num_blocks << ", output_stride=" << output_stride << ")");
+
+    vk_pipeline pipeline = ctx->device->pipeline_bc4_decompress;
+
+    const vk_bc4_decompress_push_constants pc = {
+        num_blocks,
+        output_stride,
+    };
+
+    ggml_vk_dispatch_pipeline(ctx, subctx, pipeline, { in, out }, pc, { CEIL_DIV(num_blocks * 16, 64), 1, 1 });
     ggml_vk_sync_buffers(ctx, subctx);
 }
 
