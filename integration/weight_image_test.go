@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"fmt"
 	"math"
 	"testing"
 
@@ -366,26 +365,3 @@ func BenchmarkBC4Decompression(b *testing.B) {
 	}
 }
 
-func ExampleBC4Compression() {
-	weights := make([]float32, 256)
-	for i := range weights {
-		weights[i] = float32(i)/127.5 - 1.0
-	}
-
-	cw, err := weightimage.CompressBC4(weights, 16, 16)
-	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		return
-	}
-
-	fmt.Printf("Original: %d bytes\n", 16*16*4)
-	fmt.Printf("Compressed: %d bytes\n", len(cw.Data))
-	fmt.Printf("Ratio: %.2fx\n", cw.CompressionRatio())
-
-	recovered, err := weightimage.DecompressBC4(cw)
-	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		return
-	}
-	fmt.Printf("Recovered: %d elements\n", len(recovered))
-}
