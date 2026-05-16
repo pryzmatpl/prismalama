@@ -214,6 +214,10 @@ var (
 	// tensors stream from NVMe/page cache instead of fully copying to RAM before GPU upload.
 	// Set OLLAMA_VULKAN_MMAP=false for the legacy path (no mmap with Vulkan).
 	VulkanMmap = BoolWithDefault("OLLAMA_VULKAN_MMAP")
+	// WeightImage enables weight-as-image compression for inference
+	WeightImage = Bool("OLLAMA_WEIGHT_IMAGE")
+	// WeightImageFormat sets the compression format (bc4, dct)
+	WeightImageFormat = String("OLLAMA_WEIGHT_IMAGE_FORMAT")
 )
 
 // MemoryPolicy selects default VRAM→num_ctx heuristics.

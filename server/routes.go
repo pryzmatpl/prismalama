@@ -1581,6 +1581,9 @@ func (s *Server) GenerateRoutes(rc *ollama.Registry) (http.Handler, error) {
 	r.GET("/api/version", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"version": version.Version}) })
 	r.HEAD("/api/prismalama/capabilities", PrismalamaCapabilitiesHandler)
 	r.GET("/api/prismalama/capabilities", PrismalamaCapabilitiesHandler)
+	r.GET("/api/prismalama/weights", NewWeightImageHandler().ServeHTTP)
+	r.GET("/api/prismalama/weights/stats", NewWeightImageStatsHandler().ServeHTTP)
+	r.GET("/api/prismalama/weights/layer/:layer", NewWeightLayerImageHandler().ServeHTTP)
 
 	// Local model cache management (new implementation is at end of function)
 	r.POST("/api/pull", s.PullHandler)
