@@ -74,15 +74,16 @@ func CompressBC4(weights []float32, w, h int) (*CompressedWeights, error) {
 }
 
 func compressBC4Block(pixels []float32) [8]byte {
-	minVal := float32(255)
+	minVal := float32(1)
 	maxVal := float32(0)
 
 	for _, p := range pixels {
-		if p < minVal {
-			minVal = p
+		pNorm := (p + 1.0) / 2.0
+		if pNorm < minVal {
+			minVal = pNorm
 		}
-		if p > maxVal {
-			maxVal = p
+		if pNorm > maxVal {
+			maxVal = pNorm
 		}
 	}
 
@@ -94,8 +95,8 @@ func compressBC4Block(pixels []float32) [8]byte {
 	quantMax := uint8(maxVal * 255)
 
 	var block [8]byte
-	block[0] = quantMax
-	block[1] = quantMin
+	block[0] = quantMin
+	block[1] = quantMax
 
 	range_ := maxVal - minVal
 	if range_ == 0 {
@@ -104,25 +105,12 @@ func compressBC4Block(pixels []float32) [8]byte {
 
 	indices := [16]byte{}
 	for i, p := range pixels {
-		t := (float64(p) - float64(minVal)) / float64(range_)
+		pNorm := (float64(p) + 1.0) / 2.0
+		t := (pNorm - float64(minVal)) / float64(range_)
 		t = math.Max(0, math.Min(1, t))
 
-		var idx byte
-		if t < 0.5/7.0 {
-			idx = 0
-		} else if t < 1.5/7.0 {
-			idx = 1
-		} else if t < 2.5/7.0 {
-			idx = 2
-		} else if t < 3.5/7.0 {
-			idx = 3
-		} else if t < 4.5/7.0 {
-			idx = 4
-		} else if t < 5.5/7.0 {
-			idx = 5
-		} else if t < 6.5/7.0 {
-			idx = 6
-		} else {
+		idx := byte(t * 7.0)
+		if idx > 7 {
 			idx = 7
 		}
 
@@ -152,8 +140,8 @@ func DecompressBC4(cw *CompressedWeights) ([]float32, error) {
 			blockOffset := (by*cw.BlocksX + bx) * 8
 			block := cw.Data[blockOffset : blockOffset+8]
 
-			maxVal := float32(block[0]) / 255.0
-			minVal := float32(block[1]) / 255.0
+			minVal := float32(block[0]) / 255.0
+			maxVal := float32(block[1]) / 255.0
 
 			indices := [16]byte{}
 			copy(indices[:], block[2:8])
@@ -168,17 +156,16 @@ func DecompressBC4(cw *CompressedWeights) ([]float32, error) {
 						continue
 					}
 
-					var idx byte
+					idx := indices[blockIdx/2]
 					if blockIdx%2 == 0 {
-						idx = indices[blockIdx/2] & 0x0F
+						idx = idx & 0x0F
 					} else {
-						idx = indices[blockIdx/2] >> 4
+						idx = idx >> 4
 					}
 
 					t := float32(idx) / 7.0
 					val := minVal + t*(maxVal-minVal)
-
-					weights[py*cw.Width+px] = val
+					weights[py*cw.Width+px] = val*2.0 - 1.0
 					blockIdx++
 				}
 			}
