@@ -84,12 +84,21 @@ var OnceLoad = sync.OnceFunc(func() {
 			continue
 		}
 
-		if abspath != filepath.Dir(exe) && !strings.Contains(abspath, filepath.FromSlash("lib/ollama")) {
+		exeDir := filepath.Dir(exe)
+		if abspath == exeDir {
+			slog.Debug("skipping executable directory itself as library path", "path", abspath)
+			continue
+		}
+		if !strings.Contains(abspath, filepath.FromSlash("lib/ollama")) {
 			slog.Debug("skipping path which is not part of ollama", "path", abspath)
 			continue
 		}
 
 		if _, ok := visited[abspath]; !ok {
+			if _, err := os.Stat(abspath); err != nil {
+				slog.Debug("skipping non-existent library path", "path", abspath)
+				continue
+			}
 			func() {
 				slog.Debug("ggml backend load all from path", "path", abspath)
 				cpath := C.CString(abspath)

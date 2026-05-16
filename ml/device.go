@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"math"
 	"net/http"
+	"os"
 	"runtime"
 	"slices"
 	"sort"
@@ -436,9 +437,17 @@ func LibraryPaths(l []DeviceInfo) []string {
 				}
 			}
 			if needed {
-				gpuLibs = append(gpuLibs, dir)
+				if _, err := os.Stat(dir); err == nil {
+					gpuLibs = append(gpuLibs, dir)
+				} else {
+					slog.Warn("gpu library path not found, skipping", "path", dir)
+				}
 			}
 		}
+	}
+	if len(gpuLibs) == 0 {
+		slog.Warn("no valid GPU library paths found, falling back to LibOllamaPath", "path", LibOllamaPath)
+		gpuLibs = []string{LibOllamaPath}
 	}
 	return gpuLibs
 }
