@@ -94,8 +94,9 @@ conflicts=('ollama' 'ollama-rocm' 'ollama-cuda' 'ollama-airllm-rocm')
 
 options=(!strip !debug)
 
-# Default model store (edit before build if needed)
-_model_dir="/nvme3/models"
+# Default model store — must exist at systemd startup if listed in ReadWritePaths (see unit below).
+# Override before build: _model_dir="/mnt/bigssd/models" makepkg -sf
+_model_dir="/home/models"
 
 build() {
 	cd "${startdir}"
@@ -218,6 +219,12 @@ package() {
 	install -dm755 "${pkgdir}/usr/lib/sysusers.d"
 	printf '%s\n' 'u ollama - "Ollama service user" -' > "${pkgdir}/usr/lib/sysusers.d/ollama.conf"
 
+	install -dm755 "${pkgdir}/usr/lib/tmpfiles.d"
+	cat > "${pkgdir}/usr/lib/tmpfiles.d/ollama.conf" << 'EOF'
+d /var/lib/ollama 0755 ollama ollama -
+d /home/models 0755 ollama ollama -
+EOF
+
 	install -dm755 "${pkgdir}/usr/lib/systemd/system"
 	cat > "${pkgdir}/usr/lib/systemd/system/ollama.service" << 'EOF'
 [Unit]
@@ -234,8 +241,10 @@ Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true
 ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/nvme3/models /var/lib/ollama /tmp
+# OLLAMA_MODELS under /home — ProtectHome=true hides /home from the service; must be false here.
+ProtectHome=false
+# Paths must exist when the unit starts; tmpfiles.d creates these dirs. Other dirs: mkdir + chown ollama and extend ReadWritePaths (systemctl edit).
+ReadWritePaths=/home/models /var/lib/ollama /tmp
 PrivateTmp=true
 
 [Install]

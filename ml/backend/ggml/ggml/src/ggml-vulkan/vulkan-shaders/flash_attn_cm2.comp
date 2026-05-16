@@ -18,6 +18,8 @@
 
 #include "types.glsl"
 #include "dequant_funcs_cm2.glsl"
+// CM2 uses raw byte K/V + decode callbacks; skip packed-buffer dequantize4 path in flash_attn_base.glsl.
+#define GGML_VULKAN_FLASH_ATTN_CM2
 #include "flash_attn_base.glsl"
 
 layout (binding = 0) readonly buffer Q {uint8_t data_q[];};

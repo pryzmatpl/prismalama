@@ -79,6 +79,7 @@ layout (binding = 6) readonly buffer MO {uint32_t data_mask_opt[];};
 #define MASK_OPT_ALL_NEG_INF 1
 #define MASK_OPT_ALL_ZERO 2
 
+#ifndef GGML_VULKAN_FLASH_ATTN_CM2
 #define BINDING_IDX_K 0
 #define BINDING_IDX_V 1
 #if defined(DATA_A_F32)
@@ -324,6 +325,80 @@ FLOAT_TYPEV4 dequantize4(uint ib, uint iqs, uint a_offset, uint binding_idx) {
     return FLOAT_TYPEV4(rw * norm, rx * norm, ry * norm, rz * norm);
 }
 #endif
+
+#if defined(DATA_A_PLANAR4) || defined(DATA_A_ISO4)
+const float PI_CENTROIDS_4BIT[16] = float[16](
+    -0.173926f, -0.117195f, -0.089527f, -0.068756f,
+    -0.051262f, -0.035597f, -0.020989f, -0.006938f,
+     0.006938f,  0.020989f,  0.035597f,  0.051262f,
+     0.068756f,  0.089527f,  0.117195f,  0.173926f
+);
+#endif
+
+#if defined(DATA_A_PLANAR4)
+#define BLOCK_BYTE_SIZE 69
+
+FLOAT_TYPE planar4_scalar(A_TYPE_PACKED16 blk, uint idx) {
+    float norm = float(blk.norm);
+    const uint q0i = idx & ~1u;
+    const uint q1i = q0i + 1u;
+    const uint idx_nib0 = (blk.qs[q0i / 2] >> ((q0i & 1u) * 4)) & 0xFu;
+    const uint idx_nib1 = (blk.qs[q1i / 2] >> ((q1i & 1u) * 4)) & 0xFu;
+    float q0 = PI_CENTROIDS_4BIT[idx_nib0];
+    float q1 = PI_CENTROIDS_4BIT[idx_nib1];
+    const uint p = q0i / 2u;
+    const float c = PLANAR_COS[p];
+    const float s = PLANAR_SIN[p];
+    const float r0 = (c * q0 + s * q1) * norm;
+    const float r1 = (-s * q0 + c * q1) * norm;
+    return FLOAT_TYPE((idx & 1u) != 0u ? r1 : r0);
+}
+
+FLOAT_TYPEV4 dequantize4(uint ib, uint iqs, uint a_offset, uint binding_idx) {
+    uint j0 = iqs;
+    if (binding_idx == BINDING_IDX_K) {
+        return FLOAT_TYPEV4(
+            planar4_scalar(k_packed.k_data_packed16[a_offset + ib], j0),
+            planar4_scalar(k_packed.k_data_packed16[a_offset + ib], j0 + 1u),
+            planar4_scalar(k_packed.k_data_packed16[a_offset + ib], j0 + 2u),
+            planar4_scalar(k_packed.k_data_packed16[a_offset + ib], j0 + 3u));
+    }
+    return FLOAT_TYPEV4(
+        planar4_scalar(v_packed.v_data_packed16[a_offset + ib], j0),
+        planar4_scalar(v_packed.v_data_packed16[a_offset + ib], j0 + 1u),
+        planar4_scalar(v_packed.v_data_packed16[a_offset + ib], j0 + 2u),
+        planar4_scalar(v_packed.v_data_packed16[a_offset + ib], j0 + 3u));
+}
+#endif
+
+#if defined(DATA_A_ISO4)
+#define BLOCK_BYTE_SIZE 69
+
+FLOAT_TYPEV4 dequantize4(uint ib, uint iqs, uint a_offset, uint binding_idx) {
+    block_iso4_0 kb = binding_idx == BINDING_IDX_K
+        ? k_packed.k_data_packed16[a_offset + ib]
+        : v_packed.v_data_packed16[a_offset + ib];
+    float norm = float(kb.norm);
+    int g = int(iqs) / 4;
+
+    float qvals[4];
+    for (int c = 0; c < 4; c++) {
+        uint j = uint(g * 4 + c);
+        uint idx_nib = (kb.qs[j / 2] >> ((j & 1u) * 4)) & 0xFu;
+        qvals[c] = PI_CENTROIDS_4BIT[idx_nib];
+    }
+
+    float qw = ISO_QW[g], qx = -ISO_QX[g], qy = -ISO_QY[g], qz = -ISO_QZ[g];
+    float rw = qw*qvals[0] - qx*qvals[1] - qy*qvals[2] - qz*qvals[3];
+    float rx = qw*qvals[1] + qx*qvals[0] + qy*qvals[3] - qz*qvals[2];
+    float ry = qw*qvals[2] - qx*qvals[3] + qy*qvals[0] + qz*qvals[1];
+    float rz = qw*qvals[3] + qx*qvals[2] - qy*qvals[1] + qz*qvals[0];
+
+    return FLOAT_TYPEV4(rw * norm, rx * norm, ry * norm, rz * norm);
+}
+#endif
+
+#endif // GGML_VULKAN_FLASH_ATTN_CM2
 
 #define CEIL_DIV(a, b) (((a) + (b) - 1) / (b))
 

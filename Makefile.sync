@@ -1,5 +1,5 @@
-# Prismallama tracks a fork of llama.cpp (GGUF native + GGML) for a single engine we control.
-# Pin FETCH_HEAD to a commit SHA for reproducible Arch/package builds (bump when merging the fork).
+# Prismallama tracks **our** fork (prismallama.cpp), not ggml-org directly — same policy as our AirLLM fork.
+# Bump FETCH_HEAD after merging ggml-org/llama.cpp (or Ollama’s pinned llama SHA) **into** prismallama.cpp on GitHub.
 UPSTREAM=https://github.com/piotroxp/prismallama.cpp.git
 WORKDIR=llama/vendor
 FETCH_HEAD=20efe75cf1127268cb2ad73accd5ccb6f33064ff

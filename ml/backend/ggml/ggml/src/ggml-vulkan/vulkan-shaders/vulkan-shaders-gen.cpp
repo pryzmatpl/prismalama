@@ -205,6 +205,23 @@ std::string to_uppercase(const std::string& input) {
     return result;
 }
 
+// Names in dequant_funcs_cm2.glsl use PascalCase for planar/iso (dequantFuncIso4), not FULLCAPS (dequantFuncISO4).
+static std::string flash_attn_cm2_dequant_func(const std::string& tname) {
+    if (tname == "planar3") {
+        return "dequantFuncPlanar3";
+    }
+    if (tname == "planar4") {
+        return "dequantFuncPlanar4";
+    }
+    if (tname == "iso3") {
+        return "dequantFuncIso3";
+    }
+    if (tname == "iso4") {
+        return "dequantFuncIso4";
+    }
+    return "dequantFunc" + to_uppercase(tname);
+}
+
 bool string_starts_with(const std::string& str, const std::string& prefix) {
     if (prefix.size() > str.size()) {
         return false;
@@ -652,7 +669,7 @@ void process_shaders() {
                 } else {
                     std::string data_a_key = "DATA_A_" + to_uppercase(tname);
                     string_to_spv("flash_attn_f32_f16_" + tname, "flash_attn_cm2.comp",
-                        merge_maps(fa_base_dict, {{data_a_key, "1"}, {"Q_TYPE", "float"}, {"D_TYPE", "float"}, {"D_TYPEV4", "vec4"}, {"DEQUANTFUNC", "dequantFunc"+to_uppercase(tname) }, {"BLOCK_SIZE", "QUANT_K_"+to_uppercase(tname) }}), fp16, false, true, f16acc);
+                        merge_maps(fa_base_dict, {{data_a_key, "1"}, {"Q_TYPE", "float"}, {"D_TYPE", "float"}, {"D_TYPEV4", "vec4"}, {"DEQUANTFUNC", flash_attn_cm2_dequant_func(tname) }, {"BLOCK_SIZE", "QUANT_K_"+to_uppercase(tname) }}), fp16, false, true, f16acc);
                 }
 #endif
 #if defined(GGML_VULKAN_COOPMAT_GLSLC_SUPPORT)

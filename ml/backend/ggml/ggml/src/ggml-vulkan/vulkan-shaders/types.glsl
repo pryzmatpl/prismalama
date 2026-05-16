@@ -1709,6 +1709,7 @@ struct block_planar3_0
 #define QUANT_K QUANT_K_PLANAR3
 #define QUANT_R 1
 #define A_TYPE block_planar3_0
+#define A_TYPE_PACKED16 A_TYPE
 #endif
 
 // IsoQuant 3-bit: quaternion 4D rotation + 2-bit quantized + 1-bit QJL
@@ -1724,6 +1725,7 @@ struct block_iso3_0
 #define QUANT_K QUANT_K_ISO3
 #define QUANT_R 1
 #define A_TYPE block_iso3_0
+#define A_TYPE_PACKED16 A_TYPE
 #endif
 
 // PlanarQuant 4-bit: 2D Givens rotation + 3-bit nibble + 1-bit QJL
@@ -1740,6 +1742,7 @@ struct block_planar4_0
 #define QUANT_K QUANT_K_PLANAR4
 #define QUANT_R 1
 #define A_TYPE block_planar4_0
+#define A_TYPE_PACKED16 A_TYPE
 #endif
 
 // IsoQuant 4-bit: quaternion 4D rotation + 3-bit nibble + 1-bit QJL
@@ -1756,6 +1759,7 @@ struct block_iso4_0
 #define QUANT_K QUANT_K_ISO4
 #define QUANT_R 1
 #define A_TYPE block_iso4_0
+#define A_TYPE_PACKED16 A_TYPE
 #endif
 
 #if defined(DATA_A_IQ4_NL) || defined(DATA_A_IQ4_XS)

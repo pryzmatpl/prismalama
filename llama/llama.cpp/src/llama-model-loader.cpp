@@ -450,10 +450,12 @@ namespace GGUFMeta {
             struct GGUFMeta::ArrayInfo arr_info =
                 GGUFMeta::GKV<GGUFMeta::ArrayInfo>::get_kv(metadata, kid);
 
-            if (n != arr_info.length) {
-                throw std::runtime_error(format("key %s has wrong array length; expected %u, got %u", key.c_str(), n, (uint32_t) arr_info.length));
+            if (arr_info.length > n) {
+                throw std::runtime_error(format("key %s has wrong array length; expected at most %u, got %u", key.c_str(), n, (uint32_t) arr_info.length));
             }
 
+            // Shorter arrays are zero-padded (e.g. qwen35moe rope.dimension_sections [11,11,10] vs n=4).
+            result.fill({});
             return get_arr(key, result, required);
         }
 

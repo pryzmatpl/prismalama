@@ -433,6 +433,143 @@ vec4 dequantize4(uint ib, uint iqs, uint a_offset) {
 }
 #endif
 
+#if defined(DATA_A_PLANAR3) || defined(DATA_A_ISO3) || defined(DATA_A_PLANAR4) || defined(DATA_A_ISO4)
+#include "planar_iso_shared.glsl"
+#endif
+
+#if defined(DATA_A_PLANAR3)
+float planar3_scalar(uint ib, uint idx, uint a_offset) {
+    const float norm = float(data_a[a_offset + ib].norm);
+    const uint q0i = idx & ~1u;
+    const uint q1i = q0i + 1u;
+    const uint8_t qs0 = data_a[a_offset + ib].qs[q0i / 4];
+    const uint8_t sg0 = data_a[a_offset + ib].signs[q0i / 8];
+    const uint8_t qs1 = data_a[a_offset + ib].qs[q1i / 4];
+    const uint8_t sg1 = data_a[a_offset + ib].signs[q1i / 8];
+    float q0 = PLANAR_CENTROIDS_3BIT[unpack_planar_iso3_idx(qs0, sg0, q0i)];
+    float q1 = PLANAR_CENTROIDS_3BIT[unpack_planar_iso3_idx(qs1, sg1, q1i)];
+    const uint p = q0i / 2u;
+    const float c = PLANAR_COS[p];
+    const float s = PLANAR_SIN[p];
+    const float r0 = (c * q0 + s * q1) * norm;
+    const float r1 = (-s * q0 + c * q1) * norm;
+    return (idx & 1u) != 0u ? r1 : r0;
+}
+vec2 dequantize(uint ib, uint iqs, uint a_offset) {
+    return vec2(planar3_scalar(ib, iqs, a_offset), planar3_scalar(ib, iqs + 1u, a_offset));
+}
+vec4 dequantize4(uint ib, uint iqs, uint a_offset) {
+    return vec4(
+        planar3_scalar(ib, iqs, a_offset),
+        planar3_scalar(ib, iqs + 1u, a_offset),
+        planar3_scalar(ib, iqs + 2u, a_offset),
+        planar3_scalar(ib, iqs + 3u, a_offset));
+}
+vec2 get_dm(uint ib, uint a_offset) {
+    return vec2(1.0, 0.0);
+}
+#endif
+
+#if defined(DATA_A_ISO3)
+float iso3_scalar(uint ib, uint idx, uint a_offset) {
+    const float norm = float(data_a[a_offset + ib].norm);
+    const uint g = idx / 4u;
+    float qvals[4];
+    for (int c = 0; c < 4; ++c) {
+        const uint j = uint(g) * 4u + uint(c);
+        const uint8_t qs_byte = data_a[a_offset + ib].qs[j / 4];
+        const uint8_t signs_byte = data_a[a_offset + ib].signs[j / 8];
+        qvals[c] = PLANAR_CENTROIDS_3BIT[unpack_planar_iso3_idx(qs_byte, signs_byte, j)];
+    }
+    const float qw = ISO_QW[g], qx = -ISO_QX[g], qy = -ISO_QY[g], qz = -ISO_QZ[g];
+    const float rw = qw*qvals[0] - qx*qvals[1] - qy*qvals[2] - qz*qvals[3];
+    const float rx = qw*qvals[1] + qx*qvals[0] + qy*qvals[3] - qz*qvals[2];
+    const float ry = qw*qvals[2] - qx*qvals[3] + qy*qvals[0] + qz*qvals[1];
+    const float rz = qw*qvals[3] + qx*qvals[2] - qy*qvals[1] + qz*qvals[0];
+    const uint offset = idx % 4u;
+    const float results[4] = float[4](rw, rx, ry, rz);
+    return results[offset] * norm;
+}
+vec2 dequantize(uint ib, uint iqs, uint a_offset) {
+    return vec2(iso3_scalar(ib, iqs, a_offset), iso3_scalar(ib, iqs + 1u, a_offset));
+}
+vec4 dequantize4(uint ib, uint iqs, uint a_offset) {
+    return vec4(
+        iso3_scalar(ib, iqs, a_offset),
+        iso3_scalar(ib, iqs + 1u, a_offset),
+        iso3_scalar(ib, iqs + 2u, a_offset),
+        iso3_scalar(ib, iqs + 3u, a_offset));
+}
+vec2 get_dm(uint ib, uint a_offset) {
+    return vec2(1.0, 0.0);
+}
+#endif
+
+#if defined(DATA_A_PLANAR4)
+float planar4_scalar(uint ib, uint idx, uint a_offset) {
+    const float norm = float(data_a[a_offset + ib].norm);
+    const uint q0i = idx & ~1u;
+    const uint q1i = q0i + 1u;
+    const uint idx_nib0 = (data_a[a_offset + ib].qs[q0i / 2] >> ((q0i & 1u) * 4)) & 0xFu;
+    const uint idx_nib1 = (data_a[a_offset + ib].qs[q1i / 2] >> ((q1i & 1u) * 4)) & 0xFu;
+    float q0 = PI_CENTROIDS_4BIT[idx_nib0];
+    float q1 = PI_CENTROIDS_4BIT[idx_nib1];
+    const uint p = q0i / 2u;
+    const float c = PLANAR_COS[p];
+    const float s = PLANAR_SIN[p];
+    const float r0 = (c * q0 + s * q1) * norm;
+    const float r1 = (-s * q0 + c * q1) * norm;
+    return (idx & 1u) != 0u ? r1 : r0;
+}
+vec2 dequantize(uint ib, uint iqs, uint a_offset) {
+    return vec2(planar4_scalar(ib, iqs, a_offset), planar4_scalar(ib, iqs + 1u, a_offset));
+}
+vec4 dequantize4(uint ib, uint iqs, uint a_offset) {
+    return vec4(
+        planar4_scalar(ib, iqs, a_offset),
+        planar4_scalar(ib, iqs + 1u, a_offset),
+        planar4_scalar(ib, iqs + 2u, a_offset),
+        planar4_scalar(ib, iqs + 3u, a_offset));
+}
+vec2 get_dm(uint ib, uint a_offset) {
+    return vec2(1.0, 0.0);
+}
+#endif
+
+#if defined(DATA_A_ISO4)
+float iso4_scalar(uint ib, uint idx, uint a_offset) {
+    const float norm = float(data_a[a_offset + ib].norm);
+    const uint g = idx / 4u;
+    float qvals[4];
+    for (int c = 0; c < 4; ++c) {
+        const uint j = uint(g) * 4u + uint(c);
+        const uint idx_nib = (data_a[a_offset + ib].qs[j / 2] >> ((j & 1u) * 4)) & 0xFu;
+        qvals[c] = PI_CENTROIDS_4BIT[idx_nib];
+    }
+    const float qw = ISO_QW[g], qx = -ISO_QX[g], qy = -ISO_QY[g], qz = -ISO_QZ[g];
+    const float rw = qw*qvals[0] - qx*qvals[1] - qy*qvals[2] - qz*qvals[3];
+    const float rx = qw*qvals[1] + qx*qvals[0] + qy*qvals[3] - qz*qvals[2];
+    const float ry = qw*qvals[2] - qx*qvals[3] + qy*qvals[0] + qz*qvals[1];
+    const float rz = qw*qvals[3] + qx*qvals[2] - qy*qvals[1] + qz*qvals[0];
+    const uint offset = idx % 4u;
+    const float results[4] = float[4](rw, rx, ry, rz);
+    return results[offset] * norm;
+}
+vec2 dequantize(uint ib, uint iqs, uint a_offset) {
+    return vec2(iso4_scalar(ib, iqs, a_offset), iso4_scalar(ib, iqs + 1u, a_offset));
+}
+vec4 dequantize4(uint ib, uint iqs, uint a_offset) {
+    return vec4(
+        iso4_scalar(ib, iqs, a_offset),
+        iso4_scalar(ib, iqs + 1u, a_offset),
+        iso4_scalar(ib, iqs + 2u, a_offset),
+        iso4_scalar(ib, iqs + 3u, a_offset));
+}
+vec2 get_dm(uint ib, uint a_offset) {
+    return vec2(1.0, 0.0);
+}
+#endif
+
 #if defined(DATA_A_F32) || defined(DATA_A_F16) || defined(DATA_A_BF16)
 vec2 get_dm(uint ib, uint a_offset) {
     return vec2(0, 0);
