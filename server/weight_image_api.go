@@ -151,7 +151,7 @@ func (h *WeightLayerImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	}
 
 	floatData := make([]float32, rows*cols)
-	elemSize := bigTensor.TypeSize() / bigTensor.BlockSize()
+	elemSize := bigTensor.Size() / bigTensor.Elements()
 	for i := 0; i < len(floatData) && i*int(elemSize) < len(data); i++ {
 		switch elemSize {
 		case 2:

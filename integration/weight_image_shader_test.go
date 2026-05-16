@@ -12,7 +12,8 @@ func TestBC4ShaderCompilation(t *testing.T) {
 		t.Skip("glslc not available, skipping shader compilation test")
 	}
 
-	shaderPath := "ml/backend/ggml/ggml/src/ggml-vulkan/vulkan-shaders/bc4_decompress.comp"
+	cwd, _ := os.Getwd()
+	shaderPath := cwd + "/ml/backend/ggml/ggml/src/ggml-vulkan/vulkan-shaders/bc4_decompress.comp"
 	if _, err := os.Stat(shaderPath); os.IsNotExist(err) {
 		t.Fatalf("BC4 decompress shader not found at %s", shaderPath)
 	}
@@ -27,7 +28,9 @@ func TestBC4ShaderCompilation(t *testing.T) {
 }
 
 func TestBC4ShaderExists(t *testing.T) {
+	cwd, _ := os.Getwd()
 	paths := []string{
+		cwd + "/ml/backend/ggml/ggml/src/ggml-vulkan/vulkan-shaders/bc4_decompress.comp",
 		"/workspace/ml/backend/ggml/ggml/src/ggml-vulkan/vulkan-shaders/bc4_decompress.comp",
 		"./ml/backend/ggml/ggml/src/ggml-vulkan/vulkan-shaders/bc4_decompress.comp",
 	}
