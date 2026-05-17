@@ -268,7 +268,7 @@ func (kv KV) OllamaEngineRequired() bool {
 		"olmo3",
 		"qwen25vl",
 		"qwen3", "qwen3moe",
-		"qwen3next",
+		"qwen3next", "qwen35moe",
 		"qwen3vl", "qwen3vlmoe",
 		"glm4moelite",
 		"glmocr",

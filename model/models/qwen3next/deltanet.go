@@ -37,7 +37,9 @@ type GatedDeltaNet struct {
 	// Optimized path: pre-split QKV and gate
 	SSMQKV       *nn.Linear  `gguf:"attn_qkv"`  // -> Q, K, V (concatenated)
 	SSMQKVGate   *nn.Linear  `gguf:"attn_gate"` // -> Z gate
-	SSMBetaAlpha *nn.Linear  `gguf:"ssm_ba"`    // -> beta, alpha
+	SSMBetaAlpha *nn.Linear  `gguf:"ssm_ba"`     // -> beta, alpha (qwen3next)
+	SSMBeta      *nn.Linear  `gguf:"ssm_beta"`  // qwen35 / qwen35moe
+	SSMAlpha     *nn.Linear  `gguf:"ssm_alpha"` // qwen35 / qwen35moe
 	SSMConv1D    *convKernel `gguf:"ssm_conv1d"`
 	SSMDT        ml.Tensor   `gguf:"ssm_dt"` // alpha bias
 	SSMA         ml.Tensor   `gguf:"ssm_a"`  // -A_log.exp()
@@ -96,7 +98,6 @@ func (gdn *GatedDeltaNet) Forward(ctx ml.Context, hiddenStates, _ ml.Tensor, cac
 	headVDim := opts.ssmDInner / numVHeads
 	convKernelSize := opts.convKernelSize
 
-	mixedBA := gdn.SSMBetaAlpha.Forward(ctx, hiddenStates)
 	qkvDim := headKDim*numKHeads*2 + headVDim*numVHeads
 
 	if gdn.SSMQKV == nil || gdn.SSMQKVGate == nil {
@@ -106,19 +107,34 @@ func (gdn *GatedDeltaNet) Forward(ctx ml.Context, hiddenStates, _ ml.Tensor, cac
 	qkvMixed := gdn.SSMQKV.Forward(ctx, hiddenStates).Reshape(ctx, qkvDim, nSeqTokens, nSeqs)
 	z := gdn.SSMQKVGate.Forward(ctx, hiddenStates)
 
-	baNewDim := 2 * numVHeads / numKHeads
-	mixedBAReshaped := mixedBA.Reshape(ctx, baNewDim, numKHeads, nSeqTokens, nSeqs)
+	var beta, alpha ml.Tensor
+	betaPreSigmoid := false
+	switch {
+	case gdn.SSMBetaAlpha != nil:
+		mixedBA := gdn.SSMBetaAlpha.Forward(ctx, hiddenStates)
+		baNewDim := 2 * numVHeads / numKHeads
+		mixedBAReshaped := mixedBA.Reshape(ctx, baNewDim, numKHeads, nSeqTokens, nSeqs)
 
-	// Split beta and alpha
-	betaSize := numVHeads / numKHeads
-	alphaSize := numVHeads / numKHeads
+		betaSize := numVHeads / numKHeads
+		alphaSize := numVHeads / numKHeads
 
-	b := mixedBAReshaped.Slice(ctx, 0, 0, betaSize, 1)
-	a := mixedBAReshaped.Slice(ctx, 0, betaSize, betaSize+alphaSize, 1)
+		b := mixedBAReshaped.Slice(ctx, 0, 0, betaSize, 1)
+		a := mixedBAReshaped.Slice(ctx, 0, betaSize, betaSize+alphaSize, 1)
 
-	// Reshape to merge head dimensions
-	beta := b.Contiguous(ctx, numVHeads, 1, nSeqTokens, nSeqs)
-	alpha := a.Contiguous(ctx, numVHeads, nSeqTokens, nSeqs)
+		beta = b.Contiguous(ctx, numVHeads, 1, nSeqTokens, nSeqs)
+		alpha = a.Contiguous(ctx, numVHeads, nSeqTokens, nSeqs)
+	case gdn.SSMBeta != nil && gdn.SSMAlpha != nil:
+		// qwen35moe applies sigmoid to beta before the delta-net update
+		beta = gdn.SSMBeta.Forward(ctx, hiddenStates)
+		beta = beta.Reshape(ctx, 1, numVHeads, nSeqTokens, nSeqs)
+		beta = beta.SigmoidOut(ctx)
+		betaPreSigmoid = true
+
+		alpha = gdn.SSMAlpha.Forward(ctx, hiddenStates)
+		alpha = alpha.Contiguous(ctx, numVHeads, nSeqTokens, nSeqs)
+	default:
+		return nil, errors.New("qwen3next: missing ssm_ba or ssm_beta/ssm_alpha projections")
+	}
 
 	// Compute gate: softplus(alpha + dt_bias) * -A
 	alphaBiased := alpha.Add(ctx, gdn.SSMDT)
@@ -187,10 +203,10 @@ func (gdn *GatedDeltaNet) Forward(ctx ml.Context, hiddenStates, _ ml.Tensor, cac
 	// Choose computation mode based on sequence length
 	var attnOut ml.Tensor
 	if nSeqTokens == 1 {
-		attnOut = gdn.deltaNetAutoregressive(ctx, qConv, kConv, vConv, gate, beta, state, opts, layer, cache)
+		attnOut = gdn.deltaNetAutoregressive(ctx, qConv, kConv, vConv, gate, beta, state, opts, layer, cache, betaPreSigmoid)
 	} else {
 		// Use pre-computed masks from opts (created once in Model.Forward)
-		attnOut = gdn.deltaNetChunked(ctx, qConv, kConv, vConv, gate, beta, state, opts.masks, opts, layer, cache)
+		attnOut = gdn.deltaNetChunked(ctx, qConv, kConv, vConv, gate, beta, state, opts.masks, opts, layer, cache, betaPreSigmoid)
 	}
 
 	// Apply gated normalization
@@ -217,6 +233,7 @@ func (gdn *GatedDeltaNet) deltaNetAutoregressive(
 	opts *Options,
 	layer int,
 	cache *HybridCache,
+	betaPreSigmoid bool,
 ) ml.Tensor {
 	numVHeads := v.Dim(1)
 	headVDim := v.Dim(0)
@@ -230,8 +247,9 @@ func (gdn *GatedDeltaNet) deltaNetAutoregressive(
 	scale := 1.0 / math.Sqrt(float64(headVDim))
 	q = q.Scale(ctx, scale)
 
-	// Sigmoid beta
-	beta = beta.Sigmoid(ctx)
+	if !betaPreSigmoid {
+		beta = beta.Sigmoid(ctx)
+	}
 
 	// Reshape state: [headVDim, headVDim, numVHeads, nSeqs]
 	state = state.Reshape(ctx, headVDim, headVDim, numVHeads, nSeqs)
@@ -288,6 +306,7 @@ func (gdn *GatedDeltaNet) deltaNetChunked(
 	opts *Options,
 	layer int,
 	cache *HybridCache,
+	betaPreSigmoid bool,
 ) ml.Tensor {
 	headKDim := q.Dim(0)
 	numVHeads := v.Dim(1)
@@ -303,8 +322,9 @@ func (gdn *GatedDeltaNet) deltaNetChunked(
 	scale := 1.0 / math.Sqrt(float64(headVDim))
 	q = q.Scale(ctx, scale)
 
-	// Sigmoid beta
-	beta = beta.Sigmoid(ctx)
+	if !betaPreSigmoid {
+		beta = beta.Sigmoid(ctx)
+	}
 
 	// Permute tensors for chunked computation
 	q = q.Permute(ctx, 0, 2, 1, 3).Contiguous(ctx, headKDim, nTokens, numVHeads, nSeqs)

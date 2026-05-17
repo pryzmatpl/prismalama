@@ -16,6 +16,12 @@ export OLLAMA_MEMORY_POLICY="${OLLAMA_MEMORY_POLICY:-balanced}"
 # GGUF layer streaming path (off when unset in bare binary — see docs/GOAL-GAPS.md)
 export OLLAMA_LAYER_STREAMING="${OLLAMA_LAYER_STREAMING:-1}"
 
+# Streaming buffer pool for qwen35moe / >VRAM models on 12GB GPUs (default 4 GiB is conservative)
+export OLLAMA_STREAMING_BUDGET="${OLLAMA_STREAMING_BUDGET:-6442450944}"
+
+# Ollama-engine path (required for qwen35moe / qwen3.6:35b)
+export OLLAMA_NEW_ENGINE="${OLLAMA_NEW_ENGINE:-1}"
+
 # Linux: allow mmap when resident RAM < model size so weights can page from NVMe
 export OLLAMA_MMAP_ALLOW_LOW_RAM="${OLLAMA_MMAP_ALLOW_LOW_RAM:-1}"
 

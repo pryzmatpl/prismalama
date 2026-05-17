@@ -1,0 +1,43 @@
+{
+  "recorded": "2026-05-17",
+  "hardware": "NVIDIA RTX 4070 Ti (~12 GiB VRAM)",
+  "model": "qwen3.6:35b",
+  "architecture": "qwen35moe",
+  "model_path": "/home/models",
+  "engine": "ollama-engine (OLLAMA_NEW_ENGINE=1)",
+  "configs": [
+    {
+      "name": "layer-streaming-default",
+      "env": {
+        "OLLAMA_LAYER_STREAMING": "1",
+        "OLLAMA_STREAMING_BUDGET": "4294967296",
+        "OLLAMA_NEW_ENGINE": "1",
+        "OLLAMA_MMAP_ALLOW_LOW_RAM": "1",
+        "OLLAMA_MEMORY_POLICY": "balanced"
+      },
+      "num_ctx": 2048,
+      "gpu_offload_log": "13/41 layers to GPU",
+      "size_vram_gb": 8.04,
+      "load_streaming_s": 57,
+      "eval_tps_warmup_8tok": 0.04,
+      "eval_tps_epoch_mean": 0.05,
+      "wall_tps_epoch_mean": 0.03,
+      "notes": "First request includes graph scan (~7 min for 8 tokens). Steady decode ~20-50 s/token."
+    },
+    {
+      "name": "reference-qwen2.5-7b-full-gpu",
+      "env": { "OLLAMA_LAYER_STREAMING": "0" },
+      "num_ctx": 4096,
+      "size_vram_gb": 4.88,
+      "eval_tps_mean": 72.2,
+      "wall_tps_mean": 50.6,
+      "notes": "Fits entirely in VRAM; use for speed comparisons."
+    }
+  ],
+  "tuning": {
+    "recommended_operator_env": "scripts/operator-env-large-models.sh",
+    "OLLAMA_STREAMING_BUDGET_recommendation_bytes": 6442450944,
+    "OLLAMA_STREAMING_BUDGET_rationale": "6 GiB buffer on 12 GiB cards: leaves headroom for KV/graph while allowing more resident blocks than 4 GiB default.",
+    "do_not_use_layer_streaming_for": "Models that fit fully in VRAM (e.g. qwen2.5:7b) — set OLLAMA_LAYER_STREAMING=0 for ~70+ eval TPS."
+  }
+}

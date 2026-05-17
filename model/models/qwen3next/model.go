@@ -271,19 +271,26 @@ func New(c fs.Config) (model.Model, error) {
 	}
 
 	isRecurrent = make([]bool, numLayers)
-	hasZero := false
-	hasFull := false
-	for i := range numLayers {
-		// If KV head count is 0, it's a recurrent layer
-		if i < len(headCountKV) && headCountKV[i] == 0 {
-			isRecurrent[i] = true
-			hasZero = true
-		} else if i < len(headCountKV) && headCountKV[i] > 0 {
-			hasFull = true
+	if interval := c.Uint("full_attention_interval"); interval > 0 {
+		// qwen35 / qwen35moe: full attention every N layers (see llama.cpp LLM_ARCH_QWEN35MOE)
+		for i := range numLayers {
+			isRecurrent[i] = (i+1)%int(interval) != 0
 		}
-	}
-	if !hasZero || !hasFull {
-		return nil, fmt.Errorf("qwen3next: invalid attention.head_count_kv array; expected mix of zero and non-zero values")
+	} else {
+		hasZero := false
+		hasFull := false
+		for i := range numLayers {
+			// If KV head count is 0, it's a recurrent layer
+			if i < len(headCountKV) && headCountKV[i] == 0 {
+				isRecurrent[i] = true
+				hasZero = true
+			} else if i < len(headCountKV) && headCountKV[i] > 0 {
+				hasFull = true
+			}
+		}
+		if !hasZero || !hasFull {
+			return nil, fmt.Errorf("qwen3next: invalid attention.head_count_kv array; expected mix of zero and non-zero values")
+		}
 	}
 
 	// Determine if MoE
@@ -381,4 +388,5 @@ func New(c fs.Config) (model.Model, error) {
 
 func init() {
 	model.Register("qwen3next", New)
+	model.Register("qwen35moe", New)
 }
