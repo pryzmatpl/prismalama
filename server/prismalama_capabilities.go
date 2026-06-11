@@ -56,7 +56,7 @@ func prismalamaOperatorHints() []string {
 	if envconfig.MemoryPolicy() != "balanced" {
 		h = append(h, "OLLAMA_MEMORY_POLICY defaults to performance. For models much larger than VRAM or many parallel requests, set OLLAMA_MEMORY_POLICY=balanced for conservative default context and KV budgeting (see server/memory_policy.go).")
 	}
-	if runtime.GOOS == "linux" && !envconfig.EnableVulkan() {
+	if runtime.GOOS == "linux" && !envconfig.EnableVulkan(true) {
 		h = append(h, "OLLAMA_VULKAN is off: Vulkan GGML backends are skipped during GPU discovery (discover/runner.go). Set OLLAMA_VULKAN=1 if you rely on Vulkan. CUDA/HIP libraries are still discovered separately when present.")
 	}
 	if runtime.GOOS == "linux" && !envconfig.MmapAllowLowRamLinux() {

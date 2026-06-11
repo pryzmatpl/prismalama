@@ -1,5 +1,3 @@
-//go:build mlx
-
 package safetensors
 
 import (
@@ -17,7 +15,7 @@ type WeightSource interface {
 	GetTensor(name string) (*mlx.Array, error)
 	ListTensors() []string
 	HasTensor(name string) bool
-	Quantization() string // Returns "NVFP4", "Q4", "Q8", or ""
+	Quantization() string // Returns "NVFP4", "INT4", "INT8", or ""
 	GroupSize() int       // Returns quantization group size, or 0 if not specified
 }
 
@@ -37,9 +35,11 @@ func QuantizationParams(quantization string) (groupSize, bits int, mode string) 
 	case "MXFP8":
 		// Microsoft MX FP8: group_size=32, bits=8, E4M3 scales (no qbias)
 		return 32, 8, "mxfp8"
-	case "FP8", "Q8", "INT8", "":
+	case "FP8", "Q8", "INT8":
 		// 8-bit quantization with affine mode (default for quantized models)
 		return 64, 8, "affine"
+	case "":
+		return 0, 0, ""
 	default:
 		return 32, 8, "affine" // Default to affine
 	}
@@ -74,7 +74,7 @@ type Transformer interface {
 //	err := LoadModule(&attn, weights, "model.layers.0")
 func LoadModule(dst any, weights WeightSource, prefix string) error {
 	v := reflect.ValueOf(dst)
-	if v.Kind() != reflect.Ptr || v.IsNil() {
+	if v.Kind() != reflect.Pointer || v.IsNil() {
 		return fmt.Errorf("LoadModule: dst must be a non-nil pointer")
 	}
 	v = v.Elem()
@@ -95,7 +95,7 @@ func LoadModule(dst any, weights WeightSource, prefix string) error {
 func loadStruct(v reflect.Value, weights WeightSource, prefix string, errs *[]string, parentOptional bool) {
 	t := v.Type()
 
-	for i := 0; i < t.NumField(); i++ {
+	for i := range t.NumField() {
 		field := t.Field(i)
 		fieldVal := v.Field(i)
 
@@ -124,7 +124,7 @@ func loadStruct(v reflect.Value, weights WeightSource, prefix string, errs *[]st
 		fullPath := joinPath(prefix, weightPath)
 
 		// For struct pointers without a tag, recurse with current prefix
-		if !hasTag && fieldVal.Kind() == reflect.Ptr {
+		if !hasTag && fieldVal.Kind() == reflect.Pointer {
 			elemType := fieldVal.Type().Elem()
 			if elemType.Kind() == reflect.Struct && elemType != reflect.TypeOf(mlx.Array{}) {
 				if fieldVal.IsNil() {
@@ -171,7 +171,7 @@ func loadStruct(v reflect.Value, weights WeightSource, prefix string, errs *[]st
 
 		// Handle by kind
 		switch fieldVal.Kind() {
-		case reflect.Ptr:
+		case reflect.Pointer:
 			elemType := fieldVal.Type().Elem()
 
 			// *mlx.Array - load directly (but skip if no tag - computed fields)
@@ -207,7 +207,7 @@ func loadStruct(v reflect.Value, weights WeightSource, prefix string, errs *[]st
 
 		case reflect.Slice:
 			elemType := fieldVal.Type().Elem()
-			if elemType.Kind() == reflect.Ptr && elemType.Elem().Kind() == reflect.Struct {
+			if elemType.Kind() == reflect.Pointer && elemType.Elem().Kind() == reflect.Struct {
 				loadSlice(fieldVal, weights, fullPath, errs)
 			}
 		}
@@ -228,7 +228,7 @@ func hasWeightsWithPrefix(weights WeightSource, prefix string) bool {
 func loadSlice(v reflect.Value, weights WeightSource, prefix string, errs *[]string) {
 	elemStructType := v.Type().Elem().Elem()
 
-	for i := 0; i < v.Len(); i++ {
+	for i := range v.Len() {
 		elem := v.Index(i)
 		if elem.IsNil() {
 			elem.Set(reflect.New(elemStructType))

@@ -636,7 +636,7 @@ func optionsToMap(o *api.Options) map[string]interface{} {
 func pythonCompletionBody(req llm.CompletionRequest) ([]byte, error) {
 	m := map[string]any{
 		"prompt":       req.Prompt,
-		"images":       req.Images,
+		"images":       req.Media,
 		"grammar":      req.Grammar,
 		"options":      optionsToMap(req.Options),
 		"logprobs":     req.Logprobs,

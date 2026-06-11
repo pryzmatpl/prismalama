@@ -67,7 +67,7 @@ func (o *OpenCode) Run(model string, args []string) error {
 
 	// Call Edit() to ensure config is up-to-date before launch
 	models := []string{model}
-	if config, err := loadIntegration("opencode"); err == nil && len(config.Models) > 0 {
+	if config, err := LoadIntegration("opencode"); err == nil && len(config.Models) > 0 {
 		models = config.Models
 	}
 	if err := o.Edit(models); err != nil {

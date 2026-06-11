@@ -12,3 +12,23 @@ When working in this repository:
 6. **Docker:** **`docker/test`** is CPU-only (`prismalama-test`). **`docker/gpu`** builds **`prismalama-gpu`** (ROCm HIP + Vulkan GGML, Ubuntu base). **`docker/arch`** builds **`prismalama-arch`** from the root **`PKGBUILD`** (Arch base — same layout as **`pacman`** install); see **`docker/arch/README.md`**.
 
 For Cursor-specific rule authoring, see the skill at `~/.cursor/skills-cursor/create-rule/SKILL.md`.
+
+## Building
+
+For a full build from the repository root:
+
+```sh
+cmake -B build .
+cmake --build build --parallel 8
+./ollama serve
+```
+
+For quick Go-only iteration against an existing native payload:
+
+```sh
+go build .
+go run . serve
+```
+
+See `docs/development.md` for prerequisites, platform notes, GPU backends, and
+the full development workflow.

@@ -87,7 +87,7 @@ func selectIntegration() (string, error) {
 		}
 		r := integrations[name]
 		description := r.String()
-		if conn, err := loadIntegration(name); err == nil && len(conn.Models) > 0 {
+		if conn, err := LoadIntegration(name); err == nil && len(conn.Models) > 0 {
 			description = fmt.Sprintf("%s (%s)", r.String(), conn.Models[0])
 		}
 		items = append(items, selectItem{Name: name, Description: description})
@@ -129,7 +129,7 @@ func selectModels(ctx context.Context, name, current string) ([]string, error) {
 	}
 
 	var preChecked []string
-	if saved, err := loadIntegration(name); err == nil {
+	if saved, err := LoadIntegration(name); err == nil {
 		preChecked = saved.Models
 	} else if editor, ok := r.(Editor); ok {
 		preChecked = editor.Models()
@@ -342,7 +342,7 @@ func syncAliases(ctx context.Context, client *api.Client, ac AliasConfigurer, na
 	if err := ac.SetAliases(ctx, aliases); err != nil {
 		return err
 	}
-	return saveAliases(name, aliases)
+	return SaveAliases(name, aliases)
 }
 
 // LaunchCmd returns the cobra command for launching integrations.
@@ -433,13 +433,13 @@ Examples:
 				var existingAliases map[string]string
 
 				// Load saved config
-				if cfg, err := loadIntegration(name); err == nil {
+				if cfg, err := LoadIntegration(name); err == nil {
 					existingAliases = cfg.Aliases
 					if len(cfg.Models) > 0 {
 						model = cfg.Models[0]
 						// AliasConfigurer integrations use single model; sanitize if multiple
 						if len(cfg.Models) > 1 {
-							_ = saveIntegration(name, []string{model})
+							_ = SaveIntegration(name, []string{model})
 						}
 					}
 				}
@@ -483,7 +483,7 @@ Examples:
 				if err := syncAliases(cmd.Context(), client, ac, name, model, existingAliases); err != nil {
 					fmt.Fprintf(os.Stderr, "%sWarning: Could not sync aliases: %v%s\n", ansiGray, err, ansiReset)
 				}
-				if err := saveIntegration(name, []string{model}); err != nil {
+				if err := SaveIntegration(name, []string{model}); err != nil {
 					return fmt.Errorf("failed to save: %w", err)
 				}
 
@@ -514,14 +514,14 @@ Examples:
 			var models []string
 			if modelFlag != "" {
 				models = []string{modelFlag}
-				if existing, err := loadIntegration(name); err == nil && len(existing.Models) > 0 {
+				if existing, err := LoadIntegration(name); err == nil && len(existing.Models) > 0 {
 					for _, m := range existing.Models {
 						if m != modelFlag {
 							models = append(models, m)
 						}
 					}
 				}
-			} else if saved, err := loadIntegration(name); err == nil && len(saved.Models) > 0 && !configFlag {
+			} else if saved, err := LoadIntegration(name); err == nil && len(saved.Models) > 0 && !configFlag {
 				return runIntegration(name, saved.Models[0], passArgs)
 			} else {
 				var err error
@@ -549,7 +549,7 @@ Examples:
 				}
 			}
 
-			if err := saveIntegration(name, models); err != nil {
+			if err := SaveIntegration(name, models); err != nil {
 				return fmt.Errorf("failed to save: %w", err)
 			}
 

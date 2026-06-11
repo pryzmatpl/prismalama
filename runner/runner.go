@@ -8,6 +8,7 @@ import (
 	"github.com/ollama/ollama/runner/llamarunner"
 	"github.com/ollama/ollama/runner/ollamarunner"
 	"github.com/ollama/ollama/x/imagegen"
+	"github.com/ollama/ollama/x/mlxrunner"
 )
 
 func getModelPath(args []string) string {
@@ -40,6 +41,8 @@ func Execute(args []string) error {
 			slog.Info("runner dispatch", "engine", "airllm", "model", modelPath, "reason", "explicit_flag")
 			// Pass args unchanged; the airllmrunner parses --model and --port from it.
 			return airllmrunner.Execute(args)
+		case "--mlx-engine":
+			return mlxrunner.Execute(args[1:])
 		}
 	}
 
