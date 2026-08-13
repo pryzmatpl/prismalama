@@ -47,10 +47,37 @@ func Execute(args []string) error {
 	}
 
 	modelPath := getModelPath(args)
-	if kind, why := DecideEngine(modelPath); kind == EngineAirLLM {
-		slog.Info("runner dispatch", "engine", "airllm", "model", modelPath, "reason", why)
+	d := DecideEngineDetailed(modelPath)
+	if d.Kind == EngineAirLLM {
+		slog.Info("runner dispatch",
+			"engine", "airllm",
+			"model", modelPath,
+			"reason", d.Selected.String(),
+			"reason_id", int(d.Selected),
+			"reason_trace", reasonTraceString(d.Reasons),
+		)
 		return airllmrunner.Execute(args)
 	}
-	slog.Info("runner dispatch", "engine", "llama", "model", modelPath)
+	slog.Info("runner dispatch",
+		"engine", "llama",
+		"model", modelPath,
+		"reason", d.Selected.String(),
+		"reason_id", int(d.Selected),
+		"reason_trace", reasonTraceString(d.Reasons),
+	)
 	return llamarunner.Execute(args)
+}
+
+// reasonTraceString joins the reason trace into a single string for slog.
+// Uses Reason.String() so values are stable identifiers — same as
+// POST /api/prismalama/dispatch will return.
+func reasonTraceString(rs []Reason) string {
+	if len(rs) == 0 {
+		return ""
+	}
+	out := make([]string, len(rs))
+	for i, r := range rs {
+		out[i] = r.String()
+	}
+	return strings.Join(out, ",")
 }
