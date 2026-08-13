@@ -1,7 +1,9 @@
 include(CheckCXXCompilerFlag)
 include("../cmake/common.cmake")
 
-add_compile_definitions(GGML_SCHED_MAX_COPIES=${GGML_SCHED_MAX_COPIES})
+if(DEFINED GGML_SCHED_MAX_COPIES AND NOT "${GGML_SCHED_MAX_COPIES}" STREQUAL "")
+    add_compile_definitions(GGML_SCHED_MAX_COPIES=${GGML_SCHED_MAX_COPIES})
+endif()
 
 # enable libstdc++ assertions for debug builds
 if (CMAKE_SYSTEM_NAME MATCHES "Linux")

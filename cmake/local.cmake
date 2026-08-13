@@ -10,6 +10,21 @@ set(OLLAMA_LLAMA_BACKENDS "" CACHE STRING
     "Semicolon-separated llama-server GPU backends to build: cuda_v12;cuda_v13;rocm_v7_1;rocm_v7_2;vulkan;cuda_jetpack5;cuda_jetpack6")
 set(_ollama_mlx_backends_doc "Semicolon-separated MLX backends to build: cuda_v13;metal_v3;metal_v4")
 set(OLLAMA_VERSION "0.0.0" CACHE STRING "Ollama version embedded in the local Go binary")
+
+# Phase 1 / GGML guard: cmake/local.cmake is included by ggml superbuilds that
+# invoke `add_compile_definitions(GGML_SCHED_MAX_COPIES=${GGML_SCHED_MAX_COPIES})`.
+# When the variable is unset/empty, the resulting `-DGGML_SCHED_MAX_COPIES=`
+# is interpreted by the C preprocessor as "defined to nothing", which then
+# bypasses the `#ifndef GGML_SCHED_MAX_COPIES` guard in ggml-backend.cpp and
+# produces:
+#   error: declaration of 'events' as multidimensional array must have bounds
+#          for all dimensions except the first
+# See llama/vendor/ggml/CMakeLists.txt:184 for the canonical pin. Mirror the
+# default here so the local ggml build (ml/backend/ggml/ggml/src/CMakeLists.txt)
+# stays buildable in isolation (e.g. inside the ROCm Docker build, which does
+# NOT include llama/vendor/ggml/CMakeLists.txt).
+set(GGML_SCHED_MAX_COPIES "4" CACHE STRING
+    "ggml: max input copies for pipeline parallelism (parallel-backend issue width)")
 set(OLLAMA_PAYLOAD_INSTALL_PREFIX "${CMAKE_BINARY_DIR}" CACHE PATH
     "Build-time staging prefix for nested Ollama native payloads")
 
