@@ -122,10 +122,11 @@ func buildPrismalamaCapabilities() api.PrismalamaCapabilitiesResponse {
 	resp.Environment.PRISMALAMA_AIRLLM_PYTHONPATH = os.Getenv("PRISMALAMA_AIRLLM_PYTHONPATH")
 
 	// Resolved numeric env vars (parsed). Falls back to envconfig defaults if env unset.
+	// Cast uint64 → int64 for format.HumanBytes (which expects int64).
 	resp.Resolved.GpuOverheadBytes = envconfig.GpuOverhead()
-	resp.Resolved.GpuOverheadHuman = format.HumanBytes(envconfig.GpuOverhead())
+	resp.Resolved.GpuOverheadHuman = format.HumanBytes(int64(envconfig.GpuOverhead()))
 	resp.Resolved.StreamingBudgetBytes = envconfig.StreamingBudgetBytes()
-	resp.Resolved.StreamingBudgetHuman = format.HumanBytes(envconfig.StreamingBudgetBytes())
+	resp.Resolved.StreamingBudgetHuman = format.HumanBytes(int64(envconfig.StreamingBudgetBytes()))
 
 	// Build info — GoVersion is filled at runtime; CompiledAt is best-effort
 	// (operators can wire it via -ldflags -X .../version.CompiledAt=<RFC3339>).

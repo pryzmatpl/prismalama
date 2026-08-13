@@ -108,10 +108,14 @@ type EngineDecision struct {
 // DecideEngine returns which engine should load modelPath and a non-empty reason when
 // EngineAirLLM is selected. Reason is diagnostic only (logs, /api/prismalama/capabilities).
 //
-// Signature is stable across the Phase 0 work; for the full decision trace use
-// DecideEngineDetailed. Behavior is unchanged from the pre-Phase-0 implementation.
+// Back-compat contract (pre-Phase-0): for GGML choices, reason == ""; for
+// AirLLM choices, reason is a stable identifier suitable for logs and the
+// capabilities endpoint. Use DecideEngineDetailed when you need the full trace.
 func DecideEngine(modelPath string) (EngineKind, string) {
 	d := DecideEngineDetailed(modelPath)
+	if d.Kind == EngineGGML {
+		return d.Kind, ""
+	}
 	return d.Kind, d.Selected.String()
 }
 
