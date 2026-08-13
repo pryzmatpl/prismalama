@@ -1847,6 +1847,7 @@ func (s *Server) GenerateRoutes(rc *ollama.Registry) (http.Handler, error) {
 	r.GET("/api/version", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"version": version.Version}) })
 	r.HEAD("/api/prismalama/capabilities", PrismalamaCapabilitiesHandler)
 	r.GET("/api/prismalama/capabilities", PrismalamaCapabilitiesHandler)
+	r.POST("/api/prismalama/dispatch", PrismalamaDispatchHandler)
 	r.GET("/api/prismalama/weights", gin.WrapH(NewWeightImageHandler()))
 	r.GET("/api/prismalama/weights/stats", gin.WrapH(NewWeightImageStatsHandler()))
 	r.GET("/api/prismalama/weights/layer/:layer", gin.WrapH(NewWeightLayerImageHandler()))
