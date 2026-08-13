@@ -96,6 +96,7 @@ Run the Go tests:
 ```sh
 go test ./...
 ```
+
 Then proceed to build the full Ollama release and verify.
 
 ### End-to-end Testing

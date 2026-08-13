@@ -58,27 +58,27 @@ A quantized blob stores the packed weight, scaling factors, and optional zero-po
 
 ### Metadata Fields
 
-| Field | Description |
-|---|---|
-| `quant_type` | Quantization type: `int4`, `int8`, `nvfp4`, or `mxfp8` |
+| Field        | Description                                                  |
+| ------------ | ------------------------------------------------------------ |
+| `quant_type` | Quantization type: `int4`, `int8`, `nvfp4`, or `mxfp8`       |
 | `group_size` | Number of elements per quantization group (e.g., `32`, `64`) |
 
 ### Tensor Keys
 
-| Key | Description |
-|---|---|
-| `{name}` | Packed quantized weights (dtype `U32`) |
-| `{name}.scale` | Per-group scaling factors |
-| `{name}.bias` | Per-group zero-point offsets (affine modes only) |
+| Key            | Description                                      |
+| -------------- | ------------------------------------------------ |
+| `{name}`       | Packed quantized weights (dtype `U32`)           |
+| `{name}.scale` | Per-group scaling factors                        |
+| `{name}.bias`  | Per-group zero-point offsets (affine modes only) |
 
 ## Quantization Types
 
-| Type | Bits | Group Size | Mode | Has Bias |
-|---|---|---|---|---|
-| `int4` | 4 | 32 | affine | yes |
-| `int8` | 8 | 64 | affine | yes |
-| `nvfp4` | 4 | 16 | nvfp4 | no |
-| `mxfp8` | 8 | 32 | mxfp8 | no |
+| Type    | Bits | Group Size | Mode   | Has Bias |
+| ------- | ---- | ---------- | ------ | -------- |
+| `int4`  | 4    | 32         | affine | yes      |
+| `int8`  | 8    | 64         | affine | yes      |
+| `nvfp4` | 4    | 16         | nvfp4  | no       |
+| `mxfp8` | 8    | 32         | mxfp8  | no       |
 
 **Affine modes** (`int4`, `int8`) use `scale + bias` for dequantization. The bias tensor provides the zero-point offset.
 
@@ -87,6 +87,7 @@ A quantized blob stores the packed weight, scaling factors, and optional zero-po
 ### Packed Weight Shape
 
 Quantized weights are packed into `uint32` values:
+
 - **4-bit** (int4, nvfp4): 8 values per uint32, so `packed_cols = original_cols / 8`
 - **8-bit** (int8, mxfp8): 4 values per uint32, so `packed_cols = original_cols / 4`
 
@@ -128,7 +129,7 @@ For MoE (Mixture of Experts) models, expert tensors from the same layer are pack
     "shape": [10240, 320],
     "data_offsets": [6963200, 20070400]
   },
-  "model.layers.1.mlp.experts.0.gate_proj.weight.scale": { "..." : "..." }
+  "model.layers.1.mlp.experts.0.gate_proj.weight.scale": { "...": "..." }
 }
 ```
 

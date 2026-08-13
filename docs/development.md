@@ -16,7 +16,7 @@ go run . serve
 ```
 
 > [!NOTE]
-> Ollama includes native code compiled with CGO.  From time to time these data structures can change and CGO can get out of sync resulting in unexpected crashes.  You can force a full build of the native code by running `go clean -cache` first. 
+> Ollama includes native code compiled with CGO. From time to time these data structures can change and CGO can get out of sync resulting in unexpected crashes. You can force a full build of the native code by running `go clean -cache` first.
 
 ## Native build model
 
@@ -75,24 +75,27 @@ Additional prerequisites:
 
 - [Visual Studio 2022](https://visualstudio.microsoft.com/downloads/) including the Native Desktop Workload
 - (Optional) AMD GPU support
-    - [ROCm](https://rocm.docs.amd.com/en/latest/)
+  - [ROCm](https://rocm.docs.amd.com/en/latest/)
 - (Optional) NVIDIA GPU support
-    - [CUDA SDK](https://developer.nvidia.com/cuda-downloads?target_os=Windows&target_arch=x86_64&target_type=exe_network)
+  - [CUDA SDK](https://developer.nvidia.com/cuda-downloads?target_os=Windows&target_arch=x86_64&target_type=exe_network)
 - (Optional) Vulkan GPU support
-    - [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) - useful for AMD/Intel GPUs
+  - [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) - useful for AMD/Intel GPUs
 - (Optional) MLX engine support
-    - [CUDA 13+ SDK](https://developer.nvidia.com/cuda-downloads)
-    - [cuDNN 9+](https://developer.nvidia.com/cudnn)
+  - [CUDA 13+ SDK](https://developer.nvidia.com/cuda-downloads)
+  - [cuDNN 9+](https://developer.nvidia.com/cudnn)
 
 For Ninja builds, run CMake from a Developer PowerShell/Command Prompt or another shell where the Visual Studio compiler is available.
 
 > Building for Vulkan requires VULKAN_SDK environment variable:
-> 
+>
 > PowerShell
+>
 > ```powershell
 > $env:VULKAN_SDK="C:\VulkanSDK\<version>"
 > ```
+>
 > CMD
+>
 > ```cmd
 > set VULKAN_SDK=C:\VulkanSDK\<version>
 > ```
@@ -106,18 +109,15 @@ Windows ARM does not support additional acceleration libraries at this time.
 Additional prerequisites:
 
 - (Optional) AMD GPU support
-    - [ROCm](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/quick-start.html)
+  - [ROCm](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/quick-start.html)
 - (Optional) NVIDIA GPU support
-    - [CUDA SDK](https://developer.nvidia.com/cuda-downloads)
+  - [CUDA SDK](https://developer.nvidia.com/cuda-downloads)
 - (Optional) Vulkan GPU support
-    - [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) - useful for AMD/Intel GPUs
-    - Or install via package manager: `sudo apt install vulkan-sdk` (Ubuntu/Debian) or `sudo dnf install vulkan-sdk` (Fedora/CentOS)
-- (Optional) MLX engine support
-    - [CUDA 13+ SDK](https://developer.nvidia.com/cuda-downloads)
-    - [cuDNN 9+](https://developer.nvidia.com/cudnn)
-    - OpenBLAS/LAPACK: `sudo apt install libopenblas-dev liblapack-dev liblapacke-dev` (Ubuntu/Debian)
-> [!IMPORTANT]
-> Ensure prerequisites are in `PATH` before running CMake.
+  - [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) - useful for AMD/Intel GPUs
+  - Or install via package manager: `sudo apt install vulkan-sdk` (Ubuntu/Debian) or `sudo dnf install vulkan-sdk` (Fedora/CentOS)
+- (Optional) MLX engine support - [CUDA 13+ SDK](https://developer.nvidia.com/cuda-downloads) - [cuDNN 9+](https://developer.nvidia.com/cudnn) - OpenBLAS/LAPACK: `sudo apt install libopenblas-dev liblapack-dev liblapacke-dev` (Ubuntu/Debian)
+  > [!IMPORTANT]
+  > Ensure prerequisites are in `PATH` before running CMake.
 
 ## MLX Engine (Optional)
 
@@ -181,9 +181,9 @@ go test ./...
 
 Ollama looks for native helper binaries and acceleration libraries in installed and local development layouts:
 
-* `../lib/ollama` for standard installs where `ollama` is under `bin/`
-* `./lib/ollama` for Windows release-style payloads and local dist output
-* `.` for macOS release artifacts that colocate helpers with `ollama`
-* `build/lib/ollama` and `dist/<platform>/lib/ollama` for local development builds
+- `../lib/ollama` for standard installs where `ollama` is under `bin/`
+- `./lib/ollama` for Windows release-style payloads and local dist output
+- `.` for macOS release artifacts that colocate helpers with `ollama`
+- `build/lib/ollama` and `dist/<platform>/lib/ollama` for local development builds
 
 If the libraries are not found, Ollama will not run with any acceleration libraries.

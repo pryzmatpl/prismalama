@@ -1,20 +1,20 @@
 {
   "name": "app",
-  "private": true,
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
     "build": "tsc -b && vite build",
+    "build-storybook": "storybook build",
+    "dev": "vite",
     "lint": "eslint .",
-    "preview": "vite preview",
     "prettier": "prettier --write .",
     "prettier:check": "prettier --check .",
+    "preview": "vite preview",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build",
     "test": "vitest",
-    "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.4",

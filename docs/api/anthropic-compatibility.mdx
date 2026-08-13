@@ -104,10 +104,7 @@ const stream = await anthropic.messages.stream({
 });
 
 for await (const event of stream) {
-  if (
-    event.type === "content_block_delta" &&
-    event.delta.type === "text_delta"
-  ) {
+  if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
     process.stdout.write(event.delta.text);
   }
 }
@@ -234,7 +231,7 @@ curl -X POST http://localhost:11434/v1/messages \
 
 ## Using with Claude Code
 
-[Claude Code](https://code.claude.com/docs/en/overview) can be configured to use Ollama as its backend. 
+[Claude Code](https://code.claude.com/docs/en/overview) can be configured to use Ollama as its backend.
 
 ### Recommended models
 
@@ -245,7 +242,8 @@ Download a model before use:
 ```shell
 ollama pull qwen3-coder
 ```
-> Note: Qwen 3 coder is a 30B parameter model requiring at least 24GB of VRAM to run smoothly. More is required for longer context lengths. 
+
+> Note: Qwen 3 coder is a 30B parameter model requiring at least 24GB of VRAM to run smoothly. More is required for longer context lengths.
 
 ```shell
 ollama pull glm-4.7:cloud
@@ -355,6 +353,7 @@ ollama pull qwen3-coder
 ```
 
 Recommended local models:
+
 - `qwen3-coder` - Excellent for coding tasks
 - `gpt-oss:20b` - Strong general-purpose model
 
@@ -402,20 +401,20 @@ curl http://localhost:11434/v1/messages \
 
 The following Anthropic API features are not currently supported:
 
-| Feature | Description |
-|---------|-------------|
-| `/v1/messages/count_tokens` | Token counting endpoint |
-| `tool_choice` | Forcing specific tool use or disabling tools |
-| `metadata` | Request metadata (user_id) |
-| Prompt caching | `cache_control` blocks for caching prefixes |
-| Batches API | `/v1/messages/batches` for async batch processing |
-| Citations | `citations` content blocks |
-| PDF support | `document` content blocks with PDF files |
-| Server-sent errors | `error` events during streaming (errors return HTTP status) |
+| Feature                     | Description                                                 |
+| --------------------------- | ----------------------------------------------------------- |
+| `/v1/messages/count_tokens` | Token counting endpoint                                     |
+| `tool_choice`               | Forcing specific tool use or disabling tools                |
+| `metadata`                  | Request metadata (user_id)                                  |
+| Prompt caching              | `cache_control` blocks for caching prefixes                 |
+| Batches API                 | `/v1/messages/batches` for async batch processing           |
+| Citations                   | `citations` content blocks                                  |
+| PDF support                 | `document` content blocks with PDF files                    |
+| Server-sent errors          | `error` events during streaming (errors return HTTP status) |
 
 ### Partial support
 
-| Feature | Status |
-|---------|--------|
-| Image content | Base64 images supported; URL images not supported |
+| Feature           | Status                                                   |
+| ----------------- | -------------------------------------------------------- |
+| Image content     | Base64 images supported; URL images not supported        |
 | Extended thinking | Basic support; `budget_tokens` accepted but not enforced |

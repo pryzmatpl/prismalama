@@ -10,10 +10,9 @@ Vision models accept images alongside text so the model can describe, classify, 
 ollama run gemma4 ./image.png whats in this image?
 ```
 
-
 ## Usage with Ollama's API
-Provide an `images` array. SDKs accept file paths, URLs or raw bytes while the REST API expects base64-encoded image data.
 
+Provide an `images` array. SDKs accept file paths, URLs or raw bytes while the REST API expects base64-encoded image data.
 
 <Tabs>
   <Tab title="cURL">
@@ -37,6 +36,7 @@ Provide an `images` array. SDKs accept file paths, URLs or raw bytes while the R
         "stream": false
     }'
     ```
+
   </Tab>
   <Tab title="Python">
     ```python
@@ -64,6 +64,7 @@ Provide an `images` array. SDKs accept file paths, URLs or raw bytes while the R
 
     print(response.message.content)
     ```
+
   </Tab>
   <Tab title="JavaScript">
     ```javascript
@@ -80,5 +81,6 @@ Provide an `images` array. SDKs accept file paths, URLs or raw bytes while the R
 
     console.log(response.message.content)
     ```
+
   </Tab>
 </Tabs>

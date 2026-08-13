@@ -66,11 +66,7 @@ describe("VRAM Utilities", () => {
 
   describe("getTotalVRAM", () => {
     it("should sum VRAM values from multiple computes", () => {
-      const computes = [
-        { vram: "8 GiB" },
-        { vram: "16 GiB" },
-        { vram: "4 GiB" },
-      ];
+      const computes = [{ vram: "8 GiB" }, { vram: "16 GiB" }, { vram: "4 GiB" }];
       expect(getTotalVRAM(computes)).toBe(28);
     });
 
@@ -94,12 +90,7 @@ describe("VRAM Utilities", () => {
     });
 
     it("should skip invalid VRAM strings", () => {
-      const computes = [
-        { vram: "8 GiB" },
-        { vram: "invalid" },
-        { vram: "16 GiB" },
-        { vram: "" },
-      ];
+      const computes = [{ vram: "8 GiB" }, { vram: "invalid" }, { vram: "16 GiB" }, { vram: "" }];
 
       expect(getTotalVRAM(computes)).toBe(24);
     });

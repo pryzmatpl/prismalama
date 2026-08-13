@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useModels } from "./useModels";
-import { useChat } from "./useChats";
-import { useSettings } from "./useSettings.ts";
+import { useEffect, useMemo, useRef } from "react";
+import { getInferenceCompute } from "@/api";
 import { Model } from "@/gotypes";
 import { getTotalVRAM } from "@/utils/vram.ts";
-import { getInferenceCompute } from "@/api";
+import { useChat } from "./useChats";
 import { useCloudStatus } from "./useCloudStatus";
+import { useModels } from "./useModels";
+import { useSettings } from "./useSettings.ts";
 
 export function recommendDefaultModel(totalVRAM: number): string {
   const vram = Math.max(0, Number(totalVRAM) || 0);
@@ -35,15 +35,9 @@ export function useSelectedModel(currentChatId?: string, searchQuery?: string) {
 
   const inferenceComputes = inferenceComputeResponse?.inferenceComputes || [];
 
-  const totalVRAM = useMemo(
-    () => getTotalVRAM(inferenceComputes),
-    [inferenceComputes],
-  );
+  const totalVRAM = useMemo(() => getTotalVRAM(inferenceComputes), [inferenceComputes]);
 
-  const recommendedModel = useMemo(
-    () => recommendDefaultModel(totalVRAM),
-    [totalVRAM],
-  );
+  const recommendedModel = useMemo(() => recommendDefaultModel(totalVRAM), [totalVRAM]);
 
   // Track which chat we've already restored the model for
   const restoredChatRef = useRef<string | null>(null);
@@ -96,12 +90,7 @@ export function useSelectedModel(currentChatId?: string, searchQuery?: string) {
         })) ||
       null
     );
-  }, [
-    models,
-    settings.selectedModel,
-    cloudDisabled,
-    recommendedModel,
-  ]);
+  }, [models, settings.selectedModel, cloudDisabled, recommendedModel]);
 
   useEffect(() => {
     if (!selectedModel) return;
@@ -114,18 +103,10 @@ export function useSelectedModel(currentChatId?: string, searchQuery?: string) {
       setSettings({ SelectedModel: selectedModel.model });
     }
 
-    if (
-      !cloudDisabled &&
-      settings.turboEnabled &&
-      selectedModel.model !== settings.selectedModel
-    ) {
+    if (!cloudDisabled && settings.turboEnabled && selectedModel.model !== settings.selectedModel) {
       setSettings({ SelectedModel: selectedModel.model, TurboEnabled: false });
     }
-  }, [
-    selectedModel,
-    cloudDisabled,
-    settings.selectedModel,
-  ]);
+  }, [selectedModel, cloudDisabled, settings.selectedModel]);
 
   // Set model from chat history when chat data loads
   useEffect(() => {
@@ -134,11 +115,7 @@ export function useSelectedModel(currentChatId?: string, searchQuery?: string) {
       return;
     }
 
-    if (
-      chatData?.chat?.messages &&
-      !isChatLoading &&
-      restoredChatRef.current !== currentChatId
-    ) {
+    if (chatData?.chat?.messages && !isChatLoading && restoredChatRef.current !== currentChatId) {
       // Find the most recent model used in this chat
       const messages = [...chatData.chat.messages].reverse();
       for (const message of messages) {
@@ -157,13 +134,7 @@ export function useSelectedModel(currentChatId?: string, searchQuery?: string) {
       // Mark this chat as processed even if no model was found
       restoredChatRef.current = currentChatId;
     }
-  }, [
-    currentChatId,
-    chatData,
-    isChatLoading,
-    settings.selectedModel,
-    setSettings,
-  ]);
+  }, [currentChatId, chatData, isChatLoading, settings.selectedModel, setSettings]);
 
   // On initial load, if no model is selected, set default model
   useEffect(() => {
@@ -178,22 +149,14 @@ export function useSelectedModel(currentChatId?: string, searchQuery?: string) {
 
     const defaultModel =
       models.find((m) => m.model === recommendedModel) ||
-      (cloudDisabled
-        ? models.find((m) => !m.isCloud())
-        : models.find((m) => m.isCloud())) ||
+      (cloudDisabled ? models.find((m) => !m.isCloud()) : models.find((m) => m.isCloud())) ||
       models.find((m) => m.digest === undefined || m.digest === "") ||
       models[0];
 
     if (defaultModel) {
       setSettings({ SelectedModel: defaultModel.model });
     }
-  }, [
-    isLoading,
-    inferenceComputes.length,
-    models.length,
-    settings.selectedModel,
-    cloudDisabled,
-  ]);
+  }, [isLoading, inferenceComputes.length, models.length, settings.selectedModel, cloudDisabled]);
 
   // Add the selected model to the models list if it's not already there
   const allModels = useMemo(() => {

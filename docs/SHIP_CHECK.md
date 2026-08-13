@@ -6,11 +6,11 @@
 
 ## Prerequisites
 
-| Step | Tool / package | Required for | Notes |
-|------|----------------|--------------|-------|
-| `go test -tags=integration ./integration` | Go ≥ 1.24 + CGO toolchain | both `ship-check` and `ship-check-fast` | `BC4` and other recent work requires Go 1.24+ |
-| `./build-rocm.sh` | `rocm-hip-sdk` (or `cuda` for NVIDIA) + `cmake` + `ninja` | `ship-check` only (skipped by `SHIP_SKIP_PKG=1`) | ROCm build is long (15–30 min cold) |
-| GPU runtime | HIP / CUDA libs on `LD_LIBRARY_PATH` (or `/usr/lib/ollama/rocm`) | both (test discovery skips silently if absent) | the integration suite is tag-gated; many tests `Skip` when models or hardware are missing |
+| Step                                      | Tool / package                                                   | Required for                                     | Notes                                                                                     |
+| ----------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `go test -tags=integration ./integration` | Go ≥ 1.24 + CGO toolchain                                        | both `ship-check` and `ship-check-fast`          | `BC4` and other recent work requires Go 1.24+                                             |
+| `./build-rocm.sh`                         | `rocm-hip-sdk` (or `cuda` for NVIDIA) + `cmake` + `ninja`        | `ship-check` only (skipped by `SHIP_SKIP_PKG=1`) | ROCm build is long (15–30 min cold)                                                       |
+| GPU runtime                               | HIP / CUDA libs on `LD_LIBRARY_PATH` (or `/usr/lib/ollama/rocm`) | both (test discovery skips silently if absent)   | the integration suite is tag-gated; many tests `Skip` when models or hardware are missing |
 
 A clean **CPU host** is enough for `SHIP_SKIP_PKG=1` — that is what CI
 and the fast-path use.
@@ -38,22 +38,22 @@ Print the list without running:
 
 ## Variants
 
-| Command | What it does | Use when |
-|---------|--------------|----------|
-| `make ship-check` | runs `./scripts/ship-check.sh` (integration + package) | full pre-merge gate (operator-supplied ROCm/CUDA host) |
-| `make ship-check-fast` | `SHIP_GO_TEST_EXTRA` selects only the cheap "Ship*" tests, `SHIP_SKIP_PKG=1` | CPU host, no GPU |
-| `./scripts/ship-check.sh` | same as `make ship-check` | direct invocation |
-| `SHIP_SKIP_PKG=1 ./scripts/ship-check.sh` | same as `make ship-check-fast` | direct invocation |
-| `./scripts/ship-check.sh --list` | print steps, exit 0 | debugging |
-| `./scripts/ship-check.sh --help` | print usage | n/a |
+| Command                                   | What it does                                                                  | Use when                                               |
+| ----------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `make ship-check`                         | runs `./scripts/ship-check.sh` (integration + package)                        | full pre-merge gate (operator-supplied ROCm/CUDA host) |
+| `make ship-check-fast`                    | `SHIP_GO_TEST_EXTRA` selects only the cheap "Ship\*" tests, `SHIP_SKIP_PKG=1` | CPU host, no GPU                                       |
+| `./scripts/ship-check.sh`                 | same as `make ship-check`                                                     | direct invocation                                      |
+| `SHIP_SKIP_PKG=1 ./scripts/ship-check.sh` | same as `make ship-check-fast`                                                | direct invocation                                      |
+| `./scripts/ship-check.sh --list`          | print steps, exit 0                                                           | debugging                                              |
+| `./scripts/ship-check.sh --help`          | print usage                                                                   | n/a                                                    |
 
 ## Env vars (all optional)
 
-| Var | Default | Effect |
-|-----|---------|--------|
-| `SHIP_INTEGRATION_TIMEOUT` | `15m` | `go test` timeout |
-| `SHIP_GO_TEST_EXTRA` | empty | extra args to `go test`; quote `\|` characters (e.g. `'-run=TestBlueSky\|TestShipMemoryPolicyEnv'`) |
-| `SHIP_SKIP_PKG` | unset | `1` → skip `build-rocm.sh` |
+| Var                        | Default | Effect                                                                                              |
+| -------------------------- | ------- | --------------------------------------------------------------------------------------------------- |
+| `SHIP_INTEGRATION_TIMEOUT` | `15m`   | `go test` timeout                                                                                   |
+| `SHIP_GO_TEST_EXTRA`       | empty   | extra args to `go test`; quote `\|` characters (e.g. `'-run=TestBlueSky\|TestShipMemoryPolicyEnv'`) |
+| `SHIP_SKIP_PKG`            | unset   | `1` → skip `build-rocm.sh`                                                                          |
 
 ## Invocation examples
 
@@ -76,15 +76,15 @@ SHIP_SKIP_PKG=1 make ship-check
 
 ## Failure-mode table
 
-| Symptom | Likely cause | Fix |
-|---------|--------------|-----|
-| `go: command not found` | Go toolchain not installed | Install Go ≥ 1.24 (see `MOST-RECENT-WORK.md` "Constraints") |
-| `CGO_ENABLED=1` build fails on missing `.h` | system C headers missing (`zlib`, `ssl`) | Install distro dev packages (Arch: `base-devel`) |
-| `build-rocm.sh` fails on `rocBLAS` not found | `rocm-hip-sdk` not installed or wrong version | Install per `docs/DEVELOPER.md` § "Arch package"; set `PRISMALAMA_AMDGPU_TARGETS` for non-gfx1100 |
-| Tests time out at 15m | Cold build; full integration can take 20m first time | Bump `SHIP_INTEGRATION_TIMEOUT=30m` |
-| Tests skip silently | Model files / hardware missing | Many tests are tag-gated + `Skip()` when missing; check `go test -v` output |
-| `pkgrel`/`pkgver` not bumped after `llm/` change | Operator forgot | Re-run `make update-pkg` then rebuild |
-| `next-heartbeat` job fails on missing Go | Same as "go: command not found" | Install Go ≥ 1.24 |
+| Symptom                                          | Likely cause                                         | Fix                                                                                               |
+| ------------------------------------------------ | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `go: command not found`                          | Go toolchain not installed                           | Install Go ≥ 1.24 (see `MOST-RECENT-WORK.md` "Constraints")                                       |
+| `CGO_ENABLED=1` build fails on missing `.h`      | system C headers missing (`zlib`, `ssl`)             | Install distro dev packages (Arch: `base-devel`)                                                  |
+| `build-rocm.sh` fails on `rocBLAS` not found     | `rocm-hip-sdk` not installed or wrong version        | Install per `docs/DEVELOPER.md` § "Arch package"; set `PRISMALAMA_AMDGPU_TARGETS` for non-gfx1100 |
+| Tests time out at 15m                            | Cold build; full integration can take 20m first time | Bump `SHIP_INTEGRATION_TIMEOUT=30m`                                                               |
+| Tests skip silently                              | Model files / hardware missing                       | Many tests are tag-gated + `Skip()` when missing; check `go test -v` output                       |
+| `pkgrel`/`pkgver` not bumped after `llm/` change | Operator forgot                                      | Re-run `make update-pkg` then rebuild                                                             |
+| `next-heartbeat` job fails on missing Go         | Same as "go: command not found"                      | Install Go ≥ 1.24                                                                                 |
 
 ## Capturing a run for the MR
 

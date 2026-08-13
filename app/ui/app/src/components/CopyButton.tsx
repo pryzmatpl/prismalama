@@ -32,9 +32,7 @@ const CopyButton: React.FC<CopyButtonProps> = ({
         const cloned = copyRef.current.cloneNode(true) as HTMLElement;
 
         removeClasses.forEach((className) => {
-          cloned
-            .querySelectorAll(`.${className}`)
-            .forEach((element) => element.remove());
+          cloned.querySelectorAll(`.${className}`).forEach((element) => element.remove());
         });
 
         await navigator.clipboard.write([
@@ -78,12 +76,7 @@ const CopyButton: React.FC<CopyButtonProps> = ({
   );
 
   return (
-    <button
-      type="button"
-      className={baseClasses}
-      onClick={handleCopy}
-      title={title}
-    >
+    <button type="button" className={baseClasses} onClick={handleCopy} title={title}>
       {showLabels ? (
         <span className="flex items-center gap-1">
           {icon}

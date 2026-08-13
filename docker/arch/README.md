@@ -6,9 +6,9 @@ Docker images that install the same **`prismalama-ollama`** pacman package as a 
 
 ## Which Dockerfile
 
-| File | Use when |
-|------|----------|
-| **`Dockerfile`** | You want a **full build inside Docker** (ROCm HIP + Vulkan GGML + Go). Slow; no local `makepkg` required. |
+| File                      | Use when                                                                                                                                 |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **`Dockerfile`**          | You want a **full build inside Docker** (ROCm HIP + Vulkan GGML + Go). Slow; no local `makepkg` required.                                |
 | **`Dockerfile.prebuilt`** | You already ran **`./build-rocm.sh`** / **`makepkg -sf`** on Arch and want a **lean, fast** image that only installs the `.pkg.tar.zst`. |
 
 ## Full build (from repository root)

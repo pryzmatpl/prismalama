@@ -48,12 +48,15 @@
 ## How prismalama Extends Ollama
 
 ### 1. Custom Runners
+
 Located in `/sda2/prismalama/runner/`:
+
 - **`llamarunner/`** - Standard llama.cpp (what Ollama uses)
 - **`airllmrunner/`** - AirLLM integration for huge models
 - **`ollamarunner/`** - Default Ollama runner
 
 ### 2. Model Detection (`runner/runner.go`)
+
 ```go
 func isAirLLMModel(modelPath string) bool {
     // Detects safetensors or transformers format
@@ -62,6 +65,7 @@ func isAirLLMModel(modelPath string) bool {
 ```
 
 ### 3. Integration Points
+
 - **prismalama** adds AirLLM support to Ollama's runner selection
 - **Ollama** provides the API server and model management
 - In the historical setup described here, llama.cpp performed the direct GGUF inference path.
@@ -69,6 +73,7 @@ func isAirLLMModel(modelPath string) bool {
 ## Three Ways to Use Kimi
 
 ### Option 1: Symlink Method (Recommended) ✅
+
 **Leverages Ollama + prismalama + llama.cpp without copying**
 
 ```bash
@@ -81,6 +86,7 @@ opencode run -m ollama/kimi-k2.5
 ```
 
 **How it works:**
+
 1. Calculate sha256 hash of Kimi GGUF files
 2. Create symlinks in `/var/lib/ollama/blobs/`
 3. Create manifest pointing to symlinks
@@ -88,6 +94,7 @@ opencode run -m ollama/kimi-k2.5
 5. Model stays on NVMe, layers loaded to GPU
 
 **Pros:**
+
 - ✅ Uses existing Ollama infrastructure
 - ✅ Works with opencode
 - ✅ No 579GB copy needed
@@ -95,6 +102,7 @@ opencode run -m ollama/kimi-k2.5
 - ✅ API server included
 
 ### Option 2: Direct llama.cpp (Simplest)
+
 **Bypass Ollama, use llama.cpp directly**
 
 ```bash
@@ -106,21 +114,25 @@ python3 /sda2/kimi-direct.py 'Hello!'
 ```
 
 **How it works:**
+
 - Python bindings directly call llama.cpp
 - No Ollama overhead
 - Direct file access to GGUF
 
 **Pros:**
+
 - ✅ Fastest setup
 - ✅ No manifest/symlink management
 - ✅ Full control over parameters
 
 **Cons:**
+
 - ❌ No API server
 - ❌ No opencode integration
 - ❌ Manual model management
 
 ### Option 3: AirLLM Integration (Memory Optimized)
+
 **Use prismalama's AirLLM runner for layer offloading**
 
 ```bash
@@ -133,15 +145,18 @@ export AIRLLM_DEVICE=cuda:0
 ```
 
 **How it works:**
+
 - airllmrunner loads model with 4-bit compression
 - Layers loaded on-demand
 - Minimal GPU memory usage
 
 **Pros:**
+
 - ✅ Best for very limited GPU memory
 - ✅ 579GB → ~8GB GPU usage
 
 **Cons:**
+
 - ❌ Requires Python dependencies
 - ❌ Slower inference
 - ❌ Complex setup
@@ -185,6 +200,7 @@ opencode run -m ollama/kimi-k2.5
 ## Technical Details
 
 ### Blob Structure
+
 ```
 /var/lib/ollama/blobs/
 ├── sha256-abc123...  → /nvme3/AI Models/Kimi/Kimi-K2.5-Q4_K_M-00001-of-00013.gguf (SYMLINK)
@@ -193,6 +209,7 @@ opencode run -m ollama/kimi-k2.5
 ```
 
 ### Manifest Structure
+
 ```json
 {
   "schemaVersion": 2,
@@ -208,6 +225,7 @@ opencode run -m ollama/kimi-k2.5
 ```
 
 ### Runner Selection Flow
+
 ```
 ollama run kimi-k2.5
     ↓
@@ -233,6 +251,7 @@ ROCm GPU inference
 3. **llama.cpp** (included in both) does the inference
 
 The **symlink method** lets us add Kimi to this stack without copying 579GB, giving us:
+
 - Full Ollama API compatibility
 - opencode integration
 - ROCm GPU acceleration

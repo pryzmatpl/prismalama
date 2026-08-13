@@ -30,10 +30,7 @@ function alphabeticalSort(a: Model, b: Model): number {
 }
 
 //Merges models, sorting cloud models first, then other models
-export function mergeModels(
-  localModels: Model[],
-  airplaneMode: boolean = false,
-): Model[] {
+export function mergeModels(localModels: Model[], airplaneMode: boolean = false): Model[] {
   const allModels = (localModels || []).map((model) => model);
 
   // 1. Get cloud models from local models and featured list
@@ -47,13 +44,9 @@ export function mergeModels(
   });
 
   // 2. Get other featured models (non-cloud)
-  const featuredModels = FEATURED_MODELS.filter(
-    (f) => !f.endsWith("cloud"),
-  ).map((model) => {
+  const featuredModels = FEATURED_MODELS.filter((f) => !f.endsWith("cloud")).map((model) => {
     // Check if this model exists in local models
-    const localMatch = allModels.find(
-      (m) => m.model.toLowerCase() === model.toLowerCase(),
-    );
+    const localMatch = allModels.find((m) => m.model.toLowerCase() === model.toLowerCase());
 
     if (localMatch) return localMatch;
 
@@ -66,9 +59,7 @@ export function mergeModels(
   const remainingModels = allModels.filter(
     (model) =>
       !model.isCloud() &&
-      !FEATURED_MODELS.some(
-        (f) => f.toLowerCase() === model.model.toLowerCase(),
-      ),
+      !FEATURED_MODELS.some((f) => f.toLowerCase() === model.model.toLowerCase()),
   );
 
   cloudModels.sort((a, b) => {
@@ -89,8 +80,7 @@ export function mergeModels(
   });
 
   featuredModels.sort(
-    (a, b) =>
-      FEATURED_MODELS.indexOf(a.model) - FEATURED_MODELS.indexOf(b.model),
+    (a, b) => FEATURED_MODELS.indexOf(a.model) - FEATURED_MODELS.indexOf(b.model),
   );
 
   remainingModels.sort(alphabeticalSort);

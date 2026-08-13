@@ -14,15 +14,15 @@ This document describes how the repository is wired so humans and automation can
 
 ## Repository map
 
-| Area | Role |
-|------|------|
-| `llm/` | Ollama-compatible server: scheduling, loads, API. |
-| `runner/` | Process entry: chooses **llama** vs **AirLLM** Python runner vs other engines. |
+| Area                   | Role                                                                                                                                   |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `llm/`                 | Ollama-compatible server: scheduling, loads, API.                                                                                      |
+| `runner/`              | Process entry: chooses **llama** vs **AirLLM** Python runner vs other engines.                                                         |
 | `runner/airllmrunner/` | Go HTTP front on **`port`** + `airllm_runner.py` on **`port+1`** (PyTorch AirLLM); see **`docs/RUNTIME_DISPATCH.md` § AirLLM runner**. |
-| `ml/` | GGML backends (CUDA, ROCm, **Vulkan**, Metal, CPU). |
-| `src/airllm/air_llm/` | Vendored/custom AirLLM Python package (`airllm` on `PYTHONPATH`). |
-| `integration/` | Tag-gated Go integration tests (`//go:build integration`). |
-| `ARCHITECTURE.md` | High-level diagrams (server → scheduler → runner → backend). |
+| `ml/`                  | GGML backends (CUDA, ROCm, **Vulkan**, Metal, CPU).                                                                                    |
+| `src/airllm/air_llm/`  | Vendored/custom AirLLM Python package (`airllm` on `PYTHONPATH`).                                                                      |
+| `integration/`         | Tag-gated Go integration tests (`//go:build integration`).                                                                             |
+| `ARCHITECTURE.md`      | High-level diagrams (server → scheduler → runner → backend).                                                                           |
 
 ## Which runner is used?
 
@@ -40,17 +40,17 @@ Otherwise the **llama.cpp / GGML** runner is used (GGUF; Vulkan/HIP per build an
 
 ## Environment variables (frequently used)
 
-| Variable | Effect |
-|----------|--------|
-| `OLLAMA_USE_AIRLLM` | **Arch package sets `0`**: GGML-only unless you opt in. Set **`1`** / **`true`** for AirLLM. **`0`** / **`false`** / **`no`** disables **all** AirLLM routing (including safetensors + multipart heuristics). If **unset**, layout heuristics may pick AirLLM for HF trees or multipart GGUF — see `docs/RUNTIME_DISPATCH.md`. |
-| `OLLAMA_MULTI_GGUF` | Treat as AirLLM-style when `1`. |
-| `AIRLLM_COMPRESSION` | e.g. `4bit`, `8bit`, `none` (passed to `AutoModel.from_pretrained`). |
-| `AIRLLM_DEVICE` | PyTorch device string, default `cuda:0` (ROCm uses the same API). |
-| `PRISMALAMA_AIRLLM_PYTHONPATH` | Optional prepend for `PYTHONPATH` when automatic dev-tree detection does not match your layout (colon-separated). |
-| `AIRLLM_POST_INFER_CLEANUP` | If `0`, skip post-inference GPU cache flush in `airllm_runner.py` (default: on). |
-| `OLLAMA_LAYER_STREAMING` | GGUF streaming hooks: **`LoadStreaming`**, **`InferenceStreamer`**, eval callback when backends support them (`OLLAMA_LAYER_STREAMING=0` disables). **Go default:** unset ⇒ **false** (`integration/ship_streaming_test.go`). **Arch `/etc/default/ollama`:** **`1`**. See **`ml/streaming`**, **`docs/PRISMALAMA_PRINCIPLE.md`**, **`docs/GOAL-GAPS.md`**. |
-| `OLLAMA_STREAMING_BUDGET` | Byte budget for the streaming buffer pool (default 4 GiB). |
-| `PYTORCH_CUDA_ALLOC_CONF` | e.g. `expandable_segments:True` to reduce allocator fragmentation (set by user; not modified by the repo). |
+| Variable                       | Effect                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OLLAMA_USE_AIRLLM`            | **Arch package sets `0`**: GGML-only unless you opt in. Set **`1`** / **`true`** for AirLLM. **`0`** / **`false`** / **`no`** disables **all** AirLLM routing (including safetensors + multipart heuristics). If **unset**, layout heuristics may pick AirLLM for HF trees or multipart GGUF — see `docs/RUNTIME_DISPATCH.md`.                              |
+| `OLLAMA_MULTI_GGUF`            | Treat as AirLLM-style when `1`.                                                                                                                                                                                                                                                                                                                             |
+| `AIRLLM_COMPRESSION`           | e.g. `4bit`, `8bit`, `none` (passed to `AutoModel.from_pretrained`).                                                                                                                                                                                                                                                                                        |
+| `AIRLLM_DEVICE`                | PyTorch device string, default `cuda:0` (ROCm uses the same API).                                                                                                                                                                                                                                                                                           |
+| `PRISMALAMA_AIRLLM_PYTHONPATH` | Optional prepend for `PYTHONPATH` when automatic dev-tree detection does not match your layout (colon-separated).                                                                                                                                                                                                                                           |
+| `AIRLLM_POST_INFER_CLEANUP`    | If `0`, skip post-inference GPU cache flush in `airllm_runner.py` (default: on).                                                                                                                                                                                                                                                                            |
+| `OLLAMA_LAYER_STREAMING`       | GGUF streaming hooks: **`LoadStreaming`**, **`InferenceStreamer`**, eval callback when backends support them (`OLLAMA_LAYER_STREAMING=0` disables). **Go default:** unset ⇒ **false** (`integration/ship_streaming_test.go`). **Arch `/etc/default/ollama`:** **`1`**. See **`ml/streaming`**, **`docs/PRISMALAMA_PRINCIPLE.md`**, **`docs/GOAL-GAPS.md`**. |
+| `OLLAMA_STREAMING_BUDGET`      | Byte budget for the streaming buffer pool (default 4 GiB).                                                                                                                                                                                                                                                                                                  |
+| `PYTORCH_CUDA_ALLOC_CONF`      | e.g. `expandable_segments:True` to reduce allocator fragmentation (set by user; not modified by the repo).                                                                                                                                                                                                                                                  |
 
 ## GPU memory after inference (PyTorch / AirLLM)
 
@@ -76,14 +76,14 @@ go test -tags=integration ./integration -coverprofile=/tmp/integration.cov -cove
 go tool cover -func=/tmp/integration.cov | tail -5
 ```
 
-| Build tags (examples) | Purpose |
-|------------------------|---------|
-| `integration` | Shared harness, basic API tests. |
-| `integration,airllm` | Needs `OLLAMA_TEST_AIRLLM=1` and often a model env. |
-| `integration,gpu` | GPU / VRAM related checks. |
-| `integration,minimax` | Large local paths; skips if missing. |
-| `integration,weight_streaming` | Multi-part GGUF / streaming checks. |
-| `integration,perf` | Benchmark-style tests. |
+| Build tags (examples)          | Purpose                                             |
+| ------------------------------ | --------------------------------------------------- |
+| `integration`                  | Shared harness, basic API tests.                    |
+| `integration,airllm`           | Needs `OLLAMA_TEST_AIRLLM=1` and often a model env. |
+| `integration,gpu`              | GPU / VRAM related checks.                          |
+| `integration,minimax`          | Large local paths; skips if missing.                |
+| `integration,weight_streaming` | Multi-part GGUF / streaming checks.                 |
+| `integration,perf`             | Benchmark-style tests.                              |
 
 See `integration/TEST_README.md` for the full table and env vars.
 
@@ -101,11 +101,11 @@ The packaged install uses `/usr/share/ollama/airllm`. For development, `runner/a
 
 The **default GGUF path** is **llama.cpp** embedded under `llama/` (Go bindings in `llama*.go`). Prismalama does **not** track ggml-org/llama.cpp directly for day-to-day work.
 
-| Item | Location |
-|------|----------|
-| Canonical fork | **https://github.com/piotroxp/prismallama.cpp** |
+| Item                     | Location                                                                                                                    |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| Canonical fork           | **https://github.com/piotroxp/prismallama.cpp**                                                                             |
 | Vendoring into this repo | Root **`Makefile.sync`** (`UPSTREAM`, `FETCH_HEAD`, `llama/vendor` → rsync to `llama/llama.cpp` and `ml/backend/ggml/ggml`) |
-| Maintainer workflow | **`llama/README.md`** (apply patches, sync, pin commits for releases) |
+| Maintainer workflow      | **`llama/README.md`** (apply patches, sync, pin commits for releases)                                                       |
 
 **Arch Linux / global deploys:** pin `FETCH_HEAD` in `Makefile.sync` to a **commit SHA** for reproducible binaries; branch names are fine for development only.
 
@@ -124,10 +124,10 @@ When bumping `FETCH_HEAD`, refresh the README's "Pinned commit" + "Last full aud
 
 ## Docker
 
-| Image / target | Dockerfile | Role |
-|----------------|------------|------|
-| `prismalama-test` | `docker/test/Dockerfile` | **CPU-only** GGML + `ollama` for CI and **`make ship-check-fast`** (no GPU). |
-| `prismalama-gpu` | `docker/gpu/Dockerfile` | **AMD ROCm (HIP) + Vulkan + CPU** GGML under `/usr/lib/ollama/rocm`, Ubuntu/ROCm dev base; for GPU without Arch on the host. |
+| Image / target    | Dockerfile               | Role                                                                                                                                                                                                                         |
+| ----------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `prismalama-test` | `docker/test/Dockerfile` | **CPU-only** GGML + `ollama` for CI and **`make ship-check-fast`** (no GPU).                                                                                                                                                 |
+| `prismalama-gpu`  | `docker/gpu/Dockerfile`  | **AMD ROCm (HIP) + Vulkan + CPU** GGML under `/usr/lib/ollama/rocm`, Ubuntu/ROCm dev base; for GPU without Arch on the host.                                                                                                 |
 | `prismalama-arch` | `docker/arch/Dockerfile` | **Arch Linux** image: **`makepkg`** the root **`PKGBUILD`** inside Docker (or **`Dockerfile.prebuilt`** + `docker/arch/prismalama.pkg.tar.zst`) so the container matches a native **`pacman -U prismalama-ollama`** install. |
 
 Build/run: **`make docker-test-build`** / **`make docker-test`** vs **`make docker-gpu-build`** / **`make docker-gpu-run`** vs **`make docker-arch-build`** / **`make docker-arch-prebuilt-build`** / **`make docker-arch-run`**. Kubernetes notes and example manifests: **`docker/gpu/README.md`**, **`docker/gpu/k8s/example-deployment.yaml`**. Arch package image: **`docker/arch/README.md`**.

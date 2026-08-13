@@ -30,7 +30,7 @@ intentionally skipped so a developer can iterate on a local llama.cpp tree.
   this directory — the hooks patch plus each `models/` architecture patch.
 - `models/` - the sibling **new-architecture** layer: implementations of
   architectures llama.cpp doesn't support yet, each added via a small
-  registration patch. (Those files *add* archs; the files above *translate*
+  registration patch. (Those files _add_ archs; the files above _translate_
   existing GGUFs onto archs llama.cpp already has.)
 
 The compatibility source files stay in this directory and are linked into the
@@ -67,29 +67,29 @@ llama.cpp-compatible on disk.
 This table tracks the dispatch surface. Keep it brief; the handler comments in
 `llama-ollama-compat.cpp` are the source of truth for exact KV and tensor maps.
 
-| Internal arch / marker | Text handling | Clip/mmproj handling |
-|---|---|---|
-| `gemma3` | Normalizes Gemma 3 metadata, tokenizer fields, and embedded vision/projector tensors. | Gemma 3 projector translation. |
-| `gemma3` + embedding markers (`embeddinggemma`) | Maps to `gemma-embedding` metadata and fixes embedding dense/norm tensors. | n/a |
-| `bert` + Snowflake markers (`snowflake-arctic-embed2`) | Fixes Snowflake Arctic Embed 2 tokenizer metadata. | n/a |
-| `gemma3n` | Normalizes tokenizer/EOS metadata, truncates vocab-shaped tensors, and hides unused embedded vision/audio/projector tensors. | n/a |
-| `gemma4` | Normalizes tokenizer metadata and hides embedded audio/vision/projector tensors from the text loader. | Gemma 4 vision/audio projector translation for GGUF blobs. |
-| `gptoss` | Maps to `gpt-oss`, copies KVs, injects missing expert FFN metadata, and renames tensors. | n/a |
-| `lfm2` | Renames norm tensors and fixes feed-forward metadata. | n/a |
-| `olmo3` | Maps to the OLMo2-compatible loader path. | n/a |
-| `mistral3` | Fixes RoPE/YaRN metadata and hides embedded vision/projector tensors. | Pixtral-style projector translation. |
-| `qwen35`, `qwen35moe` | Fixes Qwen3.5/Qwen3-VL-style text metadata, translates embedded MTP tensors, and hides embedded vision/projector tensors. | Qwen3-VL merger-style projector translation. |
-| `qwen3next` | Normalizes hybrid attention KV-head metadata and renames SSM dt tensors to the names expected by llama.cpp. | n/a |
-| `qwen25vl` | Maps to `qwen2vl` metadata conventions. | Qwen2.5-VL projector translation. |
-| `qwen3vl`, `qwen3vlmoe` | Adds missing Qwen3-VL metadata and hides embedded vision/projector tensors. | Qwen3-VL projector translation, including QKV merge and patch-embedding split/repack. |
-| `deepseekocr` | Maps to `deepseek2-ocr`, injects missing OCR/MoE metadata, and hides embedded SAM/vision/projector tensors. | DeepSeek OCR projector translation. |
-| `glmocr` | Maps GLM OCR metadata/tensors to the llama.cpp-compatible view. | GLM OCR projector translation. |
-| `glm4moelite` | Maps GLM-4.7 Flash MLA metadata to the `deepseek2` path and fixes special-token metadata. | n/a |
-| `nemotron_h_moe` | Fixes latent-FFN variants and hides MTP tensors. | n/a |
-| `nemotron_h_omni` | Selects the Nemotron text loader and hides audio/vision/projector tensors from the text loader. | Nemotron V2 VL projector translation; audio remains disabled. |
-| `llama` with Llama 3 markers | Fixes Llama 3 tokenizer metadata. | n/a |
-| `llama4` | Hides embedded vision/projector tensors from the text loader. | Llama 4 projector translation. |
-| `clip` projector without `clip.projector_type` | n/a | Defaults LLaVA/BakLLaVA projectors to `clip.projector_type=mlp`. |
+| Internal arch / marker                                 | Text handling                                                                                                                | Clip/mmproj handling                                                                  |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `gemma3`                                               | Normalizes Gemma 3 metadata, tokenizer fields, and embedded vision/projector tensors.                                        | Gemma 3 projector translation.                                                        |
+| `gemma3` + embedding markers (`embeddinggemma`)        | Maps to `gemma-embedding` metadata and fixes embedding dense/norm tensors.                                                   | n/a                                                                                   |
+| `bert` + Snowflake markers (`snowflake-arctic-embed2`) | Fixes Snowflake Arctic Embed 2 tokenizer metadata.                                                                           | n/a                                                                                   |
+| `gemma3n`                                              | Normalizes tokenizer/EOS metadata, truncates vocab-shaped tensors, and hides unused embedded vision/audio/projector tensors. | n/a                                                                                   |
+| `gemma4`                                               | Normalizes tokenizer metadata and hides embedded audio/vision/projector tensors from the text loader.                        | Gemma 4 vision/audio projector translation for GGUF blobs.                            |
+| `gptoss`                                               | Maps to `gpt-oss`, copies KVs, injects missing expert FFN metadata, and renames tensors.                                     | n/a                                                                                   |
+| `lfm2`                                                 | Renames norm tensors and fixes feed-forward metadata.                                                                        | n/a                                                                                   |
+| `olmo3`                                                | Maps to the OLMo2-compatible loader path.                                                                                    | n/a                                                                                   |
+| `mistral3`                                             | Fixes RoPE/YaRN metadata and hides embedded vision/projector tensors.                                                        | Pixtral-style projector translation.                                                  |
+| `qwen35`, `qwen35moe`                                  | Fixes Qwen3.5/Qwen3-VL-style text metadata, translates embedded MTP tensors, and hides embedded vision/projector tensors.    | Qwen3-VL merger-style projector translation.                                          |
+| `qwen3next`                                            | Normalizes hybrid attention KV-head metadata and renames SSM dt tensors to the names expected by llama.cpp.                  | n/a                                                                                   |
+| `qwen25vl`                                             | Maps to `qwen2vl` metadata conventions.                                                                                      | Qwen2.5-VL projector translation.                                                     |
+| `qwen3vl`, `qwen3vlmoe`                                | Adds missing Qwen3-VL metadata and hides embedded vision/projector tensors.                                                  | Qwen3-VL projector translation, including QKV merge and patch-embedding split/repack. |
+| `deepseekocr`                                          | Maps to `deepseek2-ocr`, injects missing OCR/MoE metadata, and hides embedded SAM/vision/projector tensors.                  | DeepSeek OCR projector translation.                                                   |
+| `glmocr`                                               | Maps GLM OCR metadata/tensors to the llama.cpp-compatible view.                                                              | GLM OCR projector translation.                                                        |
+| `glm4moelite`                                          | Maps GLM-4.7 Flash MLA metadata to the `deepseek2` path and fixes special-token metadata.                                    | n/a                                                                                   |
+| `nemotron_h_moe`                                       | Fixes latent-FFN variants and hides MTP tensors.                                                                             | n/a                                                                                   |
+| `nemotron_h_omni`                                      | Selects the Nemotron text loader and hides audio/vision/projector tensors from the text loader.                              | Nemotron V2 VL projector translation; audio remains disabled.                         |
+| `llama` with Llama 3 markers                           | Fixes Llama 3 tokenizer metadata.                                                                                            | n/a                                                                                   |
+| `llama4`                                               | Hides embedded vision/projector tensors from the text loader.                                                                | Llama 4 projector translation.                                                        |
+| `clip` projector without `clip.projector_type`         | n/a                                                                                                                          | Defaults LLaVA/BakLLaVA projectors to `clip.projector_type=mlp`.                      |
 
 Usage:
 
@@ -125,10 +125,10 @@ The compatibility code is mostly written against public APIs (`gguf.h`,
 `ggml.h`, `ggml-backend.h`). A few operations rely on implementation details
 because the public API does not expose equivalent mutators:
 
-| Dependency | Use | Replacement if needed |
-|---|---|---|
-| Direct writes to `ggml_tensor::type` / `ne[]` / `nb[]` | Post-creation tensor reshape/retype for in-memory translation. | Add public tensor shape/type mutators. |
-| `const_cast<char *>(gguf_get_tensor_name(...))` in `rename_tensor` | Renames gguf tensors in place. | Add a public `gguf_rename_tensor` helper. |
+| Dependency                                                               | Use                                                                      | Replacement if needed                      |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------ | ------------------------------------------ |
+| Direct writes to `ggml_tensor::type` / `ne[]` / `nb[]`                   | Post-creation tensor reshape/retype for in-memory translation.           | Add public tensor shape/type mutators.     |
+| `const_cast<char *>(gguf_get_tensor_name(...))` in `rename_tensor`       | Renames gguf tensors in place.                                           | Add a public `gguf_rename_tensor` helper.  |
 | `llama_model_loader` forward declaration from `src/llama-model-loader.h` | Opaque key for per-loader registries. The pointer is never dereferenced. | Replace registry keys with `const void *`. |
 
 Two helpers need extra context:

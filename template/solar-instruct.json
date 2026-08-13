@@ -1,7 +1,3 @@
 {
-  "stop": [
-    "### System:",
-    "### User:",
-    "### Assistant"
-  ]
+  "stop": ["### System:", "### User:", "### Assistant"]
 }

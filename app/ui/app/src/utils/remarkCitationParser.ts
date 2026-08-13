@@ -1,5 +1,5 @@
-import { visit } from "unist-util-visit";
 import type { Root, RootContent } from "mdast";
+import { visit } from "unist-util-visit";
 
 export default function remarkMyDelimiter() {
   return (tree: Root) => {
@@ -76,13 +76,7 @@ export default function remarkMyDelimiter() {
 
     // Second pass: remove adjacent duplicate citations
     visit(tree, (node, index, parent) => {
-      if (
-        parent &&
-        parent.children &&
-        index !== null &&
-        index !== undefined &&
-        index > 0
-      ) {
+      if (parent && parent.children && index !== null && index !== undefined && index > 0) {
         const currentNode = node as any;
         const prevNode = parent.children[index - 1] as any;
 
@@ -90,8 +84,7 @@ export default function remarkMyDelimiter() {
         if (
           currentNode.type === "custom-citation" &&
           prevNode.type === "custom-citation" &&
-          currentNode.data?.hProperties?.cursor ===
-            prevNode.data?.hProperties?.cursor
+          currentNode.data?.hProperties?.cursor === prevNode.data?.hProperties?.cursor
         ) {
           // Remove the current duplicate citation
           parent.children.splice(index, 1);

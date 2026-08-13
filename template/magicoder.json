@@ -1,6 +1,3 @@
 {
-  "stop": [
-    "@@ Instruction",
-    "@@ Response"
-  ]
+  "stop": ["@@ Instruction", "@@ Response"]
 }

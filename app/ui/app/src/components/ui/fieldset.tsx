@@ -1,6 +1,6 @@
+import type React from "react";
 import * as Headless from "@headlessui/react";
 import clsx from "clsx";
-import type React from "react";
 
 export function Fieldset({
   className,
@@ -9,10 +9,7 @@ export function Fieldset({
   return (
     <Headless.Fieldset
       {...props}
-      className={clsx(
-        className,
-        "*:data-[slot=text]:mt-1 [&>*+[data-slot=control]]:mt-6",
-      )}
+      className={clsx(className, "*:data-[slot=text]:mt-1 [&>*+[data-slot=control]]:mt-6")}
     />
   );
 }
@@ -33,17 +30,8 @@ export function Legend({
   );
 }
 
-export function FieldGroup({
-  className,
-  ...props
-}: React.ComponentPropsWithoutRef<"div">) {
-  return (
-    <div
-      data-slot="control"
-      {...props}
-      className={clsx(className, "space-y-8")}
-    />
-  );
+export function FieldGroup({ className, ...props }: React.ComponentPropsWithoutRef<"div">) {
+  return <div data-slot="control" {...props} className={clsx(className, "space-y-8")} />;
 }
 
 export function Field({
@@ -85,10 +73,7 @@ export function Label({
 export function Description({
   className,
   ...props
-}: { className?: string } & Omit<
-  Headless.DescriptionProps,
-  "as" | "className"
->) {
+}: { className?: string } & Omit<Headless.DescriptionProps, "as" | "className">) {
   return (
     <Headless.Description
       data-slot="description"
@@ -104,10 +89,7 @@ export function Description({
 export function ErrorMessage({
   className,
   ...props
-}: { className?: string } & Omit<
-  Headless.DescriptionProps,
-  "as" | "className"
->) {
+}: { className?: string } & Omit<Headless.DescriptionProps, "as" | "className">) {
   return (
     <Headless.Description
       data-slot="error"

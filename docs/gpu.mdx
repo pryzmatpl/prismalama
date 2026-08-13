@@ -3,37 +3,38 @@ title: Hardware support
 ---
 
 ## Nvidia
+
 Ollama supports Nvidia GPUs with compute capability 5.0+ and driver version 531 and newer.
 Nvidia GPUs with compute capability 5.0 through 6.2 require driver version 570 or newer.
 
 Check your compute compatibility to see if your card is supported:
 [https://developer.nvidia.com/cuda-gpus](https://developer.nvidia.com/cuda-gpus)
 
-| Compute Capability | Family              | Cards                                                                                                                          |
-| ------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| 12.1               | NVIDIA              | `GB10 (DGX Spark)`                                                                                                             |
-| 12.0               | GeForce RTX 50xx    | `RTX 5060` `RTX 5060 Ti` `RTX 5070` `RTX 5070 Ti` `RTX 5080` `RTX 5090`                                                        |
-|                    | NVIDIA Professional | `RTX PRO 4000 Blackwell` `RTX PRO 4500 Blackwell` `RTX PRO 5000 Blackwell` `RTX PRO 6000 Blackwell`                            |
-| 9.0                | NVIDIA              | `H200` `H100`                                                                                                                  |
-| 8.9                | GeForce RTX 40xx    | `RTX 4090` `RTX 4080 SUPER` `RTX 4080` `RTX 4070 Ti SUPER` `RTX 4070 Ti` `RTX 4070 SUPER` `RTX 4070` `RTX 4060 Ti` `RTX 4060`  |
-|                    | NVIDIA Professional | `L4` `L40` `RTX 6000`                                                                                                          |
-| 8.6                | GeForce RTX 30xx    | `RTX 3090 Ti` `RTX 3090` `RTX 3080 Ti` `RTX 3080` `RTX 3070 Ti` `RTX 3070` `RTX 3060 Ti` `RTX 3060` `RTX 3050 Ti` `RTX 3050`   |
-|                    | NVIDIA Professional | `A40` `RTX A6000` `RTX A5000` `RTX A4000` `RTX A3000` `RTX A2000` `A10` `A16` `A2`                                             |
-| 8.0                | NVIDIA              | `A100` `A30`                                                                                                                   |
-| 7.5                | GeForce GTX/RTX     | `GTX 1650 Ti` `TITAN RTX` `RTX 2080 Ti` `RTX 2080` `RTX 2070` `RTX 2060`                                                       |
-|                    | NVIDIA Professional | `T4` `RTX 5000` `RTX 4000` `RTX 3000` `T2000` `T1200` `T1000` `T600` `T500`                                                    |
-|                    | Quadro              | `RTX 8000` `RTX 6000` `RTX 5000` `RTX 4000`                                                                                    |
-| 7.0                | NVIDIA              | `TITAN V` `V100` `Quadro GV100`                                                                                                |
-| 6.1                | NVIDIA TITAN        | `TITAN Xp` `TITAN X`                                                                                                           |
-|                    | GeForce GTX         | `GTX 1080 Ti` `GTX 1080` `GTX 1070 Ti` `GTX 1070` `GTX 1060` `GTX 1050 Ti` `GTX 1050`                                          |
-|                    | Quadro              | `P6000` `P5200` `P4200` `P3200` `P5000` `P4000` `P3000` `P2200` `P2000` `P1000` `P620` `P600` `P500` `P520`                    |
-|                    | Tesla               | `P40` `P4`                                                                                                                     |
-| 6.0                | NVIDIA              | `Tesla P100` `Quadro GP100`                                                                                                    |
-| 5.2                | GeForce GTX         | `GTX TITAN X` `GTX 980 Ti` `GTX 980` `GTX 970` `GTX 960` `GTX 950`                                                             |
-|                    | Quadro              | `M6000 24GB` `M6000` `M5000` `M5500M` `M4000` `M2200` `M2000` `M620`                                                           |
-|                    | Tesla               | `M60` `M40`                                                                                                                    |
-| 5.0                | GeForce GTX         | `GTX 750 Ti` `GTX 750` `NVS 810`                                                                                               |
-|                    | Quadro              | `K2200` `K1200` `K620` `M1200` `M520` `M5000M` `M4000M` `M3000M` `M2000M` `M1000M` `K620M` `M600M` `M500M`                     |
+| Compute Capability | Family              | Cards                                                                                                                         |
+| ------------------ | ------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 12.1               | NVIDIA              | `GB10 (DGX Spark)`                                                                                                            |
+| 12.0               | GeForce RTX 50xx    | `RTX 5060` `RTX 5060 Ti` `RTX 5070` `RTX 5070 Ti` `RTX 5080` `RTX 5090`                                                       |
+|                    | NVIDIA Professional | `RTX PRO 4000 Blackwell` `RTX PRO 4500 Blackwell` `RTX PRO 5000 Blackwell` `RTX PRO 6000 Blackwell`                           |
+| 9.0                | NVIDIA              | `H200` `H100`                                                                                                                 |
+| 8.9                | GeForce RTX 40xx    | `RTX 4090` `RTX 4080 SUPER` `RTX 4080` `RTX 4070 Ti SUPER` `RTX 4070 Ti` `RTX 4070 SUPER` `RTX 4070` `RTX 4060 Ti` `RTX 4060` |
+|                    | NVIDIA Professional | `L4` `L40` `RTX 6000`                                                                                                         |
+| 8.6                | GeForce RTX 30xx    | `RTX 3090 Ti` `RTX 3090` `RTX 3080 Ti` `RTX 3080` `RTX 3070 Ti` `RTX 3070` `RTX 3060 Ti` `RTX 3060` `RTX 3050 Ti` `RTX 3050`  |
+|                    | NVIDIA Professional | `A40` `RTX A6000` `RTX A5000` `RTX A4000` `RTX A3000` `RTX A2000` `A10` `A16` `A2`                                            |
+| 8.0                | NVIDIA              | `A100` `A30`                                                                                                                  |
+| 7.5                | GeForce GTX/RTX     | `GTX 1650 Ti` `TITAN RTX` `RTX 2080 Ti` `RTX 2080` `RTX 2070` `RTX 2060`                                                      |
+|                    | NVIDIA Professional | `T4` `RTX 5000` `RTX 4000` `RTX 3000` `T2000` `T1200` `T1000` `T600` `T500`                                                   |
+|                    | Quadro              | `RTX 8000` `RTX 6000` `RTX 5000` `RTX 4000`                                                                                   |
+| 7.0                | NVIDIA              | `TITAN V` `V100` `Quadro GV100`                                                                                               |
+| 6.1                | NVIDIA TITAN        | `TITAN Xp` `TITAN X`                                                                                                          |
+|                    | GeForce GTX         | `GTX 1080 Ti` `GTX 1080` `GTX 1070 Ti` `GTX 1070` `GTX 1060` `GTX 1050 Ti` `GTX 1050`                                         |
+|                    | Quadro              | `P6000` `P5200` `P4200` `P3200` `P5000` `P4000` `P3000` `P2200` `P2000` `P1000` `P620` `P600` `P500` `P520`                   |
+|                    | Tesla               | `P40` `P4`                                                                                                                    |
+| 6.0                | NVIDIA              | `Tesla P100` `Quadro GP100`                                                                                                   |
+| 5.2                | GeForce GTX         | `GTX TITAN X` `GTX 980 Ti` `GTX 980` `GTX 970` `GTX 960` `GTX 950`                                                            |
+|                    | Quadro              | `M6000 24GB` `M6000` `M5000` `M5500M` `M4000` `M2200` `M2000` `M620`                                                          |
+|                    | Tesla               | `M60` `M40`                                                                                                                   |
+| 5.0                | GeForce GTX         | `GTX 750 Ti` `GTX 750` `NVS 810`                                                                                              |
+|                    | Quadro              | `K2200` `K1200` `K620` `M1200` `M520` `M5000M` `M4000M` `M3000M` `M2000M` `M1000M` `K620M` `M600M` `M500M`                    |
 
 For building locally to support older GPUs, see [developer](./development#linux-cuda-nvidia)
 
@@ -59,29 +60,28 @@ Ollama supports the following AMD GPUs via the ROCm library:
 > **NOTE:**
 > Additional AMD GPU support is provided by the Vulkan Library - see below.
 
-
 ### Linux Support
 
 Ollama requires the AMD ROCm v7 driver on Linux. You can install or upgrade
 using the `amdgpu-install` utility from
 [AMD's ROCm documentation](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/).
 
-| Family         | Cards and accelerators                                                                                                                                         |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AMD Radeon RX  | `9070 XT` `9070 GRE` `9070` `9060 XT` `9060 XT LP` `9060` `7900 XTX` `7900 XT` `7900 GRE` `7800 XT` `7700 XT` `7700` `7600 XT` `7600` `6950 XT` `6900 XTX` `6900XT` `6800 XT` `6800` `5700 XT` `5700` `5600 XT` `5500 XT` |
-| AMD Radeon AI PRO | `R9700` `R9600D`                                                                                                                                            |
-| AMD Radeon PRO | `W7900` `W7800` `W7700` `W7600` `W7500` `W6900X` `W6800X Duo` `W6800X` `W6800` `V620`                                                                        |
-| AMD Ryzen AI   | `Ryzen AI Max+ 395` `Ryzen AI Max 390` `Ryzen AI Max 385` `Ryzen AI 9 HX 475` `Ryzen AI 9 HX 470` `Ryzen AI 9 465` `Ryzen AI 9 HX 375` `Ryzen AI 9 HX 370` `Ryzen AI 9 365` |
-| AMD Instinct   | `MI350X` `MI300X` `MI300A` `MI250X` `MI250` `MI210` `MI100`                                                                                                   |
+| Family            | Cards and accelerators                                                                                                                                                                                                    |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AMD Radeon RX     | `9070 XT` `9070 GRE` `9070` `9060 XT` `9060 XT LP` `9060` `7900 XTX` `7900 XT` `7900 GRE` `7800 XT` `7700 XT` `7700` `7600 XT` `7600` `6950 XT` `6900 XTX` `6900XT` `6800 XT` `6800` `5700 XT` `5700` `5600 XT` `5500 XT` |
+| AMD Radeon AI PRO | `R9700` `R9600D`                                                                                                                                                                                                          |
+| AMD Radeon PRO    | `W7900` `W7800` `W7700` `W7600` `W7500` `W6900X` `W6800X Duo` `W6800X` `W6800` `V620`                                                                                                                                     |
+| AMD Ryzen AI      | `Ryzen AI Max+ 395` `Ryzen AI Max 390` `Ryzen AI Max 385` `Ryzen AI 9 HX 475` `Ryzen AI 9 HX 470` `Ryzen AI 9 465` `Ryzen AI 9 HX 375` `Ryzen AI 9 HX 370` `Ryzen AI 9 365`                                               |
+| AMD Instinct      | `MI350X` `MI300X` `MI300A` `MI250X` `MI250` `MI210` `MI100`                                                                                                                                                               |
 
 ### Windows Support
 
 Ollama requires an AMD ROCm v7 / HIP7-capable driver stack on Windows.
 
-| Family         | Cards and accelerators                                                                                               |
-| -------------- | -------------------------------------------------------------------------------------------------------------------- |
-| AMD Radeon RX  | `7900 XTX` `7900 XT` `7900 GRE` `7800 XT` `7700 XT` `7600 XT` `7600` `6950 XT` `6900 XTX` `6900XT` `6800 XT` `6800`  |
-| AMD Radeon PRO | `W7900` `W7800` `W7700` `W7600` `W7500` `W6900X` `W6800X Duo` `W6800X` `W6800` `V620`                                |
+| Family         | Cards and accelerators                                                                                              |
+| -------------- | ------------------------------------------------------------------------------------------------------------------- |
+| AMD Radeon RX  | `7900 XTX` `7900 XT` `7900 GRE` `7800 XT` `7700 XT` `7600 XT` `7600` `6950 XT` `6900 XTX` `6900XT` `6800 XT` `6800` |
+| AMD Radeon PRO | `W7900` `W7800` `W7700` `W7600` `W7500` `W6900X` `W6800X Duo` `W6800X` `W6800` `V620`                               |
 
 ### Overrides on Linux
 
@@ -140,7 +140,6 @@ accessing the AMD GPU devices. On the host system you can run
 
 Ollama supports GPU acceleration on Apple devices via the Metal API.
 
-
 ## Vulkan GPU Support
 
 Additional GPU support on Windows and Linux is provided via
@@ -156,8 +155,8 @@ multiple options for Vulkan drivers between Mesa and GPU Vendor specific package
 For AMD GPUs on some Linux distributions, you may need to add the `ollama` user to the `render` group.
 
 The Ollama scheduler leverages available VRAM data reported by the GPU libraries to
-make optimal scheduling decisions.  Vulkan requires additional capabilities or
-running as root to expose this available VRAM data.  If neither root access or this
+make optimal scheduling decisions. Vulkan requires additional capabilities or
+running as root to expose this available VRAM data. If neither root access or this
 capability are granted, Ollama will use approximate sizes of the models
 to make best effort scheduling decisions.
 

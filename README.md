@@ -12,12 +12,12 @@ Start building with open models.
 
 ## Key Defaults
 
-| Setting | Default | Purpose |
-|---------|---------|---------|
-| `OLLAMA_LAYER_STREAMING` | **`1`** in **`/etc/default/ollama`** (package); **unset ⇒ off** in raw `envconfig` | Layer-by-layer GGUF load / streaming path when supported |
-| `OLLAMA_KEEP_ALIVE` | `5m` | Models unload after idle window (no startup preload) |
-| Compute stack | GGML (HIP / Vulkan / CPU per build) | **`OLLAMA_VULKAN=1`** needed for Vulkan backends on Linux — see RUNTIME_DISPATCH |
-| `OLLAMA_USE_AIRLLM` | **`0`** (Arch package) | **`0`/`false`/`no`** disables **all** AirLLM routing; set **`1`** for HF / forced AirLLM |
+| Setting                  | Default                                                                            | Purpose                                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `OLLAMA_LAYER_STREAMING` | **`1`** in **`/etc/default/ollama`** (package); **unset ⇒ off** in raw `envconfig` | Layer-by-layer GGUF load / streaming path when supported                                 |
+| `OLLAMA_KEEP_ALIVE`      | `5m`                                                                               | Models unload after idle window (no startup preload)                                     |
+| Compute stack            | GGML (HIP / Vulkan / CPU per build)                                                | **`OLLAMA_VULKAN=1`** needed for Vulkan backends on Linux — see RUNTIME_DISPATCH         |
+| `OLLAMA_USE_AIRLLM`      | **`0`** (Arch package)                                                             | **`0`/`false`/`no`** disables **all** AirLLM routing; set **`1`** for HF / forced AirLLM |
 
 ## Quick Start
 
@@ -28,9 +28,11 @@ irm https://ollama.com/install.ps1 | iex
 or [download manually](https://ollama.com/download/OllamaSetup.exe)
 
 # Start service
+
 sudo systemctl enable --now ollama
 
 # Run a model (loads on-demand, unloads after 5m idle)
+
 ollama run qwen2.5:3b "Hello"
 
 [Manual install instructions](https://docs.ollama.com/linux#manual-install)
@@ -56,7 +58,7 @@ The official [Ollama Docker image](https://hub.docker.com/r/ollama/ollama) `olla
 ollama
 ```
 
-You'll be prompted to run a model or connect Ollama to your existing agents or applications such as `Claude Code`, `OpenClaw`, `OpenCode` , `Codex`, `Copilot`,  and more.
+You'll be prompted to run a model or connect Ollama to your existing agents or applications such as `Claude Code`, `OpenClaw`, `OpenCode` , `Codex`, `Copilot`, and more.
 
 ### Coding
 

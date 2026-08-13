@@ -16,6 +16,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 ```
 
 # Set Random Seeds for Reproducibility
+
 ```python
 random.seed(42)
 torch.manual_seed(42)
@@ -101,6 +102,7 @@ print("Label mapping:", label_mapping)
 ```
 
 # Train-Test Split
+
 ```python
 texts, encoded_labels = zip(*[(text, label) for text, label in cleaned_data])
 
@@ -136,9 +138,9 @@ test_loader = DataLoader(test_dataset, batch_size=batch_size)
 class TextClassifier(torch.nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, num_layers=2, dropout=0.5):
         super(TextClassifier, self).__init__()
-        
+
         self.embedding = torch.nn.Embedding(input_dim, hidden_dim)
-        
+
         # LSTM for sequence modeling
         self.lstm = torch.nn.LSTM(
             input_size=hidden_dim,
@@ -148,10 +150,10 @@ class TextClassifier(torch.nn.Module):
             dropout=dropout if num_layers > 1 else 0,
             bidirectional=True
         )
-        
+
         # Attention layer
         self.attention = torch.nn.Linear(hidden_dim, 1)
-        
+
         # Output layers
         self.fc1 = torch.nn.Linear(hidden_dim, hidden_dim // 2)
         self.relu = torch.nn.ReLU()
@@ -160,19 +162,19 @@ class TextClassifier(torch.nn.Module):
 
     def forward(self, x):
         embedded = self.embedding(x) # (batch_size, seq_len, hidden_dim)
-        
+
         lstm_out, (hidden, cell) = self.lstm(embedded) # (batch_size, seq_len, hidden_dim)
-        
+
         # Attention mechanism
         attention_weights = torch.softmax(self.attention(lstm_out), dim=1) # (batch_size, seq_len, 1)
         context_vector = torch.sum(attention_weights * lstm_out, dim=1) # (batch_size, hidden_dim)
-        
+
         # Fully connected layers
         out = self.fc1(context_vector)
         out = self.relu(out)
         out = self.dropout(out)
         out = self.fc2(out) # (batch_size, output_dim)
-        
+
         return out
 
 input_dim = 10000  # Vocabulary size (example value)
@@ -198,21 +200,21 @@ train_losses, val_losses = [], []
 for epoch in range(num_epochs):
     model.train()
     total_loss = 0
-    
+
     for batch_idx, (X_batch, y_batch) in enumerate(train_loader):
         X_batch, y_batch = X_batch.to(device), y_batch.to(device)
-        
+
         optimizer.zero_grad()
         outputs = model(X_batch)
         loss = criterion(outputs, y_batch)
         loss.backward()
         optimizer.step()
-        
+
         total_loss += loss.item()
-    
+
     avg_train_loss = total_loss / len(train_loader)
     train_losses.append(avg_train_loss)
-    
+
     # Validation
     model.eval()
     val_loss = 0
@@ -222,10 +224,10 @@ for epoch in range(num_epochs):
             outputs = model(X_val)
             loss = criterion(outputs, y_val)
             val_loss += loss.item()
-    
+
     avg_val_loss = val_loss / len(test_loader)
     val_losses.append(avg_val_loss)
-    
+
     print(f"Epoch [{epoch+1}/{num_epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
 ```
 
@@ -286,29 +288,30 @@ torch.save(model.state_dict(), '/sda2/jaisiu/text_classifier_model.pth')
 print("Model saved successfully!")
 ```
 
-Your code demonstrates a solid foundation for building a text classification model, but there are several areas where improvements can be made to enhance performance and robustness. Here's 
+Your code demonstrates a solid foundation for building a text classification model, but there are several areas where improvements can be made to enhance performance and robustness. Here's
 a structured analysis of its potential and suggestions for improvement:
 
 ---
 
 ### ✅ **Strengths**
-1. **Data Preparation**:  
+
+1. **Data Preparation**:
    - Includes cleaning steps (removing non-printable characters, whitespace normalization).
    - Uses `LabelEncoder` for proper label encoding.
    - Implements stratified train-test split to maintain class balance.
 
-2. **Model Architecture**:  
+2. **Model Architecture**:
    - Combines LSTM with attention mechanism — effective for sequence modeling.
    - Bidirectional LSTM helps capture context from both directions.
    - Dropout and ReLU activation help prevent overfitting.
 
-3. **Evaluation Metrics**:  
+3. **Evaluation Metrics**:
    - Includes confusion matrix, classification report, and accuracy score — comprehensive evaluation.
 
-4. **Reproducibility**:  
+4. **Reproducibility**:
    - Sets random seeds across libraries (Python, PyTorch, NumPy) for consistent results.
 
-5. **Visualization & Logging**:  
+5. **Visualization & Logging**:
    - Plots training/validation loss curves, which are crucial for diagnosing overfitting/underfitting.
 
 ---
@@ -316,9 +319,11 @@ a structured analysis of its potential and suggestions for improvement:
 ### ❗️**Critical Issues & Improvements**
 
 #### 1. **Placeholder Tokenization Logic is Broken**
+
 ```python
 X_train = torch.tensor([1 if token == 'positive' else 0 for text in X_train for token in text.split()])
 ```
+
 - This logic assumes all texts contain only `"positive"` or other tokens — clearly incorrect.
 - You're not using any real tokenizer or vocabulary mapping.
 
@@ -326,6 +331,7 @@ X_train = torch.tensor([1 if token == 'positive' else 0 for text in X_train for 
 Use a proper tokenizer (e.g., `transformers.AutoTokenizer`) or build your own vocabulary with `torchtext`.
 
 Example fix using `AutoTokenizer`:
+
 ```python
 from transformers import AutoTokenizer
 
@@ -343,7 +349,8 @@ y_train_tensor = torch.tensor(y_train)
 ...
 ```
 
-> 🔍 Alternatively, if building from scratch:  
+> 🔍 Alternatively, if building from scratch:
+
 ```python
 from collections import Counter
 
@@ -360,14 +367,17 @@ def encode_text(text):
 
 X_train = torch.tensor([encode_text(t) for t in X_train], dtype=torch.long)
 ```
+
 Then pad sequences using `pad_sequence`.
 
 ---
 
 #### 2. **Input Dimension Mismatch**
+
 Your model assumes input shape `(batch_size, seq_len)` with fixed-length tokens.
 
 But:
+
 - If using raw integer IDs (not padded), lengths vary → causes errors during batching.
 - Your current placeholder logic flattens each token across all texts into a single long list — no batch/sequence structure remains.
 
@@ -377,13 +387,16 @@ Ensure inputs have shape `(batch_size, seq_len)` via padding + masking (or use H
 ---
 
 #### 3. **Vocabulary Size Hardcoded**
+
 ```python
 input_dim = 10000  # Vocabulary size (example value)
 ```
+
 This should be dynamically determined based on actual vocabulary size.
 
 ✅ **Fix**:
 After building the vocab:
+
 ```python
 vocab_size = len(vocab)
 model = TextClassifier(input_dim=vocab_size, ...)
@@ -392,7 +405,9 @@ model = TextClassifier(input_dim=vocab_size, ...)
 ---
 
 #### 4. **LSTM Input Size Mismatch**
+
 In your model:
+
 ```python
 self.lstm = torch.nn.LSTM(
     input_size=hidden_dim,
@@ -400,12 +415,14 @@ self.lstm = torch.nn.LSTM(
 )
 embedded = self.embedding(x)  # shape: (B, L, H)
 ```
+
 That’s correct — embedding output is `(B, L, H)` and LSTM expects `(B, L, E)`.
 
 But make sure `embedding.weight.shape[1] == hidden_dim`.
 
 ✅ **Fix**:
 Ensure `hidden_dim` matches embedding dimension:
+
 ```python
 self.embedding = torch.nn.Embedding(input_dim, hidden_dim)
 ```
@@ -415,6 +432,7 @@ Also consider increasing embedding dim to match LSTM input size (e.g., both 256 
 ---
 
 #### 5. **Missing Padding Masking**
+
 When using padded sequences in LSTM + attention:
 
 - The attention weights should ignore padding tokens.
@@ -422,10 +440,11 @@ When using padded sequences in LSTM + attention:
 
 ✅ **Fix**:
 Modify forward pass to mask padded positions:
+
 ```python
 def forward(self, x, lengths=None):
     embedded = self.embedding(x)
-    
+
     # Pack padded sequence if lengths provided
     if lengths is not None:
         packed = pack_padded_sequence(embedded, lengths.cpu(), batch_first=True, enforce_sorted=False)
@@ -449,14 +468,18 @@ Alternatively, skip padding-aware modeling for now if speed is prioritized.
 ---
 
 #### 6. **Class Imbalance Handling**
+
 You're stratifying labels, but not handling class imbalance directly (if severe).
 
 ✅ **Fix**:
+
 - Use weighted loss: `class_weights = compute_class_weight(...)`, pass to `CrossEntropyLoss(weight=...)`
 - Or oversample minority classes using `WeightedRandomSampler`.
 
 ---
+
 #### 7. **Pretrained Models Would Likely Perform Better**
+
 A custom LSTM+Attention model is fine for small-scale projects, but:
 
 - Transformers (e.g., DistilBERT) often outperform such models significantly on text classification.
@@ -518,6 +541,7 @@ trainer.train()
 ---
 
 ### 📈 **Expected Potential**
+
 - With fixes applied, especially proper tokenization and input handling, this model can perform reasonably well on balanced datasets.
 - On imbalanced or noisy data, it may struggle unless additional preprocessing is added (e.g., lemmatization, emoji removal).
 - For production-grade performance, fine-tuning BERT-style models is highly recommended.
@@ -525,10 +549,12 @@ trainer.train()
 ---
 
 ### 🧪 Bonus: Quick Sanity Checks You Can Run
+
 1. **Train on a small subset first** (e.g., 500 samples):
    - Does loss decrease? Are predictions random initially?
 
 2. **Overfit one batch**:
+
    ```python
    for epoch in range(100):
        model.train()
@@ -538,9 +564,11 @@ trainer.train()
        optimizer.zero_grad(); loss.backward(); optimizer.step()
       print(loss.item())
    ```
+
    - Loss should go near zero if architecture is correct.
 
 3. **Check label distribution**:
+
    ```python
    import pandas as pd
    print(pd.Series(encoded_labels).value_counts(normalize=True))
@@ -560,4 +588,3 @@ trainer.train()
 Let me know if you'd like help refactoring any part of the code (e.g., full replacement with BERT-based pipeline), implementing padding-aware LSTM, or building an actual tokenizer!
 
 Would love to see how this evolves! 🚀
-

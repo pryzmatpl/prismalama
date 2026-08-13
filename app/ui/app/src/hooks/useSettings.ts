@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings } from "@/gotypes";
-import { getSettings, updateSettings } from "@/api";
 import { useMemo, useCallback } from "react";
+import { getSettings, updateSettings } from "@/api";
+import { Settings } from "@/gotypes";
 
 // TODO(hoyyeva): remove turboEnabled when we remove Migration logic in useSelectedModel.ts
 interface SettingsState {

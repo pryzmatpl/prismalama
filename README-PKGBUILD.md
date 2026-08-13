@@ -6,14 +6,14 @@ Builds **this** Prismalama tree (prismallama.cpp/GGML via CMake, Go `ollama` bin
 
 ## What's Installed
 
-| Path | Contents |
-|------|----------|
-| `/usr/bin/ollama` | Prismalama binary (Go + GGML/Vulkan) |
-| `/usr/lib/ollama/rocm/` | GGML backends (CPU + Vulkan; HIP/CUDA per **`PRISMALAMA_BACKENDS`** at build time) |
-| `/usr/share/ollama/airllm_runner.py` | AirLLM Python runner |
-| `/usr/share/ollama/airllm/` | AirLLM Python package (if `src/airllm/air_llm` exists) |
-| `/etc/default/ollama` | Environment variables |
-| `/usr/lib/systemd/system/ollama.service` | Systemd service |
+| Path                                     | Contents                                                                           |
+| ---------------------------------------- | ---------------------------------------------------------------------------------- |
+| `/usr/bin/ollama`                        | Prismalama binary (Go + GGML/Vulkan)                                               |
+| `/usr/lib/ollama/rocm/`                  | GGML backends (CPU + Vulkan; HIP/CUDA per **`PRISMALAMA_BACKENDS`** at build time) |
+| `/usr/share/ollama/airllm_runner.py`     | AirLLM Python runner                                                               |
+| `/usr/share/ollama/airllm/`              | AirLLM Python package (if `src/airllm/air_llm` exists)                             |
+| `/etc/default/ollama`                    | Environment variables                                                              |
+| `/usr/lib/systemd/system/ollama.service` | Systemd service                                                                    |
 
 ## Defaults
 
@@ -38,12 +38,12 @@ OLLAMA_USE_AIRLLM=0                    # AirLLM opt-in only
 
 Set **`PRISMALAMA_BACKENDS`** **before** `makepkg` so only the stacks you need are installed:
 
-| Value | Pulls (typical) | CMake |
-|--------|-----------------|--------|
-| **`amd`** | `rocm-hip-sdk`, HIP runtime | HIP + Vulkan |
-| **`nvidia`** | `cuda` | CUDA + Vulkan (no ROCm) |
-| **`all`** | ROCm + CUDA | HIP + CUDA + Vulkan |
-| **`minimal`** | neither ROCm nor CUDA toolkits | CPU + Vulkan only |
+| Value                | Pulls (typical)                                                                                                                                                                                             | CMake                   |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| **`amd`**            | `rocm-hip-sdk`, HIP runtime                                                                                                                                                                                 | HIP + Vulkan            |
+| **`nvidia`**         | `cuda`                                                                                                                                                                                                      | CUDA + Vulkan (no ROCm) |
+| **`all`**            | ROCm + CUDA                                                                                                                                                                                                 | HIP + CUDA + Vulkan     |
+| **`minimal`**        | neither ROCm nor CUDA toolkits                                                                                                                                                                              | CPU + Vulkan only       |
 | **`auto`** (default) | Uses **`pacman -Q`** for `rocm-hip-sdk` / `cuda`, else **`lspci`** PCI vendor (**`1002`** AMD, **`10de`** NVIDIA, **`8086`** Intel iGPU → minimal), else **`minimal`** or **`PRISMALAMA_BACKENDS_DEFAULT`** |
 
 **NVIDIA-only host (avoid ROCm):**
@@ -126,6 +126,7 @@ sudo systemctl restart ollama
 ```
 
 Check it works:
+
 ```bash
 sudo -u ollama python3 -c "import transformers; print('OK')"
 ```

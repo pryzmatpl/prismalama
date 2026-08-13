@@ -10,15 +10,15 @@ This directory contains comprehensive tests for the Prismalama project, which un
 
 Integration tests are organized by build tags to allow targeted testing:
 
-| Tag | Description | Example Command |
-|-----|-------------|-----------------|
-| `integration` | Basic integration tests | `go test -tags=integration ./integration` |
-| `integration,airllm` | AirLLM-specific tests | `go test -tags=integration,airllm ./integration` |
-| `integration,gpu` | GPU utilization tests | `go test -tags=integration,gpu ./integration` |
+| Tag                    | Description                | Example Command                                    |
+| ---------------------- | -------------------------- | -------------------------------------------------- |
+| `integration`          | Basic integration tests    | `go test -tags=integration ./integration`          |
+| `integration,airllm`   | AirLLM-specific tests      | `go test -tags=integration,airllm ./integration`   |
+| `integration,gpu`      | GPU utilization tests      | `go test -tags=integration,gpu ./integration`      |
 | `integration,sharding` | Large model sharding tests | `go test -tags=integration,sharding ./integration` |
-| `integration,hardware` | Hardware detection tests | `go test -tags=integration,hardware ./integration` |
-| `integration,minimax` | MiniMax model tests | `go test -tags=integration,minimax ./integration` |
-| `integration,perf` | Performance benchmarks | `go test -tags=integration,perf ./integration` |
+| `integration,hardware` | Hardware detection tests   | `go test -tags=integration,hardware ./integration` |
+| `integration,minimax`  | MiniMax model tests        | `go test -tags=integration,minimax ./integration`  |
+| `integration,perf`     | Performance benchmarks     | `go test -tags=integration,perf ./integration`     |
 
 ## Coverage
 
@@ -40,11 +40,13 @@ After a feature lands, run integration proof then build **`prismalama-ollama`**:
 ### Prerequisites
 
 1. Build the project first:
+
    ```bash
    go build .
    ```
 
 2. For ROCm/GPU tests, ensure ROCm is installed:
+
    ```bash
    rocm-smi  # Verify ROCm is working
    ```
@@ -57,6 +59,7 @@ After a feature lands, run integration proof then build **`prismalama-ollama`**:
 ### Quick Test
 
 Run basic integration tests:
+
 ```bash
 go test -tags=integration ./integration -v -timeout 5m -run TestBlueSky
 ```
@@ -124,21 +127,23 @@ KV_CACHE: type=f16 tps=42.15 total_time=1.2s response_len=256
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `OLLAMA_TEST_AIRLLM` | Set to "1" to enable AirLLM tests |
-| `OLLAMA_AIRLLM_MODEL` | Specify the AirLLM model to test |
-| `OLLAMA_TEST_EXISTING` | Set to use existing running server |
-| `OLLAMA_TEST_DEFAULT_MODEL` | Override default test model |
-| `OLLAMA_MULTI_GPU` | Set to "1" to enable multi-GPU tests |
-| `AIRLLM_COMPRESSION` | Set compression mode (4bit, 8bit, none) |
-| `OLLAMA_USE_AIRLLM` | Force AirLLM mode for models |
-| `OLLAMA_MAX_VRAM` | Maximum VRAM for tests |
+| Variable                    | Description                             |
+| --------------------------- | --------------------------------------- |
+| `OLLAMA_TEST_AIRLLM`        | Set to "1" to enable AirLLM tests       |
+| `OLLAMA_AIRLLM_MODEL`       | Specify the AirLLM model to test        |
+| `OLLAMA_TEST_EXISTING`      | Set to use existing running server      |
+| `OLLAMA_TEST_DEFAULT_MODEL` | Override default test model             |
+| `OLLAMA_MULTI_GPU`          | Set to "1" to enable multi-GPU tests    |
+| `AIRLLM_COMPRESSION`        | Set compression mode (4bit, 8bit, none) |
+| `OLLAMA_USE_AIRLLM`         | Force AirLLM mode for models            |
+| `OLLAMA_MAX_VRAM`           | Maximum VRAM for tests                  |
 
 ## Test Files
 
 ### airllm_test.go
+
 Tests for AirLLM integration:
+
 - Basic generation
 - Code generation
 - Chat completion
@@ -149,7 +154,9 @@ Tests for AirLLM integration:
 - Performance metrics
 
 ### gpu_test.go
+
 Tests for GPU utilization:
+
 - GPU utilization monitoring
 - Layer offloading
 - Model fitting
@@ -160,7 +167,9 @@ Tests for GPU utilization:
 - NVMe model loading
 
 ### sharding_test.go
+
 Tests for large model sharding:
+
 - Large GGUF model offloading
 - Layer-by-layer inference
 - Hybrid CPU offload
@@ -170,7 +179,9 @@ Tests for large model sharding:
 - Batch size optimization
 
 ### hardware_test.go
+
 Tests for hardware detection:
+
 - ROCm detection
 - VRAM detection
 - System memory detection
@@ -181,7 +192,9 @@ Tests for hardware detection:
 - Flash attention support
 
 ### minimax_test.go
+
 Tests for MiniMax M2.5 model:
+
 - Model detection
 - Model size verification
 - Basic inference
@@ -191,7 +204,9 @@ Tests for MiniMax M2.5 model:
 - Memory efficiency with 4-bit
 
 ### runner_test.go (unit tests)
+
 Tests for runner logic:
+
 - AirLLM model detection
 - Environment variable handling
 - Model path extraction
@@ -199,11 +214,13 @@ Tests for runner logic:
 ## Performance Testing
 
 Run performance benchmarks:
+
 ```bash
 go test -tags=integration,perf ./integration -v -timeout 90m -run TestModelsPerf
 ```
 
 Output can be captured and analyzed:
+
 ```bash
 go test -tags=integration,perf ./integration -v -timeout 90m 2>&1 | tee perf.log
 grep "MODEL_PERF_DATA" perf.log | cut -f2- -d: > perf.csv
@@ -212,11 +229,13 @@ grep "MODEL_PERF_DATA" perf.log | cut -f2- -d: > perf.csv
 ## Hardware Requirements
 
 ### Minimum
+
 - 16GB RAM
 - 8GB VRAM (for GPU tests)
 - 50GB free disk space
 
 ### Recommended
+
 - 64GB+ RAM (for sharding tests)
 - 24GB VRAM (for large model tests)
 - 500GB+ NVMe storage (for large models)
@@ -224,22 +243,28 @@ grep "MODEL_PERF_DATA" perf.log | cut -f2- -d: > perf.csv
 ## Troubleshooting
 
 ### Tests timeout
+
 Increase timeout: `go test -timeout 60m ...`
 
 ### ROCm not detected
+
 ```bash
 export HSA_OVERRIDE_GFX_VERSION=11.0.0
 rocm-smi
 ```
 
 ### Memory issues
+
 For large model tests, ensure sufficient swap:
+
 ```bash
 free -h
 ```
 
 ### Model not found
+
 Check model paths:
+
 ```bash
 ls -la /nvme3/ollama-models/
 ls -la "/nvme3/AI Models/"

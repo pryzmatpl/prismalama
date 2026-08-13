@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { getModelRecommendations } from "@/api";
 import type { ModelRecommendation } from "@/api";
+import { getModelRecommendations } from "@/api";
 
 export function useFeaturedModels() {
   return useQuery<ModelRecommendation[], Error>({

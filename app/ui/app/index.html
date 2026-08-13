@@ -92,10 +92,7 @@
         // Only prevent navigation shortcuts when not in editable fields
         if (!e.target.matches("input, textarea, [contenteditable], select")) {
           // Prevent Cmd/Ctrl + Left/Right arrow navigation
-          if (
-            (e.ctrlKey || e.metaKey) &&
-            (e.key === "ArrowLeft" || e.key === "ArrowRight")
-          ) {
+          if ((e.ctrlKey || e.metaKey) && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
             e.preventDefault();
             return false;
           }
@@ -149,10 +146,7 @@
           window.setContextMenuItems([]);
           let target = e.target;
           while (target && target !== document) {
-            if (
-              target.classList &&
-              target.classList.contains("allow-context-menu")
-            ) {
+            if (target.classList && target.classList.contains("allow-context-menu")) {
               return true;
             }
             target = target.parentElement;

@@ -14,7 +14,7 @@
     {
       "name": "mlx_cuda_v13_base",
       "hidden": true,
-      "inherits": [ "default" ],
+      "inherits": ["default"],
       "cacheVariables": {
         "CMAKE_CUDA_FLAGS": "-t 2",
         "OLLAMA_RUNNER_DIR": "mlx_cuda_v13"
@@ -22,7 +22,7 @@
     },
     {
       "name": "mlx_cuda_v13_linux",
-      "inherits": [ "mlx_cuda_v13_base" ],
+      "inherits": ["mlx_cuda_v13_base"],
       "binaryDir": "${sourceDir}/../../build/mlx_cuda_v13",
       "cacheVariables": {
         "MLX_CUDA_ARCHITECTURES": "75-virtual;80-virtual;86-virtual;89-virtual;90-virtual;90a-virtual;100-virtual;103-virtual;110-virtual;120-virtual;121-virtual"
@@ -30,7 +30,7 @@
     },
     {
       "name": "mlx_cuda_v13_windows",
-      "inherits": [ "mlx_cuda_v13_base" ],
+      "inherits": ["mlx_cuda_v13_base"],
       "binaryDir": "${sourceDir}/../../build/mlx_cuda_v13",
       "cacheVariables": {
         "MLX_CUDA_ARCHITECTURES": "75-virtual;80-virtual;86-virtual;89-virtual;90-virtual;90a-virtual;100-virtual;103-virtual;110-virtual;120-virtual;121-virtual"
@@ -38,12 +38,12 @@
     },
     {
       "name": "mlx_cuda_v13_user_arch",
-      "inherits": [ "mlx_cuda_v13_base" ],
+      "inherits": ["mlx_cuda_v13_base"],
       "binaryDir": "${sourceDir}/../../build/mlx_cuda_v13"
     },
     {
       "name": "mlx_metal_v3",
-      "inherits": [ "default" ],
+      "inherits": ["default"],
       "binaryDir": "${sourceDir}/../../build/metal-v3",
       "cacheVariables": {
         "CMAKE_OSX_DEPLOYMENT_TARGET": "14.0",
@@ -52,7 +52,7 @@
     },
     {
       "name": "mlx_metal_v4",
-      "inherits": [ "default" ],
+      "inherits": ["default"],
       "binaryDir": "${sourceDir}/../../build/metal-v4",
       "cacheVariables": {
         "CMAKE_OSX_DEPLOYMENT_TARGET": "26.0",
@@ -64,27 +64,27 @@
     {
       "name": "mlx_cuda_v13_linux",
       "configurePreset": "mlx_cuda_v13_linux",
-      "targets": [ "mlx", "mlxc" ]
+      "targets": ["mlx", "mlxc"]
     },
     {
       "name": "mlx_cuda_v13_windows",
       "configurePreset": "mlx_cuda_v13_windows",
-      "targets": [ "mlx", "mlxc" ]
+      "targets": ["mlx", "mlxc"]
     },
     {
       "name": "mlx_cuda_v13_user_arch",
       "configurePreset": "mlx_cuda_v13_user_arch",
-      "targets": [ "mlx", "mlxc" ]
+      "targets": ["mlx", "mlxc"]
     },
     {
       "name": "mlx_metal_v3",
       "configurePreset": "mlx_metal_v3",
-      "targets": [ "mlx", "mlxc" ]
+      "targets": ["mlx", "mlxc"]
     },
     {
       "name": "mlx_metal_v4",
       "configurePreset": "mlx_metal_v4",
-      "targets": [ "mlx", "mlxc" ]
+      "targets": ["mlx", "mlxc"]
     }
   ]
 }

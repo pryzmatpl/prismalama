@@ -40,9 +40,7 @@ export function SidebarLayout({
           params={{ chatId: "new" }}
           title="New chat"
           className={`flex ml-1 items-center justify-center rounded-full transition-opacity duration-375 h-9 w-9 hover:bg-neutral-100 dark:hover:bg-neutral-700 ${
-            settings.sidebarOpen
-              ? "opacity-0 pointer-events-none"
-              : "opacity-100"
+            settings.sidebarOpen ? "opacity-0 pointer-events-none" : "opacity-100"
           }`}
         >
           <svg
@@ -66,9 +64,7 @@ export function SidebarLayout({
         ></div>
         {settings.sidebarOpen && sidebar}
       </div>
-      <main
-        className={`flex flex-1 flex-col min-w-0 transition-all duration-300`}
-      >
+      <main className={`flex flex-1 flex-col min-w-0 transition-all duration-300`}>
         <div
           className={`h-13 flex-none w-full z-10 flex items-center bg-white dark:bg-neutral-900 ${isWindows ? "xl:hidden" : "xl:fixed xl:bg-transparent xl:dark:bg-transparent"}`}
           onDoubleClick={() => window.doubleClick && window.doubleClick()}

@@ -1,6 +1,3 @@
 {
-  "stop": [
-    "<start_of_turn>",
-    "<end_of_turn>"
-  ]
+  "stop": ["<start_of_turn>", "<end_of_turn>"]
 }

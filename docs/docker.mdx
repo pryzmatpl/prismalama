@@ -56,8 +56,9 @@ docker run -d --gpus=all -v ollama:/root/.ollama -p 11434:11434 --name ollama ol
 ```
 
 <Note>
-  If you're running on an NVIDIA JetPack system, Ollama can't automatically discover the correct JetPack version.
-  Pass the environment variable `JETSON_JETPACK=5` or `JETSON_JETPACK=6` to the container to select version 5 or 6.
+  If you're running on an NVIDIA JetPack system, Ollama can't automatically discover the correct
+  JetPack version. Pass the environment variable `JETSON_JETPACK=5` or `JETSON_JETPACK=6` to the
+  container to select version 5 or 6.
 </Note>
 
 ## AMD GPU
@@ -79,7 +80,6 @@ docker run -d --device /dev/kfd --device /dev/dri -v ollama:/root/.ollama -p 114
 
 Use `OLLAMA_VULKAN=0` to disable Vulkan, or `GGML_VK_VISIBLE_DEVICES=<ids>` to
 select specific Vulkan devices.
-
 
 ## Run model locally
 

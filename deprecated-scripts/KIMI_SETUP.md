@@ -39,12 +39,14 @@ sudo bash /sda2/register-kimi.sh
 ```
 
 This will create two Ollama models:
+
 - `kimi-k2.5` - Standard version
 - `kimi-k2.5-airllm` - Optimized with AirLLM layer offloading
 
 ### Run Inference
 
 **For Potato Machines (Recommended)**:
+
 ```bash
 # Use AirLLM-optimized version for 579GB model
 ollama run kimi-k2.5-airllm
@@ -54,6 +56,7 @@ ollama run kimi-k2.5-airllm "Explain quantum computing in simple terms"
 ```
 
 **Standard Mode** (if you have enough VRAM):
+
 ```bash
 ollama run kimi-k2.5
 ```
@@ -74,17 +77,20 @@ opencode
 Since Kimi K2.5 is 579GB, it requires AirLLM for inference on consumer hardware:
 
 ### AirLLM Features Enabled:
+
 - ✅ **Layer Offloading**: Loads only active layers into GPU memory
 - ✅ **4-bit Quantization**: Reduces memory footprint
 - ✅ **Prefetching**: Pre-loads next layers for speed
 - ✅ **Streaming**: Outputs tokens as they're generated
 
 ### Memory Requirements:
+
 - **Minimum GPU**: 8GB VRAM (with AirLLM)
 - **Recommended**: 16GB+ VRAM for better performance
 - **CPU Mode**: Works entirely on CPU (slower but functional)
 
 ### Performance Expectations:
+
 - First load: ~30-60 seconds (loading model shards)
 - Token generation: ~2-5 tokens/second (depends on hardware)
 - Memory usage: ~4-8GB GPU RAM during inference
@@ -92,13 +98,16 @@ Since Kimi K2.5 is 579GB, it requires AirLLM for inference on consumer hardware:
 ## Configuration Details
 
 ### Systemd Service
+
 The Ollama service has been configured with:
+
 ```ini
 ReadWritePaths=/sda2/airllm /var/lib/ollama /tmp
 Environment=OLLAMA_MODELS=/sda2/airllm
 ```
 
 ### Environment Variables
+
 ```bash
 OLLAMA_MODELS="/sda2/airllm"
 OLLAMA_HOST="127.0.0.1:11434"
@@ -110,6 +119,7 @@ AIRLLM_DEVICE="cuda:0"
 ## Troubleshooting
 
 ### Model Not Loading
+
 ```bash
 # Check Ollama service
 systemctl status ollama
@@ -122,11 +132,13 @@ sudo systemctl restart ollama
 ```
 
 ### Out of Memory
+
 - Use `kimi-k2.5-airllm` instead of `kimi-k2.5`
 - Reduce context length in Modelfile
 - Enable CPU-only mode by setting `num_gpu 0`
 
 ### Slow Performance
+
 - Ensure AirLLM is using GPU: check `HIP_VISIBLE_DEVICES=0`
 - Enable prefetching in AirLLM config
 - Use smaller batch sizes
@@ -146,6 +158,7 @@ sudo systemctl restart ollama
 ## Advanced Usage
 
 ### Custom Prompts
+
 ```bash
 # Long-form generation
 ollama run kimi-k2.5-airllm "Write a detailed essay about..."
@@ -158,7 +171,9 @@ ollama run kimi-k2.5-airllm "Analyze the following text: ..."
 ```
 
 ### Batch Processing
+
 Use the Python runner directly:
+
 ```bash
 python3 /sda2/airllm/kimi_runner.py \
   --prompt "Your prompt here" \
@@ -197,4 +212,5 @@ opencode run -m ollama/kimi-k2.5-airllm "Your question here"
 - First inference may take 1-2 minutes (loading shards)
 
 ---
+
 Setup completed: 2026-02-12

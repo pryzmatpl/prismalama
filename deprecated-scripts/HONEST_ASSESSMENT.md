@@ -32,6 +32,7 @@ ollama run kimi "Hello!"
 ```
 
 **This WILL work** because:
+
 - Ollama knows how to handle multi-file GGUF during `create`
 - It has space on /nvme3 to copy
 - The model will be properly indexed
@@ -67,6 +68,7 @@ make -C build llama-server
 ```
 
 **This gives you:**
+
 - HTTP API (like Ollama)
 - ROCm GPU acceleration
 - Direct file access (no copying)
@@ -81,12 +83,14 @@ make -C build llama-server
 ## My Recommendation
 
 **Use Option 1** (Let Ollama copy) because:
+
 1. ✅ You have space now (1.2TB on /nvme3)
 2. ✅ It integrates with opencode
 3. ✅ Full API support
 4. ✅ One-time wait in that environment, then repeatable there (not a universal guarantee)
 
 Run this:
+
 ```bash
 export OLLAMA_MODELS=/nvme3/ollama-models
 ollama create kimi -f /sda2/Modelfile.kimi

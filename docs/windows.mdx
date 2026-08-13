@@ -17,11 +17,10 @@ terminal application. As usual the Ollama [API](/api) will be served on
 Ollama uses unicode characters for progress indication, which may render as unknown squares in some older terminal fonts in Windows 10. If you see this, try changing your terminal font settings.
 
 <Note>
-  Some RDNA2 / Radeon RX 6000 systems, including RX 6800-class cards, may not
-  expose ROCm v7 on current Windows AMD drivers. Vulkan is enabled by default
-  and is the recommended fallback for those systems. If a mixed iGPU/dGPU
-  system selects an unstable Vulkan iGPU, set `GGML_VK_VISIBLE_DEVICES` to the
-  discrete GPU index.
+  Some RDNA2 / Radeon RX 6000 systems, including RX 6800-class cards, may not expose ROCm v7 on
+  current Windows AMD drivers. Vulkan is enabled by default and is the recommended fallback for
+  those systems. If a mixed iGPU/dGPU system selects an unstable Vulkan iGPU, set
+  `GGML_VK_VISIBLE_DEVICES` to the discrete GPU index.
 </Note>
 
 ## Filesystem Requirements
@@ -76,7 +75,8 @@ the explorer window by hitting `<Ctrl>+R` and type in:
 The Ollama Windows installer registers an Uninstaller application. Under `Add or remove programs` in Windows Settings, you can uninstall Ollama.
 
 <Note>
-  If you have [changed the OLLAMA_MODELS location](#changing-model-location), the installer will not remove your downloaded models
+  If you have [changed the OLLAMA_MODELS location](#changing-model-location), the installer will not
+  remove your downloaded models
 </Note>
 
 ## Standalone CLI
@@ -98,6 +98,4 @@ This allows for embedding Ollama in existing applications, or
 running it as a system service via `ollama serve` with tools such as
 [NSSM](https://nssm.cc/).
 
-<Note>
-  If you are upgrading from a prior version, you should remove the old directories first.
-</Note>
+<Note>If you are upgrading from a prior version, you should remove the old directories first.</Note>

@@ -1,6 +1,3 @@
 {
-  "stop": [
-    "<|START_OF_TURN_TOKEN|>",
-    "<|END_OF_TURN_TOKEN|>"
-  ]
+  "stop": ["<|START_OF_TURN_TOKEN|>", "<|END_OF_TURN_TOKEN|>"]
 }

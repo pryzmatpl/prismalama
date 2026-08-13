@@ -1,6 +1,3 @@
 {
-  "stop": [
-    "USER:",
-    "ASSISTANT:"
-  ]
+  "stop": ["USER:", "ASSISTANT:"]
 }

@@ -10,15 +10,15 @@
 
 ## In-flight tickets
 
-| ID | Title | Owner | Status |
-|----|-------|-------|--------|
-| [JAISIU-2156](https://pryzmat.youtrack.cloud/issue/JAISIU-2156) | Epic — Prismalama North-Star (2026–2027) | agent | Submitted |
-| [JAISIU-2157](https://pryzmat.youtrack.cloud/issue/JAISIU-2157) | P0-1: Harden `runner/dispatch.go` (typed reasons, structured logging, expanded tests) | tbd | Submitted |
-| [JAISIU-2158](https://pryzmat.youtrack.cloud/issue/JAISIU-2158) | P0-2: Capabilities operator surface (env keys + backends, schema v2) | tbd | Submitted |
-| [JAISIU-2159](https://pryzmat.youtrack.cloud/issue/JAISIU-2159) | P0-3: `prismallama.cpp` upstream sync audit + `llama/patches/README.md` | tbd | Submitted |
-| [JAISIU-2160](https://pryzmat.youtrack.cloud/issue/JAISIU-2160) | P0-4: Packaging defaults audit (PKGBUILD, `/etc/default/ollama`, Docker) | tbd | Submitted |
-| [JAISIU-2161](https://pryzmat.youtrack.cloud/issue/JAISIU-2161) | P0-5: NEXT.md living roadmap + CHANGELOG hygiene (this ticket) | tbd | In Progress |
-| [JAISIU-2162](https://pryzmat.youtrack.cloud/issue/JAISIU-2162) | P0-6: Verify integration suite + ship-check on a non-GPU host | tbd | Submitted |
+| ID                                                              | Title                                                                                 | Owner | Status      |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ----- | ----------- |
+| [JAISIU-2156](https://pryzmat.youtrack.cloud/issue/JAISIU-2156) | Epic — Prismalama North-Star (2026–2027)                                              | agent | Submitted   |
+| [JAISIU-2157](https://pryzmat.youtrack.cloud/issue/JAISIU-2157) | P0-1: Harden `runner/dispatch.go` (typed reasons, structured logging, expanded tests) | tbd   | Submitted   |
+| [JAISIU-2158](https://pryzmat.youtrack.cloud/issue/JAISIU-2158) | P0-2: Capabilities operator surface (env keys + backends, schema v2)                  | tbd   | Submitted   |
+| [JAISIU-2159](https://pryzmat.youtrack.cloud/issue/JAISIU-2159) | P0-3: `prismallama.cpp` upstream sync audit + `llama/patches/README.md`               | tbd   | Submitted   |
+| [JAISIU-2160](https://pryzmat.youtrack.cloud/issue/JAISIU-2160) | P0-4: Packaging defaults audit (PKGBUILD, `/etc/default/ollama`, Docker)              | tbd   | Submitted   |
+| [JAISIU-2161](https://pryzmat.youtrack.cloud/issue/JAISIU-2161) | P0-5: NEXT.md living roadmap + CHANGELOG hygiene (this ticket)                        | tbd   | In Progress |
+| [JAISIU-2162](https://pryzmat.youtrack.cloud/issue/JAISIU-2162) | P0-6: Verify integration suite + ship-check on a non-GPU host                         | tbd   | Submitted   |
 
 ## Phase 1 — first actions (post Phase 0 close)
 

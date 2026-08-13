@@ -133,8 +133,7 @@ export default function Thinking({
             ? "Thinking..."
             : finishedThinking
               ? (() => {
-                  const thinkingTime =
-                    (endTime.getTime() - startTime.getTime()) / 1000;
+                  const thinkingTime = (endTime.getTime() - startTime.getTime()) / 1000;
                   return thinkingTime < 2
                     ? "Thought for a moment"
                     : `Thought for ${thinkingTime.toFixed(1)} seconds`;
@@ -152,15 +151,8 @@ export default function Thinking({
           opacity: isCollapsed && finishedThinking ? 0 : 1,
         }}
       >
-        <div
-          ref={contentRef}
-          className="transition-transform duration-300 opacity-75 select-text"
-        >
-          <StreamingMarkdownContent
-            content={thinking}
-            isStreaming={activelyThinking}
-            size="sm"
-          />
+        <div ref={contentRef} className="transition-transform duration-300 opacity-75 select-text">
+          <StreamingMarkdownContent content={thinking} isStreaming={activelyThinking} size="sm" />
         </div>
 
         {/* Gradient overlay for fade effect when collapsed and scrolled */}

@@ -1,6 +1,6 @@
+import { Display, type DisplayAction } from "@/components/ui/display";
 import { Model } from "@/gotypes";
 import { useSendMessage, useIsStreaming } from "@/hooks/useChats";
-import { Display, type DisplayAction } from "@/components/ui/display";
 
 interface DisplayStaleProps {
   model: Model;

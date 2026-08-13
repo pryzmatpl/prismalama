@@ -10,23 +10,23 @@ See **[docs/DEVELOPER.md](./docs/DEVELOPER.md)** first. Generic upstream build n
 
 ### Ideal issues (Prismalama)
 
-* [Bugs](https://github.com/piotroxp/prismalama/issues): crashes, incorrect routing (GGML vs AirLLM), load failures, or API regressions.
-* Performance: throughput, VRAM use, or scheduling — include hardware and **`journalctl -u ollama`** snippets where useful.
-* [Security](./SECURITY.md): do **not** open public issues for undisclosed vulnerabilities; use the process in **SECURITY.md**.
+- [Bugs](https://github.com/piotroxp/prismalama/issues): crashes, incorrect routing (GGML vs AirLLM), load failures, or API regressions.
+- Performance: throughput, VRAM use, or scheduling — include hardware and **`journalctl -u ollama`** snippets where useful.
+- [Security](./SECURITY.md): do **not** open public issues for undisclosed vulnerabilities; use the process in **SECURITY.md**.
 
 Upstream Ollama uses its own tracker for stock Ollama-only issues: [bugs](https://github.com/ollama/ollama/issues?q=is%3Aissue+is%3Aopen+label%3Abug), [performance](https://github.com/ollama/ollama/issues?q=is%3Aissue+is%3Aopen+label%3Aperformance).
 
 ### Issues that are harder to review
 
-* New features: new features (e.g. API fields, environment variables) add surface area to Ollama and make it harder to maintain in the long run as they cannot be removed without potentially breaking users in the future.
-* Refactoring: large code improvements are important, but can be harder or take longer to review and merge.
-* Documentation: small updates to fill in or correct missing documentation are helpful, however large documentation additions can be hard to maintain over time.
+- New features: new features (e.g. API fields, environment variables) add surface area to Ollama and make it harder to maintain in the long run as they cannot be removed without potentially breaking users in the future.
+- Refactoring: large code improvements are important, but can be harder or take longer to review and merge.
+- Documentation: small updates to fill in or correct missing documentation are helpful, however large documentation additions can be hard to maintain over time.
 
 ### Issues that may not be accepted
 
-* Changes that break backwards compatibility in Ollama's API (including the OpenAI-compatible API)
-* Changes that add significant friction to the user experience
-* Changes that create a large future maintenance burden for maintainers and contributors
+- Changes that break backwards compatibility in Ollama's API (including the OpenAI-compatible API)
+- Changes that add significant friction to the user experience
+- Changes that create a large future maintenance burden for maintainers and contributors
 
 ## Proposing a (non-trivial) change
 
@@ -38,10 +38,10 @@ Before opening a non-trivial Pull Request, discussion helps prevent duplicated w
 
 Tips for proposals:
 
-* Explain the problem you are trying to solve, not what you are trying to do.
-* Explain why the change is important.
-* Explain how the change will be used.
-* Explain how the change will be tested.
+- Explain the problem you are trying to solve, not what you are trying to do.
+- Explain why the change is important.
+- Explain how the change will be used.
+- Explain how the change will be tested.
 
 Additionally, for bonus points: Provide draft documentation you would expect to
 see if the changes were accepted.

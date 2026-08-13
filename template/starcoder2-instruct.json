@@ -1,7 +1,3 @@
 {
-  "stop": [
-    "### Instruction",
-    "### Response",
-    "<|endoftext|>"
-  ]
+  "stop": ["### Instruction", "### Response", "<|endoftext|>"]
 }

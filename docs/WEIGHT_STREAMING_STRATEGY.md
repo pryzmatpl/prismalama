@@ -13,13 +13,13 @@ This note compares **high-probability** directions for “weight streaming” an
 
 ## Option 1 — Double down on GGUF + prismallama.cpp / GGML (Vulkan + HIP), extend the engine
 
-**Idea:** Treat “streaming” as **better memory discipline inside llama.cpp**: mmap, partial offload, optional block-at-a-time load/evict *inside the same GGML stack* (your fork), not a second Python runtime.
+**Idea:** Treat “streaming” as **better memory discipline inside llama.cpp**: mmap, partial offload, optional block-at-a-time load/evict _inside the same GGML stack_ (your fork), not a second Python runtime.
 
-| Pros | Cons |
-|------|------|
-| One **Go + GGML** artifact (matches a slim Docker story). | **HF / safetensors** layouts still need conversion to GGUF or another path. |
+| Pros                                                                            | Cons                                                                                                                                       |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| One **Go + GGML** artifact (matches a slim Docker story).                       | **HF / safetensors** layouts still need conversion to GGUF or another path.                                                                |
 | Aligns with **Vulkan as a first-class GGML backend** (vendor-agnostic GPU API). | **True** “weights larger than VRAM” sequential execution is **not** what stock llama.cpp optimizes for; large design and performance work. |
-| Reuses existing load/offload and scheduler code paths. | Long **research/engineering** cycle; easy to underperform PyTorch until tuned. |
+| Reuses existing load/offload and scheduler code paths.                          | Long **research/engineering** cycle; easy to underperform PyTorch until tuned.                                                             |
 
 **Probability of success:** **High** for “large GGUF runs well on modest VRAM **with** mmap/offload/quant”; **medium** for “replace AirLLM for all huge non-GGUF models”; **lower** if the bar is **SOTA** vs AirLLM on arbitrary HF trees without GGUF.
 
@@ -29,10 +29,10 @@ This note compares **high-probability** directions for “weight streaming” an
 
 **Idea:** Do **not** fold HF mega-models into GGML yet. **Harden** the GGUF path (defaults, mmap, offload, multi-part GGUF handling, docs, tests) and **reserve** AirLLM for **safetensors / non-GGUF** or experimental routes.
 
-| Pros | Cons |
-|------|------|
-| **Highest short-term success**: fewer moving parts per release. | **Two** runtimes (Go+GGML vs Python+Torch). |
-| Docker **GPU image** stays lean for the **common** case (GGUF inference). | Large **HF-only** models still depend on PyTorch/ROCm stack. |
+| Pros                                                                               | Cons                                                                   |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **Highest short-term success**: fewer moving parts per release.                    | **Two** runtimes (Go+GGML vs Python+Torch).                            |
+| Docker **GPU image** stays lean for the **common** case (GGUF inference).          | Large **HF-only** models still depend on PyTorch/ROCm stack.           |
 | Clear product story: “GGUF in container; AirLLM optional on host or fatter image.” | Not a single “pure Vulkan streaming layer” for **all** weight formats. |
 
 **Probability of success:** **Highest** overall for **shipping** and **reliability** in the near term.
@@ -43,11 +43,11 @@ This note compares **high-probability** directions for “weight streaming” an
 
 **Idea:** A **thin** Go layer that loads **one block / tensor group at a time**, copies to GPU, runs the op, evicts — **without** PyTorch, “bare essentials” only.
 
-| Pros | Cons |
-|------|------|
-| **Theoretical** fit with “non-vendor Vulkan + Go only.” | **Hardest** to make **fast**: the **runner + ggml graph** already own tensor lifetime, graphs, KV cache. |
-| Full control over I/O and scheduling. | High risk of **slower than AirLLM** for a long time; many **Vulkan buffer** and **sync** footguns. |
-| Could target **one** model family / quant first to cap scope. | **Generality** (all architectures) is expensive; easy to become a one-off. |
+| Pros                                                          | Cons                                                                                                     |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Theoretical** fit with “non-vendor Vulkan + Go only.”       | **Hardest** to make **fast**: the **runner + ggml graph** already own tensor lifetime, graphs, KV cache. |
+| Full control over I/O and scheduling.                         | High risk of **slower than AirLLM** for a long time; many **Vulkan buffer** and **sync** footguns.       |
+| Could target **one** model family / quant first to cap scope. | **Generality** (all architectures) is expensive; easy to become a one-off.                               |
 
 **Probability of success:** **Medium–low** for **performance + generality**; **medium** for a **narrow** demo (fixed arch, fixed quant, fixed GPU).
 

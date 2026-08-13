@@ -50,6 +50,7 @@ Embeddings turn text into numeric vectors you can store in a vector database, se
     )
     print(len(single['embeddings'][0]))  # vector length
     ```
+
   </Tab>
   <Tab title="JavaScript">
     ```javascript
@@ -61,12 +62,11 @@ Embeddings turn text into numeric vectors you can store in a vector database, se
     })
     console.log(single.embeddings[0].length) // vector length
     ```
+
   </Tab>
 </Tabs>
 
-<Note>
-  The `/api/embed` endpoint returns L2‑normalized (unit‑length) vectors.
-</Note>
+<Note>The `/api/embed` endpoint returns L2‑normalized (unit‑length) vectors.</Note>
 
 ## Generate a batch of embeddings
 
@@ -101,6 +101,7 @@ Pass an array of strings to `input`.
     )
     print(len(batch['embeddings']))  # number of vectors
     ```
+
   </Tab>
   <Tab title="JavaScript">
     ```javascript
@@ -116,6 +117,7 @@ Pass an array of strings to `input`.
     })
     console.log(batch.embeddings.length) // number of vectors
     ```
+
   </Tab>
 </Tabs>
 
@@ -123,5 +125,3 @@ Pass an array of strings to `input`.
 
 - Use cosine similarity for most semantic search use cases.
 - Use the same embedding model for both indexing and querying.
-
-

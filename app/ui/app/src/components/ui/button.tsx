@@ -183,10 +183,7 @@ export const Button = forwardRef(function Button(
 
   return "href" in props ? (
     <Link
-      {...(props as Omit<
-        React.ComponentPropsWithoutRef<typeof Link>,
-        "className"
-      >)}
+      {...(props as Omit<React.ComponentPropsWithoutRef<typeof Link>, "className">)}
       className={classes}
       ref={ref as React.ForwardedRef<HTMLAnchorElement>}
     >

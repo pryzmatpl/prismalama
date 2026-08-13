@@ -7,6 +7,7 @@
 ## ✅ What Was Done
 
 ### 1. Arch Linux Package Created
+
 - **Package:** `ollama-airllm-v0.4.1.r5052.e102207f-1-x86_64.pkg.tar.zst`
 - **Location:** `/run/media/piotro/CACHE/prismalama/`
 - **Size:** 53 MB
@@ -17,17 +18,20 @@
   - Models path set to `/run/media/piotro/CACHE/airllm`
 
 ### 2. GLM-4.7-Flash Model Configured
+
 - **Model:** zai-org/GLM-4.7-Flash-4bit
 - **Location:** `/run/media/piotro/CACHE/GLM-4.7-Flash-4bit`
 - **Size:** 15.7 GB (4-bit quantized)
 - **Architecture:** Glm4MoeLiteForCausalLM (Mixture of Experts)
 
 ### 3. AirLLM Adapted for GLM-4.7
+
 - **Modified:** `/run/media/piotro/CACHE/prismalama/airllm/air_llm/airllm/auto_model.py`
 - **Change:** Added GLM-4.7 architecture recognition
 - **Result:** GLM-4.7 models now use AirLLMChatGLM adapter
 
 ### 4. Complete Environment Setup
+
 - **Location:** `/run/media/piotro/CACHE/airllm/`
 - **Contents:**
   ```
@@ -41,6 +45,7 @@
   ```
 
 ### 5. OpenCode Integration
+
 - **Config File:** `/run/media/piotro/CACHE/airllm/opencode_config.json`
 - **Ready for use:** ✅ Yes
 - **Backend:** AirLLM
@@ -48,16 +53,16 @@
 
 ## 📁 Key Files and Locations
 
-| File/Directory | Purpose | Location |
-|----------------|----------|----------|
-| **Ollama Binary** | Main server binary | `prismalama/ollama` (after install: `/usr/bin/ollama`) |
-| **Package** | Arch Linux install package | `prismalama/ollama-airllm-*.pkg.tar.zst` |
-| **GLM-4.7 Model** | Model weights and config | `/run/media/piotro/CACHE/GLM-4.7-Flash-4bit/` |
-| **AirLLM** | Memory optimization layer | `prismalama/airllm/air_llm/` |
-| **Setup Script** | One-time setup | `/run/media/piotro/CACHE/setup_glm47.sh` |
-| **OpenCode Config** | OpenCode integration | `/run/media/piotro/CACHE/airllm/opencode_config.json` |
-| **Test Script** | Verify installation | `/run/media/piotro/CACHE/airllm/test_glm47.py` |
-| **Documentation** | Full setup guide | `/run/media/piotro/CACHE/GLM47_SETUP.md` |
+| File/Directory      | Purpose                    | Location                                               |
+| ------------------- | -------------------------- | ------------------------------------------------------ |
+| **Ollama Binary**   | Main server binary         | `prismalama/ollama` (after install: `/usr/bin/ollama`) |
+| **Package**         | Arch Linux install package | `prismalama/ollama-airllm-*.pkg.tar.zst`               |
+| **GLM-4.7 Model**   | Model weights and config   | `/run/media/piotro/CACHE/GLM-4.7-Flash-4bit/`          |
+| **AirLLM**          | Memory optimization layer  | `prismalama/airllm/air_llm/`                           |
+| **Setup Script**    | One-time setup             | `/run/media/piotro/CACHE/setup_glm47.sh`               |
+| **OpenCode Config** | OpenCode integration       | `/run/media/piotro/CACHE/airllm/opencode_config.json`  |
+| **Test Script**     | Verify installation        | `/run/media/piotro/CACHE/airllm/test_glm47.py`         |
+| **Documentation**   | Full setup guide           | `/run/media/piotro/CACHE/GLM47_SETUP.md`               |
 
 ## 🚀 How OpenCode Can Pick This Up
 
@@ -121,6 +126,7 @@ OpenCode can automatically detect and use this configuration:
 ## 📊 Memory Optimization (How It Works)
 
 ### Traditional Model Loading
+
 ```
 [GPU Memory: 8 GB]
 [Model Size: 15.7 GB]
@@ -128,6 +134,7 @@ Result: ❌ Out of Memory Error
 ```
 
 ### AirLLM Layer-by-Layer Loading
+
 ```
 [GPU Memory: 8 GB]
 
@@ -249,11 +256,13 @@ export OLLAMA_CONTEXT_LENGTH="4096"
 ## 📝 Next Steps for User
 
 1. **Install the package:**
+
    ```bash
    sudo pacman -U /run/media/piotro/CACHE/prismalama/ollama-airllm-*.pkg.tar.zst
    ```
 
 2. **Test the setup:**
+
    ```bash
    cd /run/media/piotro/CACHE/airllm
    source ./airllm_env.sh
@@ -282,6 +291,7 @@ Your system is now ready to run **GLM-4.7-Flash-4bit** model on a GPU-poor setup
 4. ✅ **Arch Linux Package** - Clean installation and management
 
 **OpenCode can now pick up and use GLM-4.7-Flash model by loading:**
+
 ```python
 with open("/run/media/piotro/CACHE/airllm/opencode_config.json") as f:
     config = json.load(f)

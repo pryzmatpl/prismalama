@@ -1,11 +1,5 @@
-import {
-  useState,
-  useCallback,
-  useRef,
-  useEffect,
-  type ReactNode,
-} from "react";
 import { DocumentPlusIcon } from "@heroicons/react/24/outline";
+import { useState, useCallback, useRef, useEffect, type ReactNode } from "react";
 import type { Model } from "@/gotypes";
 import { processFiles as processFilesUtil } from "@/utils/fileValidation";
 
@@ -42,44 +36,37 @@ export function FileUpload({
   }, []);
 
   // Helper function to read directory contents
-  const readDirectory = useCallback(
-    async (entry: FileSystemDirectoryEntry): Promise<File[]> => {
-      const files: File[] = [];
+  const readDirectory = useCallback(async (entry: FileSystemDirectoryEntry): Promise<File[]> => {
+    const files: File[] = [];
 
-      const readEntries = async (
-        dirEntry: FileSystemDirectoryEntry,
-      ): Promise<void> => {
-        const dirReader = dirEntry.createReader();
+    const readEntries = async (dirEntry: FileSystemDirectoryEntry): Promise<void> => {
+      const dirReader = dirEntry.createReader();
 
-        return new Promise((resolve, reject) => {
-          dirReader.readEntries(async (entries) => {
-            try {
-              for (const entry of entries) {
-                if (entry.isFile) {
-                  const fileEntry = entry as FileSystemFileEntry;
-                  const file = await new Promise<File>(
-                    (resolveFile, rejectFile) => {
-                      fileEntry.file(resolveFile, rejectFile);
-                    },
-                  );
-                  files.push(file);
-                } else if (entry.isDirectory) {
-                  // Skip subdirectories for simplicity
-                }
+      return new Promise((resolve, reject) => {
+        dirReader.readEntries(async (entries) => {
+          try {
+            for (const entry of entries) {
+              if (entry.isFile) {
+                const fileEntry = entry as FileSystemFileEntry;
+                const file = await new Promise<File>((resolveFile, rejectFile) => {
+                  fileEntry.file(resolveFile, rejectFile);
+                });
+                files.push(file);
+              } else if (entry.isDirectory) {
+                // Skip subdirectories for simplicity
               }
-              resolve();
-            } catch (error) {
-              reject(error);
             }
-          }, reject);
-        });
-      };
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        }, reject);
+      });
+    };
 
-      await readEntries(entry);
-      return files;
-    },
-    [],
-  );
+    await readEntries(entry);
+    return files;
+  }, []);
 
   // Main file processing function
   const processFiles = useCallback(
@@ -239,8 +226,7 @@ export function FileUpload({
             <div className="bg-white/90 dark:bg-neutral-900/90 backdrop-blur-xl rounded-2xl p-12 mx-4 max-w-sm text-center border border-neutral-200/50 dark:border-neutral-700/50 shadow-2xl">
               <DocumentPlusIcon className="w-8 h-8 mx-auto mb-2 text-black dark:text-white" />
               <p className="text-neutral-500 dark:text-neutral-400 text-sm font-medium leading-relaxed">
-                Drop files here or paste from clipboard to add them to your
-                message
+                Drop files here or paste from clipboard to add them to your message
               </p>
             </div>
           </div>

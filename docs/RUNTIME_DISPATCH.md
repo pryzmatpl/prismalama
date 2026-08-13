@@ -2,11 +2,11 @@
 
 When a model loads, the server spawns a subprocess: `ollama runner --model <path> --port …`. The **`runner`** package chooses:
 
-| Engine | Process | Typical GPU stack |
-|--------|---------|-------------------|
-| **llama** | GGML / llama.cpp in-process | ROCm HIP, CUDA, Vulkan, Metal, CPU |
+| Engine     | Process                             | Typical GPU stack                       |
+| ---------- | ----------------------------------- | --------------------------------------- |
+| **llama**  | GGML / llama.cpp in-process         | ROCm HIP, CUDA, Vulkan, Metal, CPU      |
 | **airllm** | Python `airllm_runner.py` + PyTorch | `AIRLLM_DEVICE` (e.g. `cuda:0` on ROCm) |
-| **ollama** | New Ollama engine path | As configured |
+| **ollama** | New Ollama engine path              | As configured                           |
 
 Selection is implemented in **`runner/dispatch.go`** (`DecideEngine`). The **Modelfile name** (e.g. `qwopus`) does not select the engine; **on-disk layout** and **env** do (see table below). The **Prismalama Arch package** defaults to **`OLLAMA_USE_AIRLLM=0`**: GGUF inference uses **GGML** without PyTorch/transformers unless the user opts in. **Product principle:** **`docs/PRISMALAMA_PRINCIPLE.md`** (GGML vs AirLLM is the key architectural fact). **Operators:** **`GET /api/prismalama/capabilities`** documents semantics on a running server.
 
@@ -61,10 +61,10 @@ Architectures listed in `fs/ggml/ggml.go` **`OllamaEngineRequired()`** use the *
 
 Two different stacks:
 
-| Path | What uses the GPU | If VRAM stays idle |
-|------|---------------------|---------------------|
-| **llama** / **ollama** (GGML) | `OLLAMA_LIBRARY_PATH` → HIP/Vulkan `.so` under `/usr/lib/ollama/rocm` | The scheduler packs **as many transformer layers as fit** into reported free VRAM (minus **`OLLAMA_GPU_OVERHEAD`**). Logs include **`ggml GPU layer offload`** with **`offload_percent`** and **`use_mmap`**. If VRAM looks **tiny** but the model runs (slowly), offload is likely **low** — check **`num_gpu`** in the Modelfile, discovery, and **`HIP_VISIBLE_DEVICES`**. On **Linux**, mmap is **off** when free system RAM is below the estimated model size (avoids thrashing); for large GGUF on **fast NVMe**, set **`OLLAMA_MMAP_ALLOW_LOW_RAM=1`** so weights can **mmap** from disk (`llm/server.go`). **Vulkan** backends are skipped unless **`OLLAMA_VULKAN=1`**; HIP does not need it. |
-| **airllm** (Python) | **PyTorch** with ROCm; **`AIRLLM_DEVICE`** (default **`cuda:0`** — ROCm uses the CUDA API name) | **CPU-only PyTorch** (no `torch.cuda.is_available()`). On Arch install **`python-pytorch-rocm`** (or your distro’s ROCm build), not plain **`python-pytorch`**. After restart, logs should show **`PyTorch: cuda.is_available=True`**. |
+| Path                          | What uses the GPU                                                                               | If VRAM stays idle                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **llama** / **ollama** (GGML) | `OLLAMA_LIBRARY_PATH` → HIP/Vulkan `.so` under `/usr/lib/ollama/rocm`                           | The scheduler packs **as many transformer layers as fit** into reported free VRAM (minus **`OLLAMA_GPU_OVERHEAD`**). Logs include **`ggml GPU layer offload`** with **`offload_percent`** and **`use_mmap`**. If VRAM looks **tiny** but the model runs (slowly), offload is likely **low** — check **`num_gpu`** in the Modelfile, discovery, and **`HIP_VISIBLE_DEVICES`**. On **Linux**, mmap is **off** when free system RAM is below the estimated model size (avoids thrashing); for large GGUF on **fast NVMe**, set **`OLLAMA_MMAP_ALLOW_LOW_RAM=1`** so weights can **mmap** from disk (`llm/server.go`). **Vulkan** backends are skipped unless **`OLLAMA_VULKAN=1`**; HIP does not need it. |
+| **airllm** (Python)           | **PyTorch** with ROCm; **`AIRLLM_DEVICE`** (default **`cuda:0`** — ROCm uses the CUDA API name) | **CPU-only PyTorch** (no `torch.cuda.is_available()`). On Arch install **`python-pytorch-rocm`** (or your distro’s ROCm build), not plain **`python-pytorch`**. After restart, logs should show **`PyTorch: cuda.is_available=True`**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 `/etc/default/ollama` from the package sets **`HIP_VISIBLE_DEVICES`** and **`AIRLLM_DEVICE=cuda:0`**; override only if you know your layout.
 

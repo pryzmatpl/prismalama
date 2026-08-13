@@ -2,21 +2,26 @@
 title: Streaming
 ---
 
-Streaming allows you to render text as it is produced by the model. 
+Streaming allows you to render text as it is produced by the model.
 
 Streaming is enabled by default through the REST API, but disabled by default in the SDKs.
 
 To enable streaming in the SDKs, set the `stream` parameter to `True`.
 
 ## Key streaming concepts
+
 1. Chatting: Stream partial assistant messages. Each chunk includes the `content` so you can render messages as they arrive.
 1. Thinking: Thinking-capable models emit a `thinking` field alongside regular content in each chunk. Detect this field in streaming chunks to show or hide reasoning traces before the final answer arrives.
 1. Tool calling: Watch for streamed `tool_calls` in each chunk, execute the requested tool, and append tool outputs back into the conversation.
 
 ## Handling streamed chunks
 
-
-<Note> It is necessary to accumulate the partial fields in order to maintain the history of the conversation. This is particularly important for tool calling where the thinking, tool call from the model, and the executed tool result must be passed back to the model in the next request. </Note>
+<Note>
+  {" "}
+  It is necessary to accumulate the partial fields in order to maintain the history of the
+  conversation. This is particularly important for tool calling where the thinking, tool call from
+  the model, and the executed tool result must be passed back to the model in the next request.{" "}
+</Note>
 
 <Tabs>
   <Tab title="Python">
@@ -39,7 +44,7 @@ To enable streaming in the SDKs, set the `stream` parameter to `True`.
           in_thinking = True
           print('Thinking:\n', end='', flush=True)
         print(chunk.message.thinking, end='', flush=True)
-        # accumulate the partial thinking 
+        # accumulate the partial thinking
         thinking += chunk.message.thinking
       elif chunk.message.content:
         if in_thinking:
@@ -52,6 +57,7 @@ To enable streaming in the SDKs, set the `stream` parameter to `True`.
       # append the accumulated fields to the messages for the next request
       new_messages = [{ role: 'assistant', thinking: thinking, content: content }]
     ```
+
   </Tab>
   <Tab title="JavaScript">
 
@@ -95,5 +101,6 @@ To enable streaming in the SDKs, set the `stream` parameter to `True`.
 
     main().catch(console.error)
     ```
+
   </Tab>
 </Tabs>

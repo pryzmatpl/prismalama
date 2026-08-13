@@ -5,15 +5,17 @@
 > Statements below may be outdated or inaccurate for the current Prismalama codebase.
 
 ## Model Location
+
 - **Path**: `/nvme3/AI Models/Kimi/`
 - **Format**: GGUF (13 shards, Q4_K_M quantized)
 - **Size**: 579GB
-- **Files**: 
+- **Files**:
   - `Kimi-K2.5-Q4_K_M-00001-of-00013.gguf` through `Kimi-K2.5-Q4_K_M-00013-of-00013.gguf`
 
 ## Option 1: llama-cpp-python with ROCm (Recommended)
 
 ### Installation
+
 ```bash
 bash /sda2/install-llama-cpp.sh
 ```
@@ -21,17 +23,20 @@ bash /sda2/install-llama-cpp.sh
 This installs llama-cpp-python with ROCm support for your RX 7900 XTX.
 
 ### Usage
+
 ```bash
 python3 /sda2/kimi-direct.py "Your prompt here"
 ```
 
 **Example:**
+
 ```bash
 python3 /sda2/kimi-direct.py "Explain quantum computing in simple terms"
 python3 /sda2/kimi-direct.py "Write a Python function to sort a list"
 ```
 
 ### Features
+
 - ✅ Direct GGUF loading (no copying)
 - ✅ ROCm GPU acceleration
 - ✅ 579GB model stays on NVMe
@@ -72,12 +77,14 @@ ollama run kimi-k2.5
 ## Quick Reference
 
 ### Direct Python Script
+
 ```bash
 # One-line usage after installation
 python3 /sda2/kimi-direct.py "What is the meaning of life?"
 ```
 
 ### With Custom Parameters
+
 ```python
 from llama_cpp import Llama
 
@@ -95,6 +102,7 @@ output = llm(
 ```
 
 ### Performance Expectations
+
 - **Loading**: 1-2 minutes (first time)
 - **GPU Memory**: ~4-8GB (with layer offloading)
 - **Speed**: 5-20 tokens/second (depends on context length)
@@ -103,6 +111,7 @@ output = llm(
 ## Why This Works
 
 **llama.cpp** natively supports:
+
 1. ✅ Multi-file GGUF (the 13 shards)
 2. ✅ ROCm GPU acceleration
 3. ✅ Layer offloading (load only what's needed)
@@ -110,21 +119,23 @@ output = llm(
 
 ## Comparison
 
-| Method | Disk Space | Setup | Speed | Recommendation |
-|--------|-----------|-------|-------|----------------|
-| llama-cpp-python | 0GB extra | Easy | Fast | ⭐⭐⭐⭐⭐ |
-| llama.cpp CLI | 0GB extra | Medium | Fast | ⭐⭐⭐⭐ |
-| Ollama | 579GB copy | Easy | Fast | ⭐⭐ (disk limited) |
-| AirLLM | 0GB extra | Complex | Medium | ⭐⭐ (dependencies) |
+| Method           | Disk Space | Setup   | Speed  | Recommendation      |
+| ---------------- | ---------- | ------- | ------ | ------------------- |
+| llama-cpp-python | 0GB extra  | Easy    | Fast   | ⭐⭐⭐⭐⭐          |
+| llama.cpp CLI    | 0GB extra  | Medium  | Fast   | ⭐⭐⭐⭐            |
+| Ollama           | 579GB copy | Easy    | Fast   | ⭐⭐ (disk limited) |
+| AirLLM           | 0GB extra  | Complex | Medium | ⭐⭐ (dependencies) |
 
 ## Next Steps
 
 1. **Install llama-cpp-python**:
+
    ```bash
    bash /sda2/install-llama-cpp.sh
    ```
 
 2. **Test Kimi**:
+
    ```bash
    python3 /sda2/kimi-direct.py "Hello!"
    ```
@@ -132,4 +143,5 @@ output = llm(
 3. **Enjoy your 579GB model** without copying! 🎉
 
 ---
+
 **Note**: The installation script will compile llama-cpp-python with ROCm support for your RX 7900 XTX. This takes 5-10 minutes but is a one-time setup.

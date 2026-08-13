@@ -12,11 +12,7 @@ describe("fileValidation", () => {
   });
 
   describe("validateFile", () => {
-    const createMockFile = (
-      name: string,
-      size: number,
-      type: string,
-    ): File => {
+    const createMockFile = (name: string, size: number, type: string): File => {
       const blob = new Blob(["test content"], { type });
       return new File([blob], name, { type });
     };
@@ -62,7 +58,7 @@ describe("fileValidation", () => {
       const content = new Uint8Array(largeSize);
       const blob = new Blob([content], { type: "image/webp" });
       const file = new File([blob], "large.webp", { type: "image/webp" });
-      
+
       const result = validateFile(file, {
         hasVisionCapability: true,
         maxFileSize: 10, // 10MB limit

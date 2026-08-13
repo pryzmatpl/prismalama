@@ -1,5 +1,5 @@
-import { useSettings } from "@/hooks/useSettings";
 import CopyButton from "@/components/CopyButton";
+import { useSettings } from "@/hooks/useSettings";
 
 interface LaunchCommand {
   id: string;
@@ -102,10 +102,22 @@ export default function LaunchCommands() {
           {item.darkIcon ? (
             <picture>
               <source srcSet={item.darkIcon} media="(prefers-color-scheme: dark)" />
-              <img src={item.icon} alt="" className={`${item.iconClassName ?? "h-8 w-8"} rounded-sm`} />
+              <img
+                src={item.icon}
+                alt=""
+                className={`${item.iconClassName ?? "h-8 w-8"} rounded-sm`}
+              />
             </picture>
           ) : (
-            <img src={item.icon} alt="" className={item.borderless ? "h-full w-full rounded-xl" : `${item.iconClassName ?? "h-8 w-8"} rounded-sm`} />
+            <img
+              src={item.icon}
+              alt=""
+              className={
+                item.borderless
+                  ? "h-full w-full rounded-xl"
+                  : `${item.iconClassName ?? "h-8 w-8"} rounded-sm`
+              }
+            />
           )}
         </div>
 
@@ -126,7 +138,7 @@ export default function LaunchCommands() {
               title="Copy command to clipboard"
               className="text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-200/60 dark:hover:bg-neutral-700/70"
               onCopy={() => {
-                setSettings({ LastHomeView: item.id }).catch(() => { });
+                setSettings({ LastHomeView: item.id }).catch(() => {});
               }}
             />
           </div>
@@ -141,16 +153,12 @@ export default function LaunchCommands() {
         className={`flex-1 overflow-y-auto overscroll-contain relative min-h-0 ${isWindows ? "xl:pt-4" : "xl:pt-8"}`}
       >
         <div className="max-w-[730px] mx-auto w-full px-4 pt-4 pb-20 sm:px-6 sm:pt-6 sm:pb-24 lg:px-8 lg:pt-8 lg:pb-28">
-          <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">
-            Launch
-          </h1>
+          <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Launch</h1>
           <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
             Copy a command and run it in your terminal.
           </p>
 
-          <div className="mt-6 grid gap-7">
-            {LAUNCH_COMMANDS.map(renderCommandCard)}
-          </div>
+          <div className="mt-6 grid gap-7">{LAUNCH_COMMANDS.map(renderCommandCard)}</div>
         </div>
       </section>
     </main>

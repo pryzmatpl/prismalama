@@ -1,5 +1,5 @@
-import { clsx } from "clsx";
 import { XMarkIcon } from "@heroicons/react/20/solid";
+import { clsx } from "clsx";
 
 const colors = {
   red: "bg-red-50/80 dark:bg-red-950/50",
@@ -59,29 +59,18 @@ export const Display = ({
     const buttonClass =
       "px-3 py-1.5 text-xs font-medium text-white bg-zinc-900 border border-zinc-950/90 rounded-full shadow-sm disabled:opacity-50 disabled:cursor-not-allowed dark:text-zinc-950 dark:bg-white dark:border-zinc-950/10 cursor-pointer hover:bg-zinc-800 dark:hover:bg-neutral-100";
 
-    const content = (
-      <span>{action.loading ? `${action.label}...` : action.label}</span>
-    );
+    const content = <span>{action.loading ? `${action.label}...` : action.label}</span>;
 
     if (action.href) {
       return (
-        <a
-          href={action.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={buttonClass}
-        >
+        <a href={action.href} target="_blank" rel="noopener noreferrer" className={buttonClass}>
           {content}
         </a>
       );
     }
 
     return (
-      <button
-        onClick={action.onClick}
-        disabled={action.disabled}
-        className={buttonClass}
-      >
+      <button onClick={action.onClick} disabled={action.disabled} className={buttonClass}>
         {content}
       </button>
     );
@@ -96,9 +85,7 @@ export const Display = ({
       )}
     >
       <div className="flex items-center space-x-3 select-text">
-        <span className={clsx("leading-relaxed", textColors[variant])}>
-          {message}
-        </span>
+        <span className={clsx("leading-relaxed", textColors[variant])}>{message}</span>
       </div>
 
       <div className="flex items-center space-x-3">
@@ -106,10 +93,7 @@ export const Display = ({
         {onDismiss && (
           <button
             onClick={onDismiss}
-            className={clsx(
-              "rounded-full p-1.5 cursor-pointer",
-              dismissButtonColors[variant],
-            )}
+            className={clsx("rounded-full p-1.5 cursor-pointer", dismissButtonColors[variant])}
           >
             <XMarkIcon className="h-3.5 w-3.5" />
           </button>

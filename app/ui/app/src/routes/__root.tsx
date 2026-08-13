@@ -1,7 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
 import { getSettings } from "@/api";
-import { useQuery } from "@tanstack/react-query";
 import { useCloudStatus } from "@/hooks/useCloudStatus";
 
 function RootComponent() {

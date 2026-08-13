@@ -14,18 +14,14 @@ describe("Model merging logic", () => {
     const merged = mergeModels(localModels);
 
     // First verify cloud models are first and in FEATURED_MODELS order
-    const cloudModels = FEATURED_MODELS.filter((m: string) =>
-      m.endsWith("cloud"),
-    );
+    const cloudModels = FEATURED_MODELS.filter((m: string) => m.endsWith("cloud"));
     for (let i = 0; i < cloudModels.length; i++) {
       expect(merged[i].model).toBe(cloudModels[i]);
       expect(merged[i].isCloud()).toBe(true);
     }
 
     // Then verify non-cloud featured models are next and in FEATURED_MODELS order
-    const nonCloudFeatured = FEATURED_MODELS.filter(
-      (m: string) => !m.endsWith("cloud"),
-    );
+    const nonCloudFeatured = FEATURED_MODELS.filter((m: string) => !m.endsWith("cloud"));
     for (let i = 0; i < nonCloudFeatured.length; i++) {
       const model = merged[i + cloudModels.length];
       expect(model.model).toBe(nonCloudFeatured[i]);
@@ -55,9 +51,7 @@ describe("Model merging logic", () => {
     expect(cloudModels.length).toBe(0);
 
     // Should have non-cloud featured models
-    const nonCloudFeatured = FEATURED_MODELS.filter(
-      (m) => !m.endsWith("cloud"),
-    );
+    const nonCloudFeatured = FEATURED_MODELS.filter((m) => !m.endsWith("cloud"));
     for (let i = 0; i < nonCloudFeatured.length; i++) {
       const model = merged[i];
       expect(model.model).toBe(nonCloudFeatured[i]);
@@ -81,9 +75,7 @@ describe("Model merging logic", () => {
     }
 
     // Then verify non-cloud featured models are next and in FEATURED_MODELS order
-    const nonCloudFeatured = FEATURED_MODELS.filter(
-      (m) => !m.endsWith("cloud"),
-    );
+    const nonCloudFeatured = FEATURED_MODELS.filter((m) => !m.endsWith("cloud"));
     for (let i = 0; i < nonCloudFeatured.length; i++) {
       const model = merged[i + cloudModels.length];
       expect(model.model).toBe(nonCloudFeatured[i]);
@@ -111,9 +103,7 @@ describe("Model merging logic", () => {
     }
 
     // Then verify non-cloud featured models are next and in FEATURED_MODELS order
-    const nonCloudFeatured = FEATURED_MODELS.filter(
-      (m) => !m.endsWith("cloud"),
-    );
+    const nonCloudFeatured = FEATURED_MODELS.filter((m) => !m.endsWith("cloud"));
     for (let i = 0; i < nonCloudFeatured.length; i++) {
       const model = merged[i + cloudModels.length];
       expect(model.model).toBe(nonCloudFeatured[i]);

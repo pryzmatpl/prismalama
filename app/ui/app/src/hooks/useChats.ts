@@ -1,13 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getChats, getChat, sendMessage, type ChatEventUnion } from "../api";
+import { getModelCapabilities } from "@/api";
+import { useStreamingContext } from "@/contexts/StreamingContext";
 import { Chat, ErrorEvent, Model } from "@/gotypes";
 import { Message } from "@/gotypes";
-import { useSelectedModel } from "./useSelectedModel";
-import { createQueryBatcher } from "./useQueryBatcher";
-import { useRefetchModels } from "./useModels";
-import { useStreamingContext } from "@/contexts/StreamingContext";
-import { getModelCapabilities } from "@/api";
+import { getChats, getChat, sendMessage, type ChatEventUnion } from "../api";
 import { useCloudStatus } from "./useCloudStatus";
+import { useRefetchModels } from "./useModels";
+import { createQueryBatcher } from "./useQueryBatcher";
+import { useSelectedModel } from "./useSelectedModel";
 
 export const useChats = () => {
   return useQuery({
@@ -24,10 +24,7 @@ export const useChat = (chatId: string) => {
     queryKey: ["chat", chatId],
     queryFn: async () => {
       // Check if we have optimistic data and this chat is currently streaming
-      const existingData = queryClient.getQueryData<{ chat: Chat }>([
-        "chat",
-        chatId,
-      ]);
+      const existingData = queryClient.getQueryData<{ chat: Chat }>(["chat", chatId]);
       const isStreaming = streamingChatIds.has(chatId);
 
       const response = await getChat(chatId);
@@ -46,10 +43,7 @@ export const useChat = (chatId: string) => {
       if (response.chat && response.chat.messages) {
         response.chat.messages = response.chat.messages.map((msg) => {
           // If this is a tool message without tool_calls but has content about a tool call
-          if (
-            msg.role === "tool" &&
-            (!msg.tool_calls || msg.tool_calls.length === 0)
-          ) {
+          if (msg.role === "tool" && (!msg.tool_calls || msg.tool_calls.length === 0)) {
             // Check if content indicates this is a tool call (not a tool result)
             const toolCallMatch = msg.content.match(/Tool (\w+) called/);
             if (toolCallMatch) {
@@ -131,8 +125,7 @@ export const useDismissStaleModel = () => {
 
   return (modelName: string) => {
     const currentDismissedModels =
-      queryClient.getQueryData<Set<string>>(["dismissedStaleModels"]) ||
-      new Set();
+      queryClient.getQueryData<Set<string>>(["dismissedStaleModels"]) || new Set();
     const newSet = new Set(currentDismissedModels);
     newSet.add(modelName);
     queryClient.setQueryData(["dismissedStaleModels"], newSet);
@@ -149,8 +142,7 @@ export const useIsWaitingForLoad = (chatId: string) => {
   const queryClient = useQueryClient();
 
   // Basic check: is this chat streaming but hasn't loaded yet?
-  const isWaitingForLoad =
-    streamingChatIds.has(chatId) && !loadingChats.has(chatId);
+  const isWaitingForLoad = streamingChatIds.has(chatId) && !loadingChats.has(chatId);
 
   if (!isWaitingForLoad || !selectedModel || !chatsData?.chatInfos) {
     return isWaitingForLoad;
@@ -167,19 +159,12 @@ export const useIsWaitingForLoad = (chatId: string) => {
 
   // Check if the most recent chat used the same model within 5 minutes
   const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-  const wasRecentlyActive =
-    mostRecentOtherChat.updatedAt.getTime() > fiveMinutesAgo;
+  const wasRecentlyActive = mostRecentOtherChat.updatedAt.getTime() > fiveMinutesAgo;
   if (!wasRecentlyActive) {
     return isWaitingForLoad;
   }
-  const recentChatData = queryClient.getQueryData<{ chat: Chat }>([
-    "chat",
-    mostRecentOtherChat.id,
-  ]);
-  if (
-    !recentChatData?.chat?.messages ||
-    recentChatData.chat.messages.length === 0
-  ) {
+  const recentChatData = queryClient.getQueryData<{ chat: Chat }>(["chat", mostRecentOtherChat.id]);
+  if (!recentChatData?.chat?.messages || recentChatData.chat.messages.length === 0) {
     return isWaitingForLoad;
   }
   const lastAssistantMessage = [...recentChatData.chat.messages]
@@ -264,37 +249,30 @@ export const useSendMessage = (chatId: string) => {
         // Only add optimistic message for non-empty messages
         if (message.trim() !== "") {
           // Optimistically add the user message
-          queryClient.setQueryData(
-            ["chat", chatId],
-            (old: { chat: Chat } | undefined) => {
-              if (!old) return old;
+          queryClient.setQueryData(["chat", chatId], (old: { chat: Chat } | undefined) => {
+            if (!old) return old;
 
-              const newMessage = new Message({
-                role: "user",
-                content: message,
-                attachments: attachments,
-              });
+            const newMessage = new Message({
+              role: "user",
+              content: message,
+              attachments: attachments,
+            });
 
-              let messages = old.chat.messages || [];
+            let messages = old.chat.messages || [];
 
-              // If editing a message (index provided), truncate messages array
-              if (
-                index !== undefined &&
-                index >= 0 &&
-                index < messages.length
-              ) {
-                messages = messages.slice(0, index);
-              }
+            // If editing a message (index provided), truncate messages array
+            if (index !== undefined && index >= 0 && index < messages.length) {
+              messages = messages.slice(0, index);
+            }
 
-              return {
-                ...old,
-                chat: new Chat({
-                  ...old.chat,
-                  messages: [...messages, newMessage],
-                }),
-              };
-            },
-          );
+            return {
+              ...old,
+              chat: new Chat({
+                ...old.chat,
+                messages: [...messages, newMessage],
+              }),
+            };
+          });
         }
       }
 
@@ -352,10 +330,7 @@ export const useSendMessage = (chatId: string) => {
         // download events don't count as loaded
         // TODO(jmorganca): loading should potentially be an event instead of
         // reducing it this way
-        if (
-          event.eventName !== "download" &&
-          !loadingChats.has(currentChatId)
-        ) {
+        if (event.eventName !== "download" && !loadingChats.has(currentChatId)) {
           // If this is the first time loading this chat, mark it as loaded
           setLoadingChats((prev: Set<string>) => {
             const newSet = new Set(prev);
@@ -389,10 +364,8 @@ export const useSendMessage = (chatId: string) => {
 
               // Update the last message with new content
               if (lastMessage) {
-                const updatedContent =
-                  (lastMessage.content || "") + (event.content || "");
-                const updatedThinking =
-                  (lastMessage.thinking || "") + (event.thinking || "");
+                const updatedContent = (lastMessage.content || "") + (event.content || "");
+                const updatedThinking = (lastMessage.thinking || "") + (event.thinking || "");
                 const updatedMessage = new Message({
                   ...lastMessage,
                   content: updatedContent,
@@ -441,8 +414,7 @@ export const useSendMessage = (chatId: string) => {
 
               // Update the last message with new thinking content
               if (lastMessage) {
-                const updatedThinking =
-                  (lastMessage.thinking || "") + (event.thinking || "");
+                const updatedThinking = (lastMessage.thinking || "") + (event.thinking || "");
                 const updatedMessage = new Message({
                   ...lastMessage,
                   thinking: updatedThinking,
@@ -466,126 +438,114 @@ export const useSendMessage = (chatId: string) => {
           case "tool_call": {
             // Handle tool call events - these are now mostly handled by assistant_with_tools
             // but kept for backward compatibility, potentially still good for normal tool calling models
-            queryClient.setQueryData(
-              ["chat", currentChatId],
-              (old: { chat: Chat } | undefined) => {
-                if (!old) return old;
+            queryClient.setQueryData(["chat", currentChatId], (old: { chat: Chat } | undefined) => {
+              if (!old) return old;
 
-                const existingMessages = old.chat.messages || [];
-                const newMessages = [...existingMessages];
+              const existingMessages = old.chat.messages || [];
+              const newMessages = [...existingMessages];
 
-                // Add tool call message
-                if (event.toolCall) {
-                  newMessages.push(
-                    new Message({
-                      role: "tool",
-                      content: `Tool ${event.toolCall.function.name} called`,
-                      tool_calls: [event.toolCall],
-                      thinkingTimeStart: event.thinkingTimeStart,
-                      thinkingTimeEnd: event.thinkingTimeEnd,
-                    }),
-                  );
-                }
-
-                return {
-                  ...old,
-                  chat: new Chat({
-                    ...old.chat,
-                    messages: newMessages,
+              // Add tool call message
+              if (event.toolCall) {
+                newMessages.push(
+                  new Message({
+                    role: "tool",
+                    content: `Tool ${event.toolCall.function.name} called`,
+                    tool_calls: [event.toolCall],
+                    thinkingTimeStart: event.thinkingTimeStart,
+                    thinkingTimeEnd: event.thinkingTimeEnd,
                   }),
-                };
-              },
-            );
+                );
+              }
+
+              return {
+                ...old,
+                chat: new Chat({
+                  ...old.chat,
+                  messages: newMessages,
+                }),
+              };
+            });
             break;
           }
           case "assistant_with_tools": {
             // Handle assistant messages that include tool calls
-            queryClient.setQueryData(
-              ["chat", currentChatId],
-              (old: { chat: Chat } | undefined) => {
-                if (!old) return old;
+            queryClient.setQueryData(["chat", currentChatId], (old: { chat: Chat } | undefined) => {
+              if (!old) return old;
 
-                const existingMessages = old.chat.messages || [];
-                const newMessages = [...existingMessages];
+              const existingMessages = old.chat.messages || [];
+              const newMessages = [...existingMessages];
 
-                // Find the last assistant message and update it with tool calls
-                const lastMessage = newMessages[newMessages.length - 1];
-                if (lastMessage && lastMessage.role === "assistant") {
-                  // Update existing assistant message with tool calls
-                  const updatedMessage = new Message({
-                    ...lastMessage,
-                    content: lastMessage.content + (event.content || ""),
-                    thinking: lastMessage.thinking + (event.thinking || ""),
+              // Find the last assistant message and update it with tool calls
+              const lastMessage = newMessages[newMessages.length - 1];
+              if (lastMessage && lastMessage.role === "assistant") {
+                // Update existing assistant message with tool calls
+                const updatedMessage = new Message({
+                  ...lastMessage,
+                  content: lastMessage.content + (event.content || ""),
+                  thinking: lastMessage.thinking + (event.thinking || ""),
+                  tool_calls: event.toolCalls,
+                  thinkingTimeStart: lastMessage.thinkingTimeStart || event.thinkingTimeStart,
+                  thinkingTimeEnd: event.thinkingTimeEnd,
+                  model: selectedModel.model,
+                });
+                newMessages[newMessages.length - 1] = updatedMessage;
+              } else {
+                // No existing assistant message, create new one
+                newMessages.push(
+                  new Message({
+                    role: "assistant",
+                    content: event.content,
+                    thinking: event.thinking,
                     tool_calls: event.toolCalls,
-                    thinkingTimeStart:
-                      lastMessage.thinkingTimeStart || event.thinkingTimeStart,
+                    thinkingTimeStart: event.thinkingTimeStart,
                     thinkingTimeEnd: event.thinkingTimeEnd,
                     model: selectedModel.model,
-                  });
-                  newMessages[newMessages.length - 1] = updatedMessage;
-                } else {
-                  // No existing assistant message, create new one
-                  newMessages.push(
-                    new Message({
-                      role: "assistant",
-                      content: event.content,
-                      thinking: event.thinking,
-                      tool_calls: event.toolCalls,
-                      thinkingTimeStart: event.thinkingTimeStart,
-                      thinkingTimeEnd: event.thinkingTimeEnd,
-                      model: selectedModel.model,
-                    }),
-                  );
-                }
-
-                return {
-                  ...old,
-                  chat: new Chat({
-                    ...old.chat,
-                    messages: newMessages,
                   }),
-                };
-              },
-            );
+                );
+              }
+
+              return {
+                ...old,
+                chat: new Chat({
+                  ...old.chat,
+                  messages: newMessages,
+                }),
+              };
+            });
             break;
           }
           case "tool_result": {
             // Handle tool result events
-            queryClient.setQueryData(
-              ["chat", currentChatId],
-              (old: { chat: Chat } | undefined) => {
-                if (!old) return old;
+            queryClient.setQueryData(["chat", currentChatId], (old: { chat: Chat } | undefined) => {
+              if (!old) return old;
 
-                const existingMessages = old.chat.messages || [];
-                const newMessages = [...existingMessages];
+              const existingMessages = old.chat.messages || [];
+              const newMessages = [...existingMessages];
 
-                newMessages.push(
-                  Object.assign(
-                    new Message({
-                      role: "tool",
-                      content: event.content,
-                      thinkingTimeStart: event.thinkingTimeStart,
-                      thinkingTimeEnd: event.thinkingTimeEnd,
-                    }),
-                    {
-                      tool_result: (event as any).toolResultData,
-                      ...((event as any).toolName
-                        ? { tool_name: (event as any).toolName }
-                        : {}),
-                    },
-                  ),
-                );
-
-                return {
-                  ...old,
-                  chat: new Chat({
-                    ...old.chat,
-                    messages: newMessages,
-                    browser_state: event.toolState ?? old.chat.browser_state,
+              newMessages.push(
+                Object.assign(
+                  new Message({
+                    role: "tool",
+                    content: event.content,
+                    thinkingTimeStart: event.thinkingTimeStart,
+                    thinkingTimeEnd: event.thinkingTimeEnd,
                   }),
-                };
-              },
-            );
+                  {
+                    tool_result: (event as any).toolResultData,
+                    ...((event as any).toolName ? { tool_name: (event as any).toolName } : {}),
+                  },
+                ),
+              );
+
+              return {
+                ...old,
+                chat: new Chat({
+                  ...old.chat,
+                  messages: newMessages,
+                  browser_state: event.toolState ?? old.chat.browser_state,
+                }),
+              };
+            });
             break;
           }
           case "download": {
@@ -597,9 +557,7 @@ export const useSendMessage = (chatId: string) => {
 
             if (event.done && selectedModel) {
               const currentStaleModels =
-                queryClient.getQueryData<Map<string, boolean>>([
-                  "staleModels",
-                ]) || new Map();
+                queryClient.getQueryData<Map<string, boolean>>(["staleModels"]) || new Map();
               const newStaleMap = new Map(currentStaleModels);
               newStaleMap.delete(selectedModel.model);
               queryClient.setQueryData(["staleModels"], newStaleMap);
@@ -615,10 +573,7 @@ export const useSendMessage = (chatId: string) => {
                   );
                 })
                 .catch((error) => {
-                  console.error(
-                    "Failed to fetch capabilities after download:",
-                    error,
-                  );
+                  console.error("Failed to fetch capabilities after download:", error);
                   queryClient.invalidateQueries({
                     queryKey: ["modelCapabilities", selectedModel.model],
                   });
@@ -640,10 +595,7 @@ export const useSendMessage = (chatId: string) => {
             });
 
             // Set error using separate React Query cache
-            queryClient.setQueryData(
-              ["chatError", currentChatId],
-              event as ErrorEvent,
-            );
+            queryClient.setQueryData(["chatError", currentChatId], event as ErrorEvent);
             break;
           }
           case "done":
@@ -689,11 +641,10 @@ export const useSendMessage = (chatId: string) => {
             batcher.flushBatch();
             batcher.cleanup();
             currentChatId = newId;
-            batcher = createQueryBatcher<{ chat: Chat }>(
-              queryClient,
-              ["chat", currentChatId],
-              { batchInterval: 4, immediateFirst: true },
-            );
+            batcher = createQueryBatcher<{ chat: Chat }>(queryClient, ["chat", currentChatId], {
+              batchInterval: 4,
+              immediateFirst: true,
+            });
 
             // Create initial chat data for the new chat
             queryClient.setQueryData(["chat", newId], {
@@ -731,20 +682,14 @@ export const useSendMessage = (chatId: string) => {
 };
 
 export const useCancelMessage = () => {
-  const {
-    abortControllers,
-    setStreamingChatIds,
-    setAbortControllers,
-    setDownloadProgress,
-  } = useStreamingContext();
+  const { abortControllers, setStreamingChatIds, setAbortControllers, setDownloadProgress } =
+    useStreamingContext();
 
   return (chatId: string) => {
     const controller = abortControllers.get(chatId);
     if (controller) {
       controller.abort();
-      setStreamingChatIds(
-        (prev) => new Set([...prev].filter((id) => id !== chatId)),
-      );
+      setStreamingChatIds((prev) => new Set([...prev].filter((id) => id !== chatId)));
       setAbortControllers((prev) => {
         const newMap = new Map(prev);
         newMap.delete(chatId);

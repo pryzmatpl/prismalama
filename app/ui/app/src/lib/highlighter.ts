@@ -1,5 +1,5 @@
-import { createHighlighter } from "shiki";
 import type { ThemeRegistration } from "shiki";
+import { createHighlighter } from "shiki";
 
 const oneLightTheme: ThemeRegistration = {
   name: "one-light",
@@ -23,12 +23,7 @@ const oneLightTheme: ThemeRegistration = {
       settings: { foreground: "#4078f2" },
     },
     {
-      scope: [
-        "constant.numeric",
-        "constant.language",
-        "constant.character",
-        "number",
-      ],
+      scope: ["constant.numeric", "constant.language", "constant.character", "number"],
       settings: { foreground: "#c18401" },
     },
     {
@@ -85,12 +80,7 @@ const oneDarkTheme: ThemeRegistration = {
       settings: { foreground: "#61afef" },
     },
     {
-      scope: [
-        "constant.numeric",
-        "constant.language",
-        "constant.character",
-        "number",
-      ],
+      scope: ["constant.numeric", "constant.language", "constant.character", "number"],
       settings: { foreground: "#d19a66" },
     },
     {
@@ -125,8 +115,7 @@ const oneDarkTheme: ThemeRegistration = {
   ],
 };
 
-export let highlighter: Awaited<ReturnType<typeof createHighlighter>> | null =
-  null;
+export let highlighter: Awaited<ReturnType<typeof createHighlighter>> | null = null;
 
 export const highlighterPromise = createHighlighter({
   themes: [oneLightTheme, oneDarkTheme],

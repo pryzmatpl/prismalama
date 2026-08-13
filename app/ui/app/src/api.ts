@@ -1,3 +1,4 @@
+import type { ModelResponse } from "ollama/browser";
 import {
   ChatResponse,
   ChatsResponse,
@@ -11,10 +12,9 @@ import {
   Settings,
   User,
 } from "@/gotypes";
-import { parseJsonlFromResponse } from "./util/jsonl-parsing";
-import { ollamaClient as ollama } from "./lib/ollama-client";
-import type { ModelResponse } from "ollama/browser";
 import { API_BASE, OLLAMA_DOT_COM } from "./lib/config";
+import { ollamaClient as ollama } from "./lib/ollama-client";
+import { parseJsonlFromResponse } from "./util/jsonl-parsing";
 
 // Extend Model class with utility methods
 declare module "@/gotypes" {
@@ -176,16 +176,12 @@ export async function getModels(query?: string): Promise<Model[]> {
   }
 }
 
-export async function getModelCapabilities(
-  modelName: string,
-): Promise<ModelCapabilitiesResponse> {
+export async function getModelCapabilities(modelName: string): Promise<ModelCapabilitiesResponse> {
   try {
     const showResponse = await ollama.show({ model: modelName });
 
     return new ModelCapabilitiesResponse({
-      capabilities: Array.isArray(showResponse.capabilities)
-        ? showResponse.capabilities
-        : [],
+      capabilities: Array.isArray(showResponse.capabilities) ? showResponse.capabilities : [],
     });
   } catch (error) {
     // Model might not be downloaded yet, return empty capabilities
@@ -229,9 +225,7 @@ export async function* sendMessage(
         model: model.model,
         prompt: message,
         ...(index !== undefined ? { index } : {}),
-        ...(serializedAttachments !== undefined
-          ? { attachments: serializedAttachments }
-          : {}),
+        ...(serializedAttachments !== undefined ? { attachments: serializedAttachments } : {}),
         // Always send web_search as a boolean value (default to false)
         web_search: webSearch ?? false,
         file_tools: fileTools ?? false,
@@ -290,9 +284,7 @@ export async function updateSettings(settings: Settings): Promise<{
   };
 }
 
-export async function updateCloudSetting(
-  enabled: boolean,
-): Promise<CloudStatusResponse> {
+export async function updateCloudSetting(enabled: boolean): Promise<CloudStatusResponse> {
   const response = await fetch(`${API_BASE}/api/v1/cloud`, {
     method: "POST",
     headers: {
@@ -352,9 +344,7 @@ export async function getModelUpstreamInfo(
     });
 
     if (!response.ok) {
-      console.warn(
-        `Failed to check upstream for ${model.model}: ${response.status}`,
-      );
+      console.warn(`Failed to check upstream for ${model.model}: ${response.status}`);
       return { stale: false, exists: false };
     }
 
@@ -419,13 +409,9 @@ export interface ModelRecommendationsResponse {
 }
 
 export async function getModelRecommendations(): Promise<ModelRecommendation[]> {
-  const response = await fetch(
-    `${API_BASE}/api/experimental/model-recommendations`,
-  );
+  const response = await fetch(`${API_BASE}/api/experimental/model-recommendations`);
   if (!response.ok) {
-    throw new Error(
-      `Failed to fetch model recommendations: ${response.statusText}`,
-    );
+    throw new Error(`Failed to fetch model recommendations: ${response.statusText}`);
   }
   const data: ModelRecommendationsResponse = await response.json();
   return data.recommendations || [];
@@ -434,9 +420,7 @@ export async function getModelRecommendations(): Promise<ModelRecommendation[]> 
 export async function getInferenceCompute(): Promise<InferenceComputeResponse> {
   const response = await fetch(`${API_BASE}/api/v1/inference-compute`);
   if (!response.ok) {
-    throw new Error(
-      `Failed to fetch inference compute: ${response.statusText}`,
-    );
+    throw new Error(`Failed to fetch inference compute: ${response.statusText}`);
   }
 
   const data = await response.json();

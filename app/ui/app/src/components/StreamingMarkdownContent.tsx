@@ -1,13 +1,9 @@
+import type { BundledLanguage } from "shiki";
 import React from "react";
-import {
-  Streamdown,
-  defaultRehypePlugins,
-  defaultRemarkPlugins,
-} from "streamdown";
+import { Streamdown, defaultRehypePlugins, defaultRemarkPlugins } from "streamdown";
+import { highlighter } from "@/lib/highlighter";
 import remarkCitationParser from "@/utils/remarkCitationParser";
 import CopyButton from "./CopyButton";
-import type { BundledLanguage } from "shiki";
-import { highlighter } from "@/lib/highlighter";
 
 interface StreamingMarkdownContentProps {
   content: string;
@@ -35,110 +31,103 @@ const extractText = (node: React.ReactNode): string => {
 
 const safeRehypePlugins = [defaultRehypePlugins.katex];
 
-const CodeBlock = React.memo(
-  ({ children }: React.HTMLAttributes<HTMLPreElement>) => {
-    // Extract code and language from children
-    const codeElement = children as React.ReactElement<{
-      className?: string;
-      children: React.ReactNode;
-    }>;
-    const language =
-      codeElement.props.className?.replace(/language-/, "") || "";
-    const codeText = extractText(codeElement.props.children);
+const CodeBlock = React.memo(({ children }: React.HTMLAttributes<HTMLPreElement>) => {
+  // Extract code and language from children
+  const codeElement = children as React.ReactElement<{
+    className?: string;
+    children: React.ReactNode;
+  }>;
+  const language = codeElement.props.className?.replace(/language-/, "") || "";
+  const codeText = extractText(codeElement.props.children);
 
-    // Synchronously highlight code using the pre-loaded highlighter
-    const tokens = React.useMemo(() => {
-      if (!highlighter) return null;
+  // Synchronously highlight code using the pre-loaded highlighter
+  const tokens = React.useMemo(() => {
+    if (!highlighter) return null;
 
-      try {
-        return {
-          light: highlighter.codeToTokensBase(codeText, {
-            lang: language as BundledLanguage,
-            theme: "one-light" as any,
-          }),
-          dark: highlighter.codeToTokensBase(codeText, {
-            lang: language as BundledLanguage,
-            theme: "one-dark" as any,
-          }),
-        };
-      } catch (error) {
-        console.error("Failed to highlight code:", error);
-        return null;
-      }
-    }, [codeText, language]);
+    try {
+      return {
+        light: highlighter.codeToTokensBase(codeText, {
+          lang: language as BundledLanguage,
+          theme: "one-light" as any,
+        }),
+        dark: highlighter.codeToTokensBase(codeText, {
+          lang: language as BundledLanguage,
+          theme: "one-dark" as any,
+        }),
+      };
+    } catch (error) {
+      console.error("Failed to highlight code:", error);
+      return null;
+    }
+  }, [codeText, language]);
 
-    return (
-      <div className="relative bg-neutral-100 dark:bg-neutral-800 rounded-2xl overflow-hidden my-6">
-        <div className="flex select-none">
-          {language && (
-            <div className="text-[13px] text-neutral-500 dark:text-neutral-400 font-mono px-4 py-2">
-              {language}
-            </div>
-          )}
-          <CopyButton
-            content={codeText}
-            showLabels={true}
-            className="copy-button text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 ml-auto"
-          />
-        </div>
-        {/* Light mode */}
-        <pre className="dark:hidden m-0 bg-neutral-100 text-sm overflow-x-auto p-4">
-          <code className="font-mono text-sm">
-            {tokens?.light
-              ? tokens.light.map((line: any, i: number) => (
-                  <React.Fragment key={i}>
-                    {line.map((token: any, j: number) => (
-                      <span
-                        key={j}
-                        style={{
-                          color: token.color,
-                        }}
-                      >
-                        {token.content}
-                      </span>
-                    ))}
-                    {i < tokens.light.length - 1 && "\n"}
-                  </React.Fragment>
-                ))
-              : codeText}
-          </code>
-        </pre>
-        {/* Dark mode */}
-        <pre className="hidden dark:block m-0 bg-neutral-800 text-sm overflow-x-auto p-4">
-          <code className="font-mono text-sm">
-            {tokens?.dark
-              ? tokens.dark.map((line: any, i: number) => (
-                  <React.Fragment key={i}>
-                    {line.map((token: any, j: number) => (
-                      <span
-                        key={j}
-                        style={{
-                          color: token.color,
-                        }}
-                      >
-                        {token.content}
-                      </span>
-                    ))}
-                    {i < tokens.dark.length - 1 && "\n"}
-                  </React.Fragment>
-                ))
-              : codeText}
-          </code>
-        </pre>
+  return (
+    <div className="relative bg-neutral-100 dark:bg-neutral-800 rounded-2xl overflow-hidden my-6">
+      <div className="flex select-none">
+        {language && (
+          <div className="text-[13px] text-neutral-500 dark:text-neutral-400 font-mono px-4 py-2">
+            {language}
+          </div>
+        )}
+        <CopyButton
+          content={codeText}
+          showLabels={true}
+          className="copy-button text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 ml-auto"
+        />
       </div>
-    );
-  },
-);
+      {/* Light mode */}
+      <pre className="dark:hidden m-0 bg-neutral-100 text-sm overflow-x-auto p-4">
+        <code className="font-mono text-sm">
+          {tokens?.light
+            ? tokens.light.map((line: any, i: number) => (
+                <React.Fragment key={i}>
+                  {line.map((token: any, j: number) => (
+                    <span
+                      key={j}
+                      style={{
+                        color: token.color,
+                      }}
+                    >
+                      {token.content}
+                    </span>
+                  ))}
+                  {i < tokens.light.length - 1 && "\n"}
+                </React.Fragment>
+              ))
+            : codeText}
+        </code>
+      </pre>
+      {/* Dark mode */}
+      <pre className="hidden dark:block m-0 bg-neutral-800 text-sm overflow-x-auto p-4">
+        <code className="font-mono text-sm">
+          {tokens?.dark
+            ? tokens.dark.map((line: any, i: number) => (
+                <React.Fragment key={i}>
+                  {line.map((token: any, j: number) => (
+                    <span
+                      key={j}
+                      style={{
+                        color: token.color,
+                      }}
+                    >
+                      {token.content}
+                    </span>
+                  ))}
+                  {i < tokens.dark.length - 1 && "\n"}
+                </React.Fragment>
+              ))
+            : codeText}
+        </code>
+      </pre>
+    </div>
+  );
+});
 
-const StreamingMarkdownContent: React.FC<StreamingMarkdownContentProps> =
-  React.memo(({ content, isStreaming = false, size, browserToolResult }) => {
+const StreamingMarkdownContent: React.FC<StreamingMarkdownContentProps> = React.memo(
+  ({ content, isStreaming = false, size, browserToolResult }) => {
     // Build the remark plugins array - keep default GFM and Math, add citations
     const remarkPlugins = React.useMemo(() => {
-      return [
-        defaultRemarkPlugins.gfm,
-        defaultRemarkPlugins.math,
-        remarkCitationParser,
-      ];
+      return [defaultRemarkPlugins.gfm, defaultRemarkPlugins.math, remarkCitationParser];
     }, []);
 
     return (
@@ -209,10 +198,7 @@ const StreamingMarkdownContent: React.FC<StreamingMarkdownContentProps> =
           break-words
         `}
       >
-        <StreamingMarkdownErrorBoundary
-          content={content}
-          isStreaming={isStreaming}
-        >
+        <StreamingMarkdownErrorBoundary content={content} isStreaming={isStreaming}>
           <Streamdown
             parseIncompleteMarkdown={isStreaming}
             isAnimating={isStreaming}
@@ -223,10 +209,7 @@ const StreamingMarkdownContent: React.FC<StreamingMarkdownContentProps> =
               img: ({ alt }: React.ImgHTMLAttributes<HTMLImageElement>) =>
                 alt ? <span>{alt}</span> : null,
               pre: CodeBlock,
-              table: ({
-                children,
-                ...props
-              }: React.HTMLAttributes<HTMLTableElement>) => (
+              table: ({ children, ...props }: React.HTMLAttributes<HTMLTableElement>) => (
                 <div className="overflow-x-auto max-w-full">
                   <table
                     {...props}
@@ -237,13 +220,7 @@ const StreamingMarkdownContent: React.FC<StreamingMarkdownContentProps> =
                 </div>
               ),
               // @ts-expect-error: custom citation type
-              "ol-citation": ({
-                cursor,
-              }: {
-                cursor: number;
-                start: number;
-                end: number;
-              }) => {
+              "ol-citation": ({ cursor }: { cursor: number; start: number; end: number }) => {
                 const pageStack = browserToolResult?.page_stack;
                 const hasValidPage = pageStack && cursor < pageStack.length;
                 const pageUrl = hasValidPage ? pageStack[cursor] : null;
@@ -290,7 +267,8 @@ const StreamingMarkdownContent: React.FC<StreamingMarkdownContentProps> =
         </StreamingMarkdownErrorBoundary>
       </div>
     );
-  });
+  },
+);
 
 interface StreamingMarkdownErrorBoundaryProps {
   content: string;
@@ -330,11 +308,7 @@ class StreamingMarkdownErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, info: { componentStack: string }) {
-    console.error(
-      "StreamingMarkdownContent: caught rendering error",
-      error,
-      info,
-    );
+    console.error("StreamingMarkdownContent: caught rendering error", error, info);
   }
 
   render() {

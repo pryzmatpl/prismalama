@@ -1,8 +1,5 @@
 import * as Headless from "@headlessui/react";
-import {
-  Link as RouterLink,
-  type LinkProps as RouterLinkProps,
-} from "@tanstack/react-router";
+import { Link as RouterLink, type LinkProps as RouterLinkProps } from "@tanstack/react-router";
 import React, { forwardRef } from "react";
 
 export const Link = forwardRef(function Link(

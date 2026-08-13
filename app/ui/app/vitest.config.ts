@@ -1,5 +1,5 @@
-import { defineConfig, mergeConfig } from "vite";
 import path from "path";
+import { defineConfig, mergeConfig } from "vite";
 import baseConfig from "./vite.config";
 
 export default defineConfig((configEnv) =>

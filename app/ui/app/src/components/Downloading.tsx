@@ -13,13 +13,7 @@ function formatBytes(bytes: number, unit?: string): string {
   return `${(bytes / Math.pow(K, i)).toFixed(decimals)} ${SIZES[i]}`;
 }
 
-export default function Downloading({
-  completed,
-  total,
-}: {
-  completed: number;
-  total: number;
-}) {
+export default function Downloading({ completed, total }: { completed: number; total: number }) {
   const percentage = total > 0 ? (completed / total) * 100 : 0;
   const unitIndex = total > 0 ? Math.floor(Math.log(total) / Math.log(K)) : 0;
   const unit = SIZES[unitIndex];

@@ -2,7 +2,6 @@
 title: Droid
 ---
 
-
 ## Install
 
 Install the [Droid CLI](https://factory.ai/):
@@ -11,7 +10,10 @@ Install the [Droid CLI](https://factory.ai/):
 curl -fsSL https://app.factory.ai/cli | sh
 ```
 
-<Note>Droid requires a larger context window. It is recommended to use a context window of at least 64k tokens. See [Context length](/context-length) for more information.</Note>
+<Note>
+  Droid requires a larger context window. It is recommended to use a context window of at least 64k
+  tokens. See [Context length](/context-length) for more information.
+</Note>
 
 ## Usage with Ollama
 
@@ -40,14 +42,14 @@ Add a local configuration block to `~/.factory/config.json`:
       "base_url": "http://localhost:11434/v1/",
       "api_key": "not-needed",
       "provider": "generic-chat-completion-api",
-      "max_tokens": 32000 
+      "max_tokens": 32000
     }
   ]
 }
 ```
 
-
 ## Cloud Models
+
 `qwen3-coder:480b-cloud` is the recommended model for use with Droid.
 
 Add the cloud configuration block to `~/.factory/config.json`:

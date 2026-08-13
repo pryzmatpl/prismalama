@@ -1,11 +1,3 @@
-import { useEffect, useState, useCallback } from "react";
-import { Switch } from "@/components/ui/switch";
-import { Text } from "@/components/ui/text";
-import { Input } from "@/components/ui/input";
-import { Field, Label, Description } from "@/components/ui/fieldset";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import {
   WifiIcon,
   FolderIcon,
@@ -17,11 +9,9 @@ import {
   ArrowLeftIcon,
   ArrowDownTrayIcon,
 } from "@heroicons/react/20/solid";
-import { Settings as SettingsType } from "@/gotypes";
-import { useNavigate } from "@tanstack/react-router";
-import { useUser } from "@/hooks/useUser";
-import { useCloudStatus } from "@/hooks/useCloudStatus";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { useEffect, useState, useCallback } from "react";
 import {
   getSettings,
   type CloudStatusResponse,
@@ -29,6 +19,16 @@ import {
   updateSettings,
   getInferenceCompute,
 } from "@/api";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Field, Label, Description } from "@/components/ui/fieldset";
+import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { Text } from "@/components/ui/text";
+import { Settings as SettingsType } from "@/gotypes";
+import { useCloudStatus } from "@/hooks/useCloudStatus";
+import { useUser } from "@/hooks/useUser";
 
 function AnimatedDots() {
   return (
@@ -62,11 +62,7 @@ export default function Settings() {
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [pollingInterval, setPollingInterval] = useState<number | null>(null);
   const navigate = useNavigate();
-  const {
-    cloudDisabled,
-    cloudStatus,
-    isLoading: cloudStatusLoading,
-  } = useCloudStatus();
+  const { cloudDisabled, cloudStatus, isLoading: cloudStatusLoading } = useCloudStatus();
 
   const {
     data: settingsData,
@@ -100,11 +96,8 @@ export default function Settings() {
     onMutate: async (enabled: boolean) => {
       await queryClient.cancelQueries({ queryKey: ["cloudStatus"] });
 
-      const previous = queryClient.getQueryData<CloudStatusResponse | null>([
-        "cloudStatus",
-      ]);
-      const envForcesDisabled =
-        previous?.source === "env" || previous?.source === "both";
+      const previous = queryClient.getQueryData<CloudStatusResponse | null>(["cloudStatus"]);
+      const envForcesDisabled = previous?.source === "env" || previous?.source === "both";
 
       queryClient.setQueryData<CloudStatusResponse | null>(
         ["cloudStatus"],
@@ -127,10 +120,7 @@ export default function Settings() {
       }
     },
     onSuccess: (status) => {
-      queryClient.setQueryData<CloudStatusResponse | null>(
-        ["cloudStatus"],
-        status,
-      );
+      queryClient.setQueryData<CloudStatusResponse | null>(["cloudStatus"], status);
       queryClient.invalidateQueries({ queryKey: ["models"] });
       queryClient.invalidateQueries({ queryKey: ["cloudStatus"] });
 
@@ -220,8 +210,7 @@ export default function Settings() {
     }
   };
 
-  const cloudOverriddenByEnv =
-    cloudStatus?.source === "env" || cloudStatus?.source === "both";
+  const cloudOverriddenByEnv = cloudStatus?.source === "env" || cloudStatus?.source === "both";
   const cloudToggleDisabled =
     cloudStatusLoading || updateCloudMutation.isPending || cloudOverriddenByEnv;
 
@@ -252,9 +241,7 @@ export default function Settings() {
     } catch (error) {
       console.error("Error connecting to Ollama account:", error);
       setConnectionError(
-        error instanceof Error
-          ? error.message
-          : "Failed to connect to Ollama account",
+        error instanceof Error ? error.message : "Failed to connect to Ollama account",
       );
       setIsAwaitingConnection(false);
     }
@@ -339,12 +326,7 @@ export default function Settings() {
                             type="button"
                             color="dark"
                             className="px-3 py-2 text-sm font-medium bg-black/90 backdrop-blur-sm text-white rounded-lg border border-white/10 shadow-2xl transition-all duration-300 ease-out relative overflow-hidden group"
-                            onClick={() =>
-                              window.open(
-                                "https://ollama.com/upgrade",
-                                "_blank",
-                              )
-                            }
+                            onClick={() => window.open("https://ollama.com/upgrade", "_blank")}
                           >
                             <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-green-500/20 opacity-60 group-hover:opacity-80 transition-opacity duration-300"></div>
                             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-out"></div>
@@ -357,9 +339,7 @@ export default function Settings() {
                           type="button"
                           color="white"
                           className="px-3 py-2 text-sm"
-                          onClick={() =>
-                            window.open("https://ollama.com/settings", "_blank")
-                          }
+                          onClick={() => window.open("https://ollama.com/settings", "_blank")}
                         >
                           Manage
                         </Button>
@@ -397,20 +377,14 @@ export default function Settings() {
                       onClick={handleConnectOllamaAccount}
                       disabled={isRefreshing || isAwaitingConnection}
                     >
-                      {isRefreshing || isAwaitingConnection ? (
-                        <AnimatedDots />
-                      ) : (
-                        "Sign In"
-                      )}
+                      {isRefreshing || isAwaitingConnection ? <AnimatedDots /> : "Sign In"}
                     </Button>
                   </div>
                 )}
               </Field>
               {connectionError && (
                 <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                  <Text className="text-sm text-red-600 dark:text-red-400">
-                    {connectionError}
-                  </Text>
+                  <Text className="text-sm text-red-600 dark:text-red-400">{connectionError}</Text>
                 </div>
               )}
             </div>
@@ -476,9 +450,7 @@ export default function Settings() {
                     <WifiIcon className="mt-1 h-5 w-5 flex-shrink-0 text-black dark:text-neutral-100" />
                     <div>
                       <Label>Expose Ollama to the network</Label>
-                      <Description>
-                        Allow other devices or services to access Ollama.
-                      </Description>
+                      <Description>Allow other devices or services to access Ollama.</Description>
                     </div>
                   </div>
                   <div className="flex-shrink-0">
@@ -510,16 +482,12 @@ export default function Settings() {
                         onClick={async () => {
                           if (window.webview?.selectModelsDirectory) {
                             try {
-                              const directory =
-                                await window.webview.selectModelsDirectory();
+                              const directory = await window.webview.selectModelsDirectory();
                               if (directory) {
                                 handleChange("Models", directory);
                               }
                             } catch (error) {
-                              console.error(
-                                "Error selecting models directory:",
-                                error,
-                              );
+                              console.error("Error selecting models directory:", error);
                             }
                           }
                         }}
@@ -539,8 +507,8 @@ export default function Settings() {
                   <div className="w-full">
                     <Label>Context length</Label>
                     <Description>
-                      Context length determines how much of your conversation
-                      local LLMs can remember and use to generate responses.
+                      Context length determines how much of your conversation local LLMs can
+                      remember and use to generate responses.
                     </Description>
                     <div className="mt-3">
                       <Slider
@@ -576,9 +544,7 @@ export default function Settings() {
                       <BoltIcon className="mt-1 h-5 w-5 flex-shrink-0 text-black dark:text-neutral-100" />
                       <div>
                         <Label>Enable Agent Mode</Label>
-                        <Description>
-                          Use multi-turn tools to fulfill user requests
-                        </Description>
+                        <Description>Use multi-turn tools to fulfill user requests</Description>
                       </div>
                     </div>
                     <Switch
@@ -595,9 +561,7 @@ export default function Settings() {
                       <WrenchIcon className="mt-1 h-5 w-5 flex-shrink-0 text-black dark:text-neutral-100" />
                       <div>
                         <Label>Enable Tools Mode</Label>
-                        <Description>
-                          Use single-turn tools to fulfill user requests
-                        </Description>
+                        <Description>Use single-turn tools to fulfill user requests</Description>
                       </div>
                     </div>
                     <Switch
@@ -612,12 +576,7 @@ export default function Settings() {
 
           {/* Reset button */}
           <div className="mt-6 flex justify-end px-4">
-            <Button
-              type="button"
-              color="white"
-              className="px-3"
-              onClick={handleResetToDefaults}
-            >
+            <Button type="button" color="white" className="px-3" onClick={handleResetToDefaults}>
               Reset to defaults
             </Button>
           </div>
@@ -626,10 +585,7 @@ export default function Settings() {
         {/* Saved indicator */}
         {(showSaved || restartMessage) && (
           <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 transition-opacity duration-300 z-50">
-            <Badge
-              color="green"
-              className="!bg-green-500 !text-white dark:!bg-green-600"
-            >
+            <Badge color="green" className="!bg-green-500 !text-white dark:!bg-green-600">
               Saved
             </Badge>
           </div>

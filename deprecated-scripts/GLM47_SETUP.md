@@ -7,27 +7,29 @@
 ## Overview
 
 This setup allows you to run the **GLM-4.7-Flash-4bit** model (15.7GB, 4-bit quantized) on a GPU-poor system using:
+
 - **AirLLM**: Layer-by-layer loading to fit large models in limited VRAM
 - **Ollama**: Easy model serving and API access
 - **OpenCode**: Direct integration for code generation tasks
 
 ## Model Details
 
-| Property | Value |
-|----------|--------|
-| **Model** | zai-org/GLM-4.7-Flash |
-| **Quantization** | 4-bit |
-| **Size** | ~15.7 GB |
-| **Architecture** | Glm4MoeLiteForCausalLM (MoE) |
-| **Context Length** | 4096 tokens |
-| **Vocabulary** | 154,880 tokens |
-| **Languages** | Chinese, English |
+| Property           | Value                        |
+| ------------------ | ---------------------------- |
+| **Model**          | zai-org/GLM-4.7-Flash        |
+| **Quantization**   | 4-bit                        |
+| **Size**           | ~15.7 GB                     |
+| **Architecture**   | Glm4MoeLiteForCausalLM (MoE) |
+| **Context Length** | 4096 tokens                  |
+| **Vocabulary**     | 154,880 tokens               |
+| **Languages**      | Chinese, English             |
 
 ## Installation
 
 ### Prerequisites
 
 The following have been installed:
+
 ```bash
 # Python packages
 transformers
@@ -67,6 +69,7 @@ source ./airllm_env.sh
 ```
 
 **Output example:**
+
 ```
 ============================================================
 Testing GLM-4.7-Flash with AirLLM
@@ -187,19 +190,21 @@ export OLLAMA_MODELS="/run/media/piotro/CACHE/airllm"
 
 ## Memory Requirements
 
-| Component | Required VRAM |
-|-----------|---------------|
-| **Minimum (CPU)** | 0 GB (slow) |
-| **Recommended (4-bit)** | 8-12 GB |
-| **Optimal** | 16+ GB |
+| Component               | Required VRAM |
+| ----------------------- | ------------- |
+| **Minimum (CPU)**       | 0 GB (slow)   |
+| **Recommended (4-bit)** | 8-12 GB       |
+| **Optimal**             | 16+ GB        |
 
 **With 8GB VRAM:**
+
 - AirLLM will load layers sequentially
 - Each layer is loaded, processed, then unloaded
 - Fits the full 15.7GB model in 8GB VRAM
 - Slightly slower but functional
 
 **With 16GB+ VRAM:**
+
 - Can keep multiple layers in memory
 - Better performance
 - Still uses AirLLM for memory management
@@ -230,6 +235,7 @@ PARAMETER temperature 0.8        # Higher temperature
 ### Issue: "CUDA out of memory"
 
 **Solution:**
+
 ```bash
 # Reduce context length
 export OLLAMA_CONTEXT_LENGTH="2048"
@@ -243,6 +249,7 @@ export CUDA_VISIBLE_DEVICES=""
 ### Issue: "Model loading is very slow"
 
 **Solution:**
+
 ```bash
 # Enable AirLLM compression
 export AIRLLM_COMPRESSION="4bit"
@@ -257,6 +264,7 @@ export AIRLLM_CACHE_DIR="/run/media/piotro/CACHE/airllm/.cache"
 ### Issue: "Ollama service not starting"
 
 **Solution:**
+
 ```bash
 # Check logs
 sudo journalctl -u ollama -n 50
@@ -368,14 +376,15 @@ print(response.json()['message']['content'])
 
 ## Comparison: GLM-4.7 vs Other Models
 
-| Model | Size | VRAM Required | Features |
-|--------|-------|---------------|-----------|
+| Model             | Size    | VRAM Required   | Features                              |
+| ----------------- | ------- | --------------- | ------------------------------------- |
 | **GLM-4.7-Flash** | 15.7 GB | 8-12 GB (4-bit) | Chinese/English, MoE, Flash attention |
-| Llama 2 70B | 140 GB | 24+ GB (8-bit) | English only |
-| Qwen 72B | 144 GB | 24+ GB (4-bit) | Chinese/English |
-| ChatGLM3 6B | 12 GB | 4-6 GB | Chinese/English |
+| Llama 2 70B       | 140 GB  | 24+ GB (8-bit)  | English only                          |
+| Qwen 72B          | 144 GB  | 24+ GB (4-bit)  | Chinese/English                       |
+| ChatGLM3 6B       | 12 GB   | 4-6 GB          | Chinese/English                       |
 
 **Advantages of GLM-4.7:**
+
 - ✅ Optimized for both Chinese and English
 - ✅ Efficient MoE architecture (64 experts)
 - ✅ Large context window (202K tokens)
@@ -385,6 +394,7 @@ print(response.json()['message']['content'])
 ## Next Steps
 
 1. **Test the setup:**
+
    ```bash
    cd /run/media/piotro/CACHE/airllm
    source ./airllm_env.sh
@@ -392,6 +402,7 @@ print(response.json()['message']['content'])
    ```
 
 2. **Start Ollama server:**
+
    ```bash
    systemctl start ollama
    systemctl enable ollama  # Auto-start on boot
@@ -404,6 +415,7 @@ print(response.json()['message']['content'])
    - CLI: `ollama run glm47`
 
 4. **Monitor performance:**
+
    ```bash
    # GPU memory
    nvidia-smi
@@ -435,6 +447,7 @@ print(response.json()['message']['content'])
 **Configuration Path:** `/run/media/piotro/CACHE/airllm/opencode_config.json`
 
 **Quick Start:**
+
 ```bash
 cd /run/media/piotro/CACHE/airllm
 source ./airllm_env.sh

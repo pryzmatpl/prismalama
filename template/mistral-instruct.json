@@ -1,6 +1,3 @@
 {
-  "stop": [
-    "<|im_start|>",
-    "<|im_end|>"
-  ]
+  "stop": ["<|im_start|>", "<|im_end|>"]
 }

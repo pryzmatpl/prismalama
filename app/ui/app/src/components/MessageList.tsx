@@ -1,8 +1,8 @@
-import { Message as MessageType, DownloadEvent, ErrorEvent } from "@/gotypes";
 import React from "react";
-import Message from "./Message";
+import { Message as MessageType, DownloadEvent, ErrorEvent } from "@/gotypes";
 import Downloading from "./Downloading";
 import { ErrorMessage } from "./ErrorMessage";
+import Message from "./Message";
 
 export default function MessageList({
   messages,
@@ -73,7 +73,9 @@ export default function MessageList({
                     ? String(args.url).trim()
                     : "";
               if (candidate) lastQuery = candidate;
-            } catch { /* ignored */ }
+            } catch {
+              /* ignored */
+            }
           }
         }
       }
@@ -96,9 +98,7 @@ export default function MessageList({
               onEditMessage={onEditMessage}
               messageIndex={idx}
               isStreaming={isStreaming && idx === lastIdx}
-              isFaded={
-                editingMessageIndex !== undefined && idx >= editingMessageIndex
-              }
+              isFaded={editingMessageIndex !== undefined && idx >= editingMessageIndex}
               browserToolResult={browserToolResult}
               lastToolQuery={lastToolQuery}
             />
@@ -107,9 +107,9 @@ export default function MessageList({
       })}
 
       {/* Inline error message */}
-      {error &&
-        error.code !== "usage_limit_upgrade" &&
-        error.code !== "cloud_unauthorized" && <ErrorMessage error={error} />}
+      {error && error.code !== "usage_limit_upgrade" && error.code !== "cloud_unauthorized" && (
+        <ErrorMessage error={error} />
+      )}
 
       {/* Indeterminate loading indicator */}
       {showDots && (

@@ -4,9 +4,7 @@ title: VS Code
 
 VS Code includes built-in AI chat through GitHub Copilot Chat. Ollama models can be used directly in the Copilot Chat model picker.
 
-
 ![VS Code with Ollama](/images/vscode.png)
-
 
 ## Prerequisites
 
@@ -14,7 +12,12 @@ VS Code includes built-in AI chat through GitHub Copilot Chat. Ollama models can
 - [VS Code 1.113+](https://code.visualstudio.com/download)
 - [GitHub Copilot Chat extension 0.41.0+](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat)
 
-<Note> VS Code requires you to be logged in to use its model selector, even for custom models. This doesn't require a paid GitHub Copilot account; GitHub Copilot Free will enable model selection for custom models.</Note>
+<Note>
+  {" "}
+  VS Code requires you to be logged in to use its model selector, even for custom models. This
+  doesn't require a paid GitHub Copilot account; GitHub Copilot Free will enable model selection for
+  custom models.
+</Note>
 
 ## Quick setup
 
@@ -25,6 +28,7 @@ ollama launch vscode
 Recommended models will be shown after running the command. See the latest models at [ollama.com](https://ollama.com/search?c=tools).
 
 Make sure **Local** is selected at the bottom of the Copilot Chat panel to use your Ollama models.
+
 <div style={{ display: "flex", justifyContent: "center" }}>
   <img
     src="/images/local.png"
@@ -34,12 +38,12 @@ Make sure **Local** is selected at the bottom of the Copilot Chat panel to use y
   />
 </div>
 
-
 ## Run directly with a model
 
 ```shell
 ollama launch vscode --model qwen3.5:cloud
 ```
+
 Cloud models are also available at [ollama.com](https://ollama.com/search?c=cloud).
 
 ## Manual setup
@@ -65,6 +69,7 @@ To configure Ollama manually without `ollama launch`:
      />
    </div>
 3. Click **Add Models** and select **Ollama** to load all your Ollama models into VS Code
+
    <div style={{ display: "flex", justifyContent: "center" }}>
      <img
        src="/images/vscode-add-ollama.png"
@@ -74,7 +79,7 @@ To configure Ollama manually without `ollama launch`:
      />
    </div>
 
-4. Click the **Unhide** button in the model picker to show your Ollama models  
+4. Click the **Unhide** button in the model picker to show your Ollama models
    <div style={{ display: "flex", justifyContent: "center" }}>
      <img
        src="/images/vscode-unhide.png"

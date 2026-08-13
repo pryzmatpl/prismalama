@@ -20,21 +20,13 @@ interface StreamingContextType {
   setDownloadProgress: Dispatch<SetStateAction<Map<string, DownloadEvent>>>;
 }
 
-const StreamingContext = createContext<StreamingContextType | undefined>(
-  undefined,
-);
+const StreamingContext = createContext<StreamingContextType | undefined>(undefined);
 
 export function StreamingProvider({ children }: { children: ReactNode }) {
-  const [streamingChatIds, setStreamingChatIds] = useState<Set<string>>(
-    new Set(),
-  );
+  const [streamingChatIds, setStreamingChatIds] = useState<Set<string>>(new Set());
   const [loadingChats, setLoadingChats] = useState<Set<string>>(new Set());
-  const [abortControllers, setAbortControllers] = useState<
-    Map<string, AbortController>
-  >(new Map());
-  const [downloadProgress, setDownloadProgress] = useState<
-    Map<string, DownloadEvent>
-  >(new Map());
+  const [abortControllers, setAbortControllers] = useState<Map<string, AbortController>>(new Map());
+  const [downloadProgress, setDownloadProgress] = useState<Map<string, DownloadEvent>>(new Map());
 
   const contextValue = useMemo(
     () => ({
@@ -50,19 +42,13 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
     [streamingChatIds, loadingChats, abortControllers, downloadProgress],
   );
 
-  return (
-    <StreamingContext.Provider value={contextValue}>
-      {children}
-    </StreamingContext.Provider>
-  );
+  return <StreamingContext.Provider value={contextValue}>{children}</StreamingContext.Provider>;
 }
 
 export function useStreamingContext() {
   const context = useContext(StreamingContext);
   if (context === undefined) {
-    throw new Error(
-      "useStreamingContext must be used within a StreamingProvider",
-    );
+    throw new Error("useStreamingContext must be used within a StreamingProvider");
   }
   return context;
 }

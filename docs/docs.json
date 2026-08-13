@@ -32,9 +32,7 @@
     "codeblocks": "system"
   },
   "contextual": {
-    "options": [
-      "copy"
-    ]
+    "options": ["copy"]
   },
   "navbar": {
     "links": [
@@ -54,9 +52,7 @@
       "display": "simple"
     },
     "examples": {
-      "languages": [
-        "curl"
-      ]
+      "languages": ["curl"]
     }
   },
   "redirects": [
@@ -88,11 +84,7 @@
         "groups": [
           {
             "group": "Get started",
-            "pages": [
-              "index",
-              "quickstart",
-              "/cloud"
-            ]
+            "pages": ["index", "quickstart", "/cloud"]
           },
           {
             "group": "Capabilities",
@@ -150,21 +142,15 @@
               },
               {
                 "group": "Chat & RAG",
-                "pages": [
-                  "/integrations/onyx"
-                ]
+                "pages": ["/integrations/onyx"]
               },
               {
                 "group": "Automation",
-                "pages": [
-                  "/integrations/n8n"
-                ]
+                "pages": ["/integrations/n8n"]
               },
               {
                 "group": "Notebooks",
-                "pages": [
-                  "/integrations/marimo"
-                ]
+                "pages": ["/integrations/marimo"]
               }
             ]
           },
@@ -174,9 +160,7 @@
               "/cli",
               {
                 "group": "Assistant Sandboxing",
-                "pages": [
-                  "/integrations/nemoclaw"
-                ]
+                "pages": ["/integrations/nemoclaw"]
               },
               "/modelfile",
               "/context-length",

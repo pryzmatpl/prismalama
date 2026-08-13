@@ -1,7 +1,7 @@
+import { useEffect, useState } from "react";
 import type { ErrorEvent } from "@/gotypes";
 import { Display, type DisplayAction } from "@/components/ui/display";
 import { useUser } from "@/hooks/useUser";
-import { useEffect, useState } from "react";
 
 interface DisplayLoginProps {
   error: ErrorEvent | null;
@@ -10,12 +10,7 @@ interface DisplayLoginProps {
   message?: string;
 }
 
-export const DisplayLogin = ({
-  error,
-  className,
-  onDismiss,
-  message,
-}: DisplayLoginProps) => {
+export const DisplayLogin = ({ error, className, onDismiss, message }: DisplayLoginProps) => {
   const { fetchConnectUrl, refetchUser, isAuthenticated } = useUser();
   const [isAwaitingAuth, setIsAwaitingAuth] = useState(false);
 
@@ -43,8 +38,7 @@ export const DisplayLogin = ({
     }
   }, [isAuthenticated, isAwaitingAuth, onDismiss]);
 
-  if (!error || error.code !== "cloud_unauthorized" || isAuthenticated)
-    return null;
+  if (!error || error.code !== "cloud_unauthorized" || isAuthenticated) return null;
 
   const handleSignIn = async () => {
     try {

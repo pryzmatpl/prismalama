@@ -56,10 +56,7 @@ export interface ValidationResult {
   error?: string;
 }
 
-export function validateFile(
-  file: File,
-  options: FileValidationOptions = {},
-): ValidationResult {
+export function validateFile(file: File, options: FileValidationOptions = {}): ValidationResult {
   const {
     maxFileSize = 10,
     allowedExtensions = [...TEXT_FILE_EXTENSIONS, ...IMAGE_EXTENSIONS],

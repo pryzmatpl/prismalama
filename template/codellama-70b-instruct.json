@@ -1,7 +1,3 @@
 {
-  "stop": [
-    "Source:",
-    "Destination:",
-    "<step>"
-  ]
+  "stop": ["Source:", "Destination:", "<step>"]
 }

@@ -1,15 +1,12 @@
-import { useCallback, useRef } from "react";
 import { useQueryClient, QueryClient } from "@tanstack/react-query";
+import { useCallback, useRef } from "react";
 
 interface BatcherConfig {
   batchInterval?: number; // milliseconds, default 8ms (~120fps)
   immediateFirst?: boolean; // if true, first update is immediate
 }
 
-export const useQueryBatcher = <T>(
-  queryKey: readonly unknown[],
-  config: BatcherConfig = {},
-) => {
+export const useQueryBatcher = <T>(queryKey: readonly unknown[], config: BatcherConfig = {}) => {
   const queryClient = useQueryClient();
   const { batchInterval = 8, immediateFirst = false } = config;
 

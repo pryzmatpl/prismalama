@@ -6,30 +6,30 @@ This tree extends upstream Ollama with **Prismalama-specific** runtime dispatch 
 
 ## Prismalama — read first
 
-| Document | Audience |
-|----------|----------|
-| [PRISMALAMA_PRINCIPLE.md](./PRISMALAMA_PRINCIPLE.md) | Architecture north star: two engines, honest semantics |
-| [RUNTIME_DISPATCH.md](./RUNTIME_DISPATCH.md) | Which runner runs; logs; mmap/Vulkan/HIP; AirLLM two-port proxy |
-| [WEIGHT_STREAMING_STRATEGY.md](./WEIGHT_STREAMING_STRATEGY.md) | Product tradeoffs for “streaming” |
-| [GOAL-GAPS.md](./GOAL-GAPS.md) | Goals vs current gaps and defaults |
-| [DEVELOPER.md](./DEVELOPER.md) | Repo layout, env vars, tests, Docker, prismallama.cpp sync |
+| Document                                                       | Audience                                                        |
+| -------------------------------------------------------------- | --------------------------------------------------------------- |
+| [PRISMALAMA_PRINCIPLE.md](./PRISMALAMA_PRINCIPLE.md)           | Architecture north star: two engines, honest semantics          |
+| [RUNTIME_DISPATCH.md](./RUNTIME_DISPATCH.md)                   | Which runner runs; logs; mmap/Vulkan/HIP; AirLLM two-port proxy |
+| [WEIGHT_STREAMING_STRATEGY.md](./WEIGHT_STREAMING_STRATEGY.md) | Product tradeoffs for “streaming”                               |
+| [GOAL-GAPS.md](./GOAL-GAPS.md)                                 | Goals vs current gaps and defaults                              |
+| [DEVELOPER.md](./DEVELOPER.md)                                 | Repo layout, env vars, tests, Docker, prismallama.cpp sync      |
 
 ## User / operator
 
-| Document | Notes |
-|----------|-------|
-| [../README.md](../README.md) | Quick start, configuration |
+| Document                                       | Notes                                        |
+| ---------------------------------------------- | -------------------------------------------- |
+| [../README.md](../README.md)                   | Quick start, configuration                   |
 | [../README-PKGBUILD.md](../README-PKGBUILD.md) | Arch package build and `/etc/default/ollama` |
-| [../INSTALL.md](../INSTALL.md) | Install pointers (Arch vs source) |
-| [../SECURITY.md](../SECURITY.md) | Network exposure and reporting |
+| [../INSTALL.md](../INSTALL.md)                 | Install pointers (Arch vs source)            |
+| [../SECURITY.md](../SECURITY.md)               | Network exposure and reporting               |
 
 ## API
 
-| Document | Notes |
-|----------|-------|
-| [api.md](./api.md) | REST reference (upstream-shaped); includes Prismalama capabilities endpoint |
-| [examples.md](./examples.md) | Examples |
-| [modelfile.mdx](./modelfile.mdx) | Modelfile syntax |
+| Document                         | Notes                                                                       |
+| -------------------------------- | --------------------------------------------------------------------------- |
+| [api.md](./api.md)               | REST reference (upstream-shaped); includes Prismalama capabilities endpoint |
+| [examples.md](./examples.md)     | Examples                                                                    |
+| [modelfile.mdx](./modelfile.mdx) | Modelfile syntax                                                            |
 
 Upstream API reference (compatibility): [https://docs.ollama.com/api](https://docs.ollama.com/api)
 
@@ -45,10 +45,10 @@ These describe stock Ollama; Prismalama behavior may differ where **`docs/RUNTIM
 
 ## Development
 
-| Document | Notes |
-|----------|-------|
-| [development.md](./development.md) | Generic build notes (upstream); prefer **DEVELOPER.md** for Prismalama |
-| [TECHNICAL_DOCUMENTATION.md](./TECHNICAL_DOCUMENTATION.md) | Deep component survey (may lag; verify against code) |
+| Document                                                   | Notes                                                                  |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------- |
+| [development.md](./development.md)                         | Generic build notes (upstream); prefer **DEVELOPER.md** for Prismalama |
+| [TECHNICAL_DOCUMENTATION.md](./TECHNICAL_DOCUMENTATION.md) | Deep component survey (may lag; verify against code)                   |
 
 ## Troubleshooting
 

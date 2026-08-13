@@ -1,11 +1,4 @@
-import {
-  useRef,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useState,
-  useMemo,
-} from "react";
+import { useRef, useCallback, useEffect, useLayoutEffect, useState, useMemo } from "react";
 import type { Message } from "@/gotypes";
 
 // warning: this file is all claude code, needs to be looked into more closely
@@ -124,10 +117,7 @@ export const useMessageAutoscroll = ({
       return Number.isFinite(idx) && idx > lastUserIndex;
     });
 
-    const contentHeightAfterTarget = elementsAfter.reduce(
-      (sum, el) => sum + el.offsetHeight,
-      0,
-    );
+    const contentHeightAfterTarget = elementsAfter.reduce((sum, el) => sum + el.offsetHeight, 0);
 
     // Calculate the spacer height needed to position the user message at the top
     // Add extra space for assistant response area
@@ -146,10 +136,7 @@ export const useMessageAutoscroll = ({
     } else {
       // Content exists after the user message
       // Calculate spacer to position user message at top
-      baseHeight = Math.max(
-        0,
-        containerHeight - contentHeightAfterTarget - targetMessageHeight,
-      );
+      baseHeight = Math.max(0, containerHeight - contentHeightAfterTarget - targetMessageHeight);
     }
 
     // Only apply spacer height when actively interacting (streaming or pending new message)
@@ -194,21 +181,11 @@ export const useMessageAutoscroll = ({
         setIsActiveInteraction(isStreaming);
       }
     }
-  }, [
-    messages,
-    getLastUserMessageIndex,
-    scrollToMessage,
-    updateSpacerHeight,
-    isStreaming,
-  ]);
+  }, [messages, getLastUserMessageIndex, scrollToMessage, updateSpacerHeight, isStreaming]);
 
   // Update active interaction state based on streaming and message submission
   useEffect(() => {
-    if (
-      isStreaming ||
-      pendingScrollToUserMessage.current ||
-      hasSubmittedMessage
-    ) {
+    if (isStreaming || pendingScrollToUserMessage.current || hasSubmittedMessage) {
       setIsActiveInteraction(true);
     } else {
       setIsActiveInteraction(false);
@@ -240,13 +217,8 @@ export const useMessageAutoscroll = ({
       let hasSignificantChange = false;
       for (const entry of entries) {
         const element = entry.target as HTMLElement;
-        if (
-          element.dataset.messageIndex &&
-          entry.contentRect.height !== element.offsetHeight
-        ) {
-          const heightDiff = Math.abs(
-            entry.contentRect.height - element.offsetHeight,
-          );
+        if (element.dataset.messageIndex && entry.contentRect.height !== element.offsetHeight) {
+          const heightDiff = Math.abs(entry.contentRect.height - element.offsetHeight);
           if (heightDiff > 50) {
             hasSignificantChange = true;
             break;
@@ -294,9 +266,7 @@ export const useMessageAutoscroll = ({
     });
 
     // Observe all message elements for size changes
-    const messageElements = containerRef.current.querySelectorAll(
-      "[data-message-index]",
-    );
+    const messageElements = containerRef.current.querySelectorAll("[data-message-index]");
     messageElements.forEach((element) => {
       resizeObserver.observe(element);
     });

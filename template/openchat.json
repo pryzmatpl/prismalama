@@ -1,5 +1,3 @@
 {
-  "stop": [
-    "<|end_of_turn|>"
-  ]
+  "stop": ["<|end_of_turn|>"]
 }

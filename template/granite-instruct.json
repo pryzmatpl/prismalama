@@ -1,7 +1,3 @@
 {
-  "stop": [
-    "System:",
-    "Question:",
-    "Answer:"
-  ]
+  "stop": ["System:", "Question:", "Answer:"]
 }

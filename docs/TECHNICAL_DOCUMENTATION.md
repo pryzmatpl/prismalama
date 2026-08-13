@@ -12,6 +12,7 @@ build targets) plus optional AirLLM routing for HF-style layouts. Large-model be
 engine dispatch, memory policy, and backend support for streaming interfaces.
 
 ### Key Capabilities
+
 - Vulkan compute backend for hardware-agnostic GPU acceleration (AMD, NVIDIA, Intel)
 - Multiple runner interfaces: llama.cpp (GGUF), AirLLM (weight streaming), Ollama runner
 - GGUF format support with intelligent weight streaming
@@ -22,14 +23,17 @@ engine dispatch, memory policy, and backend support for streaming interfaces.
 ## Architecture Layers
 
 ### 1. Client Layer (`cmd/`)
+
 - REST API server on port 11434
 - CLI via `ollama run` commands
 - Interactive terminal chat interface
 
 ### 2. Server Layer (`llm/`, `server/`)
+
 Core orchestration for model loading, scheduling, and response streaming.
 
 #### Server (`llm/server.go`)
+
 - Request handling via REST endpoints (`/api/generate`, `/api/chat`)
 - Model discovery and loader coordination
 - GPU allocation through scheduler
@@ -37,6 +41,7 @@ Core orchestration for model loading, scheduling, and response streaming.
 - SSE response streaming
 
 #### Scheduler (`server/sched.go`)
+
 - `Scheduler` struct manages request queuing and model loading
 - Key functions:
   - `GetRunner()` - acquires runner for model request
@@ -48,6 +53,7 @@ Core orchestration for model loading, scheduling, and response streaming.
 ### 3. Runner Layer (`runner/`)
 
 #### Runner Dispatch (`runner/dispatch.go`, `DecideEngine`)
+
 The dispatcher selects **GGML** vs **AirLLM** from directory layout and env (see **`docs/RUNTIME_DISPATCH.md`**). **`OLLAMA_USE_AIRLLM=0` / `false` / `no` is evaluated first** and forces **GGML for all layouts** (including safetensors and multipart GGUF). The Arch package ships **`OLLAMA_USE_AIRLLM=0`**.
 
 ```
@@ -64,13 +70,15 @@ DecideEngine(modelPath):
 ```
 
 #### Runners
-| Runner | Path | Use Case |
-|--------|------|----------|
-| **LlamaRunner** | `runner/llamarunner/` | Standard GGUF via llama.cpp |
-| **OllamaRunner** | `runner/ollamarunner/` | Ollama-native inference |
+
+| Runner           | Path                   | Use Case                        |
+| ---------------- | ---------------------- | ------------------------------- |
+| **LlamaRunner**  | `runner/llamarunner/`  | Standard GGUF via llama.cpp     |
+| **OllamaRunner** | `runner/ollamarunner/` | Ollama-native inference         |
 | **AirLLMRunner** | `runner/airllmrunner/` | NVME streaming for large models |
 
 #### AirLLMRunner Implementation (`runner/airllmrunner/runner.go`)
+
 - Go HTTP proxy on port N
 - Spawns `airllm_runner.py` on port N+1 (Python HTTP server)
 - Proxies requests to Python backend
@@ -78,6 +86,7 @@ DecideEngine(modelPath):
 - Flash attention enum mapping: `ml.FlashAttentionType` → Python strings
 
 #### AirLLM Python Runner (`airllm_runner.py`)
+
 - Ollama-compatible HTTP server
 - Implements endpoints: `/load`, `/status`, `/completion`, `/embed`
 - `LoadRequest`, `CompletionRequest`, `EmbeddingRequest` dataclasses
@@ -86,6 +95,7 @@ DecideEngine(modelPath):
 ### 4. Compute Backend (`ml/`)
 
 #### Backend Interface (`ml/backend.go`)
+
 ```go
 type Backend interface {
     Close()
@@ -100,7 +110,9 @@ type Backend interface {
 ```
 
 #### Tensor Operations
+
 Full tensor API including:
+
 - Arithmetic: `Add`, `Sub`, `Mul`, `Div`
 - Matrix: `Mulmat`, `MulmatFullPrec`, `MulmatID`
 - Normalization: `LayerNorm`, `RMSNorm`
@@ -109,6 +121,7 @@ Full tensor API including:
 - Manipulation: `Reshape`, `Permute`, `Slice`, `Concat`
 
 #### Data Types
+
 ```go
 const (
     DTypeOther DType = iota
@@ -124,6 +137,7 @@ const (
 ### 5. GGML Backend (`ml/backend/ggml/`)
 
 #### GGML Backend (`ml/backend/ggml/ggml.go`)
+
 - CGO bindings to `ggml.h`, `ggml-cpu.h`, `ggml-backend.h`
 - Device initialization via `ggml_backend_dev_count()`, `ggml_backend_dev_get()`
 - Device types: CPU, ACCEL, GPU, iGPU (integrated)
@@ -132,6 +146,7 @@ const (
 ### 6. Device Management (`ml/device.go`)
 
 #### Device Priority
+
 1. CUDA (NVIDIA) - Preferred
 2. ROCm (AMD) - Preferred
 3. Vulkan - Fallback for any GPU
@@ -139,6 +154,7 @@ const (
 5. CPU - Universal fallback
 
 #### Key Types
+
 ```go
 type DeviceInfo struct {
     ID           string
@@ -167,11 +183,13 @@ type BackendMemory struct {
 ## Memory Management
 
 ### VRAM Allocation Flow
+
 1. `GPULayersList` calculates memory per device
 2. Distributes layers across available GPUs
 3. Scheduler implements `waitForVRAMRecovery` (5s default)
 
 ### AirLLM Memory Cleanup
+
 1. Per-layer: `AirLLMBaseModel.forward()` moves layers to `"meta"`, calls `clean_memory()`
 2. Post-request: `airllm_runner.py` calls `finalize_inference_memory()`:
    - `torch.cuda.synchronize()`
@@ -183,33 +201,36 @@ type BackendMemory struct {
 
 ## Environment Variables
 
-| Variable | Effect |
-|----------|--------|
-| `OLLAMA_USE_AIRLLM` | **`0`/`false`/`no`** ⇒ GGML only (**all** layouts). **`1`/`true`** ⇒ AirLLM when combined with layout/env rules. **Unset** ⇒ `DecideEngine` heuristics may pick AirLLM (safetensors, multipart GGUF). See **`docs/RUNTIME_DISPATCH.md`**. |
-| `OLLAMA_MULTI_GGUF` | `1` = treat as AirLLM-style |
-| `AIRLLM_COMPRESSION` | e.g., `4bit`, `8bit`, `none` |
-| `AIRLLM_DEVICE` | PyTorch device string (default `cuda:0`) |
-| `PRISMALAMA_AIRLLM_PYTHONPATH` | Prepend to PYTHONPATH |
-| `AIRLLM_POST_INFER_CLEANUP` | `0` = skip GPU cache flush |
+| Variable                       | Effect                                                                                                                                                                                                                                    |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OLLAMA_USE_AIRLLM`            | **`0`/`false`/`no`** ⇒ GGML only (**all** layouts). **`1`/`true`** ⇒ AirLLM when combined with layout/env rules. **Unset** ⇒ `DecideEngine` heuristics may pick AirLLM (safetensors, multipart GGUF). See **`docs/RUNTIME_DISPATCH.md`**. |
+| `OLLAMA_MULTI_GGUF`            | `1` = treat as AirLLM-style                                                                                                                                                                                                               |
+| `AIRLLM_COMPRESSION`           | e.g., `4bit`, `8bit`, `none`                                                                                                                                                                                                              |
+| `AIRLLM_DEVICE`                | PyTorch device string (default `cuda:0`)                                                                                                                                                                                                  |
+| `PRISMALAMA_AIRLLM_PYTHONPATH` | Prepend to PYTHONPATH                                                                                                                                                                                                                     |
+| `AIRLLM_POST_INFER_CLEANUP`    | `0` = skip GPU cache flush                                                                                                                                                                                                                |
 
 ---
 
 ## Integration Tests
 
 ### Test Structure (`integration/`)
+
 - Build tag-gated: `integration`, `airllm`, `gpu`, `minimax`, `weight_streaming`, `perf`
 
 ### Test Categories
-| Tag | Tests |
-|-----|-------|
-| `integration` | Basic API, model loading |
-| `airllm` | AirLLM runner-specific |
-| `gpu` | GPU utilization, VRAM |
-| `minimax` | Large model (143GB+ class) |
-| `weight_streaming` | Multi-part GGUF |
-| `perf` | Benchmarks |
+
+| Tag                | Tests                      |
+| ------------------ | -------------------------- |
+| `integration`      | Basic API, model loading   |
+| `airllm`           | AirLLM runner-specific     |
+| `gpu`              | GPU utilization, VRAM      |
+| `minimax`          | Large model (143GB+ class) |
+| `weight_streaming` | Multi-part GGUF            |
+| `perf`             | Benchmarks                 |
 
 ### Run Commands
+
 ```bash
 # Basic
 go test -tags=integration ./integration -timeout 10m
@@ -226,12 +247,14 @@ go test -tags=integration,airllm ./integration
 ## Build System
 
 ### Build Targets
+
 - `make ship-check` - integration tests + package build
 - `make ship-check-fast` - TestBlueSky only (no packaging)
 - `build-rocm.sh` - ROCm-specific package build
 - `makepkg -sf` - Arch package from PKGBUILD
 
 ### Package Output
+
 - `prismalama-ollama` - Main binary
 - Installs to: `/usr/bin/ollama`, `/usr/lib/ollama/rocm`, `/usr/share/ollama/airllm`
 
@@ -1099,6 +1122,7 @@ prismalama/
 ---
 
 ## References
+
 - `docs/DEVELOPER.md` - Developer guide, runner selection, env vars
 - `docs/RUNTIME_DISPATCH.md` - Which runner handles which model
 - `docs/WEIGHT_STREAMING_STRATEGY.md` - Streaming implementation details

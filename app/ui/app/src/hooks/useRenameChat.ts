@@ -5,8 +5,7 @@ export function useRenameChat() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ chatId, title }: { chatId: string; title: string }) =>
-      renameChat(chatId, title),
+    mutationFn: ({ chatId, title }: { chatId: string; title: string }) => renameChat(chatId, title),
     onSuccess: (_, { chatId }) => {
       // Invalidate and refetch chats list
       queryClient.invalidateQueries({ queryKey: ["chats"] });

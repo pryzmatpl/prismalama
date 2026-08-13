@@ -10,104 +10,104 @@
 
 // Import Routes
 
-import { Route as rootRoute } from './routes/__root'
-import { Route as SettingsImport } from './routes/settings'
-import { Route as IndexImport } from './routes/index'
-import { Route as CChatIdImport } from './routes/c.$chatId'
+import { Route as rootRoute } from "./routes/__root";
+import { Route as CChatIdImport } from "./routes/c.$chatId";
+import { Route as IndexImport } from "./routes/index";
+import { Route as SettingsImport } from "./routes/settings";
 
 // Create/Update Routes
 
 const SettingsRoute = SettingsImport.update({
-  id: '/settings',
-  path: '/settings',
+  id: "/settings",
+  path: "/settings",
   getParentRoute: () => rootRoute,
-} as any)
+} as any);
 
 const IndexRoute = IndexImport.update({
-  id: '/',
-  path: '/',
+  id: "/",
+  path: "/",
   getParentRoute: () => rootRoute,
-} as any)
+} as any);
 
 const CChatIdRoute = CChatIdImport.update({
-  id: '/c/$chatId',
-  path: '/c/$chatId',
+  id: "/c/$chatId",
+  path: "/c/$chatId",
   getParentRoute: () => rootRoute,
-} as any)
+} as any);
 
 // Populate the FileRoutesByPath interface
 
-declare module '@tanstack/react-router' {
+declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexImport
-      parentRoute: typeof rootRoute
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsImport
-      parentRoute: typeof rootRoute
-    }
-    '/c/$chatId': {
-      id: '/c/$chatId'
-      path: '/c/$chatId'
-      fullPath: '/c/$chatId'
-      preLoaderRoute: typeof CChatIdImport
-      parentRoute: typeof rootRoute
-    }
+    "/": {
+      id: "/";
+      path: "/";
+      fullPath: "/";
+      preLoaderRoute: typeof IndexImport;
+      parentRoute: typeof rootRoute;
+    };
+    "/settings": {
+      id: "/settings";
+      path: "/settings";
+      fullPath: "/settings";
+      preLoaderRoute: typeof SettingsImport;
+      parentRoute: typeof rootRoute;
+    };
+    "/c/$chatId": {
+      id: "/c/$chatId";
+      path: "/c/$chatId";
+      fullPath: "/c/$chatId";
+      preLoaderRoute: typeof CChatIdImport;
+      parentRoute: typeof rootRoute;
+    };
   }
 }
 
 // Create and export the route tree
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/settings': typeof SettingsRoute
-  '/c/$chatId': typeof CChatIdRoute
+  "/": typeof IndexRoute;
+  "/settings": typeof SettingsRoute;
+  "/c/$chatId": typeof CChatIdRoute;
 }
 
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/settings': typeof SettingsRoute
-  '/c/$chatId': typeof CChatIdRoute
+  "/": typeof IndexRoute;
+  "/settings": typeof SettingsRoute;
+  "/c/$chatId": typeof CChatIdRoute;
 }
 
 export interface FileRoutesById {
-  __root__: typeof rootRoute
-  '/': typeof IndexRoute
-  '/settings': typeof SettingsRoute
-  '/c/$chatId': typeof CChatIdRoute
+  __root__: typeof rootRoute;
+  "/": typeof IndexRoute;
+  "/settings": typeof SettingsRoute;
+  "/c/$chatId": typeof CChatIdRoute;
 }
 
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/settings' | '/c/$chatId'
-  fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/settings' | '/c/$chatId'
-  id: '__root__' | '/' | '/settings' | '/c/$chatId'
-  fileRoutesById: FileRoutesById
+  fileRoutesByFullPath: FileRoutesByFullPath;
+  fullPaths: "/" | "/settings" | "/c/$chatId";
+  fileRoutesByTo: FileRoutesByTo;
+  to: "/" | "/settings" | "/c/$chatId";
+  id: "__root__" | "/" | "/settings" | "/c/$chatId";
+  fileRoutesById: FileRoutesById;
 }
 
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  SettingsRoute: typeof SettingsRoute
-  CChatIdRoute: typeof CChatIdRoute
+  IndexRoute: typeof IndexRoute;
+  SettingsRoute: typeof SettingsRoute;
+  CChatIdRoute: typeof CChatIdRoute;
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SettingsRoute: SettingsRoute,
   CChatIdRoute: CChatIdRoute,
-}
+};
 
 export const routeTree = rootRoute
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+  ._addFileTypes<FileRouteTypes>();
 
 /* ROUTE_MANIFEST_START
 {

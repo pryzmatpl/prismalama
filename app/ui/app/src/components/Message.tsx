@@ -1,10 +1,10 @@
+import React, { useState, useMemo, useRef } from "react";
 import { Message as MessageType, ToolCall, File } from "@/gotypes";
-import Thinking from "./Thinking";
-import StreamingMarkdownContent from "./StreamingMarkdownContent";
-import { ImageThumbnail } from "./ImageThumbnail";
 import { isImageFile } from "@/utils/imageUtils";
 import CopyButton from "./CopyButton";
-import React, { useState, useMemo, useRef } from "react";
+import { ImageThumbnail } from "./ImageThumbnail";
+import StreamingMarkdownContent from "./StreamingMarkdownContent";
+import Thinking from "./Thinking";
 
 const Message = React.memo(
   ({
@@ -105,9 +105,7 @@ function processBrowserToolContent(content: string): BrowserToolContent {
 
   // Parse the viewing lines info from the second line
   // Example: **viewing lines [0 - 134] of 167**
-  const viewingLineMatch = lines[1]?.match(
-    /\*\*viewing lines \[(\d+) - (\d+)\] of (\d+)\*\*/,
-  );
+  const viewingLineMatch = lines[1]?.match(/\*\*viewing lines \[(\d+) - (\d+)\] of (\d+)\*\*/);
   const startingLine = viewingLineMatch ? parseInt(viewingLineMatch[1], 10) : 0;
   let totalLines = viewingLineMatch ? parseInt(viewingLineMatch[3], 10) : 0;
 
@@ -119,9 +117,7 @@ function processBrowserToolContent(content: string): BrowserToolContent {
   // Extract the actual content lines (skip first 2 lines and empty line 3)
   const contentLines = lines.slice(3).filter((line) => line.startsWith("L"));
   // remove the L<number>: prefix with a regex
-  const contentLinesWithoutPrefix = contentLines.map((line) =>
-    line.replace(/^L(\d+):\s*/, ""),
-  );
+  const contentLinesWithoutPrefix = contentLines.map((line) => line.replace(/^L(\d+):\s*/, ""));
 
   return {
     cursor,
@@ -133,17 +129,9 @@ function processBrowserToolContent(content: string): BrowserToolContent {
   };
 }
 
-function BrowserToolResult({
-  content,
-}: {
-  toolResult: BrowserToolResult;
-  content: string;
-}) {
+function BrowserToolResult({ content }: { toolResult: BrowserToolResult; content: string }) {
   const [isCollapsed, setIsCollapsed] = React.useState(true);
-  const processedContent = useMemo(
-    () => processBrowserToolContent(content),
-    [content],
-  );
+  const processedContent = useMemo(() => processBrowserToolContent(content), [content]);
 
   let urlToUse: string | null = null;
   if (processedContent.url.startsWith("http")) {
@@ -151,8 +139,7 @@ function BrowserToolResult({
   }
 
   const isSearchResults =
-    /^search_results_/i.test(processedContent.url) ||
-    /_search$/i.test(processedContent.url);
+    /^search_results_/i.test(processedContent.url) || /_search$/i.test(processedContent.url);
 
   return (
     <div
@@ -211,14 +198,12 @@ function BrowserToolResult({
             <InlineSearchTerm term={processedContent.title} />
           )}
           {urlToUse != null && (
-            <span className="text-neutral-500 text-sm ml-2 break-all">
-              ({urlToUse})
-            </span>
+            <span className="text-neutral-500 text-sm ml-2 break-all">({urlToUse})</span>
           )}
           <span className="text-neutral-500 text-sm ml-2">
             (lines {processedContent.startingLine}-
-            {processedContent.startingLine + processedContent.lines.length - 1}{" "}
-            of {processedContent.totalLines})
+            {processedContent.startingLine + processedContent.lines.length - 1} of{" "}
+            {processedContent.totalLines})
           </span>
         </div>
       </div>
@@ -235,10 +220,7 @@ function BrowserToolResult({
             {processedContent.lines.map((line, index) => {
               const lineNumber = processedContent.startingLine + index;
               return (
-                <div
-                  key={index}
-                  className="flex whitespace-nowrap text-xs h-[2em] font-mono"
-                >
+                <div key={index} className="flex whitespace-nowrap text-xs h-[2em] font-mono">
                   <div className="w-10 text-right pr-2 text-neutral-500 flex-shrink-0 border-r border-neutral-200 dark:border-neutral-700">
                     {lineNumber}
                   </div>
@@ -268,9 +250,7 @@ function ToolRoleContent({
   const [isCollapsed, setIsCollapsed] = useState(true);
 
   if (browserToolResult && typeof browserToolResult === "object") {
-    return (
-      <BrowserToolResult toolResult={browserToolResult} content={content} />
-    );
+    return <BrowserToolResult toolResult={browserToolResult} content={content} />;
   }
   return (
     // collapsable tool result with raw json
@@ -343,8 +323,7 @@ function ToolRoleContent({
                             : "");
                         return u ? (
                           <>
-                            Fetch results for{" "}
-                            <span className="break-all">{u}</span>
+                            Fetch results for <span className="break-all">{u}</span>
                           </>
                         ) : (
                           "Web fetch results"
@@ -410,10 +389,7 @@ function cursorToPageText(
   return `Page #${cursor}`;
 }
 
-function cursorToPage(
-  cursor: number,
-  browserToolResult: BrowserToolResult | undefined,
-) {
+function cursorToPage(cursor: number, browserToolResult: BrowserToolResult | undefined) {
   const pageText = cursorToPageText(cursor, browserToolResult);
 
   return (
@@ -482,10 +458,7 @@ function BrowserToolCallDisplay({
           </svg>
           <div className="ml-6">
             {loc
-              ? `Scrolling to line ${loc} on ${cursorToPageText(
-                  cursor,
-                  browserToolResult,
-                )}`
+              ? `Scrolling to line ${loc} on ${cursorToPageText(cursor, browserToolResult)}`
               : `Scrolling`}
           </div>
         </div>
@@ -588,26 +561,15 @@ function ToolCallDisplay({
     let preview = "";
     // preview from the tool's JSON arguments.
     try {
-      const argsObj = JSON.parse(toolCall.function.arguments) as Record<
-        string,
-        unknown
-      >;
-      const preferredKey = [
-        "query",
-        "url",
-        "pattern",
-        "id",
-        "file",
-        "path",
-      ].find((k) => Object.prototype.hasOwnProperty.call(argsObj, k));
+      const argsObj = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
+      const preferredKey = ["query", "url", "pattern", "id", "file", "path"].find((k) =>
+        Object.prototype.hasOwnProperty.call(argsObj, k),
+      );
       if (preferredKey && typeof (argsObj as any)[preferredKey] === "string") {
         preview = String((argsObj as any)[preferredKey]);
       }
     } catch (err) {
-      console.error(
-        "Failed to parse toolCall.function.arguments in Message.tsx:",
-        err,
-      );
+      console.error("Failed to parse toolCall.function.arguments in Message.tsx:", err);
     }
 
     return (
@@ -637,12 +599,7 @@ function ToolCallDisplay({
   }
 
   if (toolCall.function.name.startsWith("browser.")) {
-    return (
-      <BrowserToolCallDisplay
-        toolCall={toolCall}
-        browserToolResult={browserToolResult}
-      />
-    );
+    return <BrowserToolCallDisplay toolCall={toolCall} browserToolResult={browserToolResult} />;
   }
 
   let parsedArgs = null;
@@ -800,10 +757,7 @@ function UserMessage({
             .filter((attachment: File) => isImageFile(attachment.filename))
             .map((attachment: File, index: number) => (
               <div key={`image-attachment-${index}`} className="flex-shrink-0">
-                <ImageThumbnail
-                  image={attachment}
-                  className="w-16 h-16 object-cover rounded-md"
-                />
+                <ImageThumbnail image={attachment} className="w-16 h-16 object-cover rounded-md" />
               </div>
             ))}
         </div>
@@ -817,14 +771,10 @@ function UserMessage({
         >
           {/* Show non-image attachments inside the message */}
           {message.attachments &&
-            message.attachments.some(
-              (attachment: File) => !isImageFile(attachment.filename),
-            ) && (
+            message.attachments.some((attachment: File) => !isImageFile(attachment.filename)) && (
               <div className="flex gap-2 mb-2 overflow-x-auto">
                 {message.attachments
-                  .filter(
-                    (attachment: File) => !isImageFile(attachment.filename),
-                  )
+                  .filter((attachment: File) => !isImageFile(attachment.filename))
                   .map((attachment: File, index: number) => (
                     <div
                       key={`file-attachment-${index}`}
@@ -851,9 +801,7 @@ function UserMessage({
               </div>
             )}
 
-          <div className="message-content whitespace-pre-line break-words">
-            {message.content}
-          </div>
+          <div className="message-content whitespace-pre-line break-words">{message.content}</div>
 
           {/* Edit button */}
           <button
@@ -908,18 +856,11 @@ function OtherRoleMessage({
         {/* Only render content div if there's actual content to show */}
         {(() => {
           // Skip rendering content div for tool messages with structured tool_calls
-          if (
-            message.role === "tool" &&
-            message.tool_calls &&
-            message.tool_calls.length > 0
-          ) {
+          if (message.role === "tool" && message.tool_calls && message.tool_calls.length > 0) {
             return null;
           }
 
-          if (
-            message.role !== "tool" &&
-            (!message.content || !message.content.trim())
-          ) {
+          if (message.role !== "tool" && (!message.content || !message.content.trim())) {
             return null;
           }
 
@@ -961,10 +902,7 @@ function OtherRoleMessage({
       )}
 
       {message.tool_call && (
-        <ToolCallDisplay
-          toolCall={message.tool_call}
-          browserToolResult={browserToolResult}
-        />
+        <ToolCallDisplay toolCall={message.tool_call} browserToolResult={browserToolResult} />
       )}
 
       {!isStreaming &&

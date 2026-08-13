@@ -60,23 +60,14 @@ export function ImageThumbnail({
           bytes[i] = binaryString.charCodeAt(i);
         }
       } else {
-        console.error(
-          "Invalid data format for:",
-          image.filename,
-          typeof image.data,
-        );
+        console.error("Invalid data format for:", image.filename, typeof image.data);
         return "";
       }
 
       const blob = new Blob([bytes], { type: mimeType });
       return URL.createObjectURL(blob);
     } catch (error) {
-      console.error(
-        "Error converting file data to URL for",
-        image.filename,
-        ":",
-        error,
-      );
+      console.error("Error converting file data to URL for", image.filename, ":", error);
       return "";
     }
   }, [image]);

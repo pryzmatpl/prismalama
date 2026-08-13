@@ -15,9 +15,9 @@ On macOS, the generated image will automatically open in Preview.
 
 ## Supported Models
 
-| Model | VRAM Required | Notes |
-|-------|---------------|-------|
-| z-image | ~12GB | Based on Flux architecture |
+| Model   | VRAM Required | Notes                      |
+| ------- | ------------- | -------------------------- |
+| z-image | ~12GB         | Based on Flux architecture |
 
 ## CLI Usage
 
@@ -41,6 +41,7 @@ POST /v1/images/generations
 ```
 
 **Request:**
+
 ```json
 {
   "model": "z-image",
@@ -51,6 +52,7 @@ POST /v1/images/generations
 ```
 
 **Response:**
+
 ```json
 {
   "created": 1704067200,
@@ -97,6 +99,7 @@ curl http://localhost:11434/v1/images/generations \
 ```
 
 Events:
+
 ```
 event: progress
 data: {"step": 1, "total": 30}
@@ -111,14 +114,14 @@ data: {"created": 1704067200, "data": [{"b64_json": "..."}]}
 
 ## Parameters
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| model | string | required | Model name |
-| prompt | string | required | Text description of image |
-| size | string | "1024x1024" | Image dimensions (WxH) |
-| n | int | 1 | Number of images (currently only 1 supported) |
-| response_format | string | "b64_json" | "b64_json" or "url" |
-| stream | bool | false | Enable progress streaming |
+| Parameter       | Type   | Default     | Description                                   |
+| --------------- | ------ | ----------- | --------------------------------------------- |
+| model           | string | required    | Model name                                    |
+| prompt          | string | required    | Text description of image                     |
+| size            | string | "1024x1024" | Image dimensions (WxH)                        |
+| n               | int    | 1           | Number of images (currently only 1 supported) |
+| response_format | string | "b64_json"  | "b64_json" or "url"                           |
+| stream          | bool   | false       | Enable progress streaming                     |
 
 ## Requirements
 
@@ -169,6 +172,7 @@ The manifest follows the standard ollama format with tensor-specific layer metad
 ```
 
 Each tensor layer includes:
+
 - `name`: Path-style tensor name (e.g., `text_encoder/model.layers.0.mlp.down_proj.weight`)
 - `dtype`: Data type (BF16, F32, etc.)
 - `shape`: Tensor dimensions
@@ -188,7 +192,7 @@ Each tensor blob is a minimal safetensors file:
 Header contains a single tensor named `"data"`:
 
 ```json
-{"data":{"dtype":"BF16","shape":[2560,9728],"data_offsets":[0,49807360]}}
+{ "data": { "dtype": "BF16", "shape": [2560, 9728], "data_offsets": [0, 49807360] } }
 ```
 
 ## Why Include the Header?
@@ -247,4 +251,3 @@ ollama create z-image-fp8 --quantize fp8
 ```
 
 This quantizes weights during import. The resulting model will be ~15GB instead of ~31GB.
-

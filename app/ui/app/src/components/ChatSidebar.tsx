@@ -1,12 +1,12 @@
-import { useChats } from "@/hooks/useChats";
-import { useRenameChat } from "@/hooks/useRenameChat";
-import { useDeleteChat } from "@/hooks/useDeleteChat";
+import { CogIcon, RocketLaunchIcon } from "@heroicons/react/24/outline";
 import { useQueryClient } from "@tanstack/react-query";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { getChat } from "@/api";
 import { Link } from "@/components/ui/link";
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { ChatsResponse } from "@/gotypes";
-import { CogIcon, RocketLaunchIcon } from "@heroicons/react/24/outline";
+import { useChats } from "@/hooks/useChats";
+import { useDeleteChat } from "@/hooks/useDeleteChat";
+import { useRenameChat } from "@/hooks/useRenameChat";
 
 // there's a hidden debug feature to copy a chat's data to the clipboard by
 // holding shift and clicking this many times within this many seconds
@@ -59,18 +59,15 @@ export function ChatSidebar({ currentChatId }: ChatSidebarProps) {
     setEditValue("");
 
     // Optimistically update the cache
-    queryClient.setQueryData(
-      ["chats"],
-      (oldData: ChatsResponse | undefined) => {
-        if (!oldData?.chatInfos) return oldData;
-        return {
-          ...oldData,
-          chatInfos: oldData.chatInfos.map((chat) =>
-            chat.id === chatId ? { ...chat, title: newTitle } : chat,
-          ),
-        };
-      },
-    );
+    queryClient.setQueryData(["chats"], (oldData: ChatsResponse | undefined) => {
+      if (!oldData?.chatInfos) return oldData;
+      return {
+        ...oldData,
+        chatInfos: oldData.chatInfos.map((chat) =>
+          chat.id === chatId ? { ...chat, title: newTitle } : chat,
+        ),
+      };
+    });
 
     try {
       await renameMutation.mutateAsync({
@@ -93,10 +90,7 @@ export function ChatSidebar({ currentChatId }: ChatSidebarProps) {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        inputRef.current &&
-        !inputRef.current.contains(event.target as Node)
-      ) {
+      if (inputRef.current && !inputRef.current.contains(event.target as Node)) {
         saveRename();
       }
     };
@@ -166,9 +160,7 @@ export function ChatSidebar({ currentChatId }: ChatSidebarProps) {
 
   const handleDeleteChat = useCallback(
     async (chatId: string) => {
-      const confirmed = window.confirm(
-        `Are you sure you want to remove this chat?`,
-      );
+      const confirmed = window.confirm(`Are you sure you want to remove this chat?`);
 
       if (!confirmed) return;
 
@@ -268,8 +260,9 @@ export function ChatSidebar({ currentChatId }: ChatSidebarProps) {
         <Link
           href="/c/new"
           mask={{ to: "/" }}
-          className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 dark:text-neutral-100 ${currentChatId === "new" ? "bg-neutral-100 dark:bg-neutral-800" : ""
-            }`}
+          className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 dark:text-neutral-100 ${
+            currentChatId === "new" ? "bg-neutral-100 dark:bg-neutral-800" : ""
+          }`}
           draggable={false}
         >
           <svg
@@ -291,10 +284,9 @@ export function ChatSidebar({ currentChatId }: ChatSidebarProps) {
               sessionStorage.setItem(launchSidebarRequestedKey, "1");
             }
           }}
-          className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 dark:text-neutral-100 cursor-pointer ${currentChatId === "launch"
-            ? "bg-neutral-100 dark:bg-neutral-800"
-            : ""
-            }`}
+          className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 dark:text-neutral-100 cursor-pointer ${
+            currentChatId === "launch" ? "bg-neutral-100 dark:bg-neutral-800" : ""
+          }`}
           draggable={false}
         >
           <RocketLaunchIcon className="h-5 w-5 stroke-current" />
@@ -321,18 +313,15 @@ export function ChatSidebar({ currentChatId }: ChatSidebarProps) {
               {group.chats.map((chat) => (
                 <div
                   key={chat.id}
-                  className={`allow-context-menu flex items-center relative text-sm text-neutral-800 dark:text-neutral-400 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 ${chat.id === currentChatId
-                    ? "bg-neutral-100 text-black dark:bg-neutral-800"
-                    : ""
-                    }`}
+                  className={`allow-context-menu flex items-center relative text-sm text-neutral-800 dark:text-neutral-400 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 ${
+                    chat.id === currentChatId ? "bg-neutral-100 text-black dark:bg-neutral-800" : ""
+                  }`}
                   onMouseEnter={() => handleMouseEnter(chat.id)}
                   onContextMenu={(e) =>
                     handleContextMenu(
                       e,
                       chat.id,
-                      chat.title ||
-                      chat.userExcerpt ||
-                      chat.createdAt.toLocaleString(),
+                      chat.title || chat.userExcerpt || chat.createdAt.toLocaleString(),
                     )
                   }
                 >
@@ -374,9 +363,7 @@ export function ChatSidebar({ currentChatId }: ChatSidebarProps) {
                       draggable={false}
                     >
                       <span className="truncate font-sans text-sm">
-                        {chat.title ||
-                          chat.userExcerpt ||
-                          chat.createdAt.toLocaleString()}
+                        {chat.title || chat.userExcerpt || chat.createdAt.toLocaleString()}
                       </span>
                       {copiedChatId === chat.id && (
                         <span className="ml-2 text-xs text-green-600 dark:text-green-400">

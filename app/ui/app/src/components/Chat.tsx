@@ -1,9 +1,7 @@
-import MessageList from "./MessageList";
-import ChatForm from "./ChatForm";
-import { FileUpload } from "./FileUpload";
-import { DisplayUpgrade } from "./DisplayUpgrade";
-import { DisplayStale } from "./DisplayStale";
-import { DisplayLogin } from "./DisplayLogin";
+import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
+import { Message } from "@/gotypes";
 import {
   useChat,
   useSendMessage,
@@ -16,19 +14,15 @@ import {
 } from "@/hooks/useChats";
 import { useHealth } from "@/hooks/useHealth";
 import { useMessageAutoscroll } from "@/hooks/useMessageAutoscroll";
-import {
-  useState,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useCallback,
-} from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useHasVisionCapability } from "@/hooks/useModelCapabilities";
 import { useSelectedModel } from "@/hooks/useSelectedModel";
 import { useUser } from "@/hooks/useUser";
-import { useHasVisionCapability } from "@/hooks/useModelCapabilities";
-import { Message } from "@/gotypes";
+import ChatForm from "./ChatForm";
+import { DisplayLogin } from "./DisplayLogin";
+import { DisplayStale } from "./DisplayStale";
+import { DisplayUpgrade } from "./DisplayUpgrade";
+import { FileUpload } from "./FileUpload";
+import MessageList from "./MessageList";
 
 export default function Chat({ chatId }: { chatId: string }) {
   const queryClient = useQueryClient();
@@ -102,12 +96,11 @@ export default function Chat({ chatId }: { chatId: string }) {
 
   const sendMessageMutation = useSendMessage(chatId);
 
-  const { containerRef, handleNewUserMessage, spacerHeight } =
-    useMessageAutoscroll({
-      messages,
-      isStreaming,
-      chatId,
-    });
+  const { containerRef, handleNewUserMessage, spacerHeight } = useMessageAutoscroll({
+    messages,
+    isStreaming,
+    chatId,
+  });
 
   // Scroll to bottom only when switching to a different existing chat
   useLayoutEffect(() => {
@@ -187,10 +180,7 @@ export default function Chat({ chatId }: { chatId: string }) {
   };
 
   const clearChatError = () => {
-    queryClient.setQueryData(
-      ["chatError", chatId === "new" ? "" : chatId],
-      null,
-    );
+    queryClient.setQueryData(["chatError", chatId === "new" ? "" : chatId], null);
   };
 
   const isWindows = navigator.platform.toLowerCase().includes("win");
@@ -244,9 +234,7 @@ export default function Chat({ chatId }: { chatId: string }) {
               <div className="pb-2">
                 <DisplayStale
                   model={selectedModel}
-                  onDismiss={() =>
-                    dismissStaleModel(selectedModel?.model || "")
-                  }
+                  onDismiss={() => dismissStaleModel(selectedModel?.model || "")}
                   chatId={chatId}
                   onScrollToBottom={() => {
                     if (containerRef.current) {

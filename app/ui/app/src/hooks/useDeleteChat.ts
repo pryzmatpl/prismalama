@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { deleteChat } from "@/api";
 import { useNavigate } from "@tanstack/react-router";
+import { deleteChat } from "@/api";
 
 export function useDeleteChat() {
   const queryClient = useQueryClient();
