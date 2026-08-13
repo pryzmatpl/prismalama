@@ -76,3 +76,23 @@ clean: checkout
 .PHONY: print-base
 print-base:
 	@echo $(FETCH_HEAD)
+
+# Phase 0 / JAISIU-2159 — fails if llama/patches/README.md is stale relative to FETCH_HEAD.
+# CI MUST call this on every PR that touches Makefile.sync or llama/patches/.
+.PHONY: sync-audit-check
+sync-audit-check:
+	@echo "Verify llama/patches/README.md references FETCH_HEAD=$(FETCH_HEAD)"
+	@grep -q "$(FETCH_HEAD)" llama/patches/README.md || \
+		(echo "stale patches README — please re-run sync-audit and refresh 'Pinned commit' + 'Last full audit'" && exit 1)
+	@echo "OK: llama/patches/README.md references FETCH_HEAD=$(FETCH_HEAD)"
+
+# Phase 0 / JAISIU-2159 — count local patches + emit Subject: headers for the README table.
+# Read-only; safe to run anytime.
+.PHONY: print-patches-audit
+print-patches-audit:
+	@echo "FETCH_HEAD=$(FETCH_HEAD)"
+	@echo "patch_count=$$(ls llama/patches/*.patch 2>/dev/null | wc -l)"
+	@for f in llama/patches/*.patch; do \
+		s=$$(grep -m1 '^Subject:' "$$f" | sed 's/Subject: \[PATCH\] //; s/Subject: //'); \
+		echo "$$(basename $$f)|$$s"; \
+	done
