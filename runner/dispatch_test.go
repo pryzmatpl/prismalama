@@ -109,12 +109,15 @@ func TestAirLLMModelAndReasonCompat(t *testing.T) {
 // Phase 0 / JAISIU-2157: typed Reason coverage.
 
 func TestReasonStrings_Stable(t *testing.T) {
-	// Stable identifiers — part of the public contract (capabilities, dispatch endpoint).
+	// Stable identifiers — part of the public contract (capabilities, dispatch
+	// endpoint). Back-compat: pre-Phase-0 contract mapped OLLAMA_USE_AIRLLM=0/1
+	// to the bare identifier "OLLAMA_USE_AIRLLM" (see runner/dispatch_test.go's
+	// TestDecideEngine_ForceAirLLMEnv / _OptOutDisablesAirLLM).
 	cases := map[Reason]string{
 		ReasonUnknown:          "unknown",
-		ReasonExplicitOptOut:   "OLLAMA_USE_AIRLLM=0",
-		ReasonExplicitOptIn:    "OLLAMA_USE_AIRLLM=1",
-		ReasonMultiGGUF:        "OLLAMA_MULTI_GGUF=1",
+		ReasonExplicitOptOut:   "OLLAMA_USE_AIRLLM",
+		ReasonExplicitOptIn:    "OLLAMA_USE_AIRLLM",
+		ReasonMultiGGUF:        "OLLAMA_MULTI_GGUF",
 		ReasonSafetensorsIndex: "model.safetensors.index.json",
 		ReasonSafetensorsShards:"safetensors_shards",
 		ReasonConfigHF:         "config.json_hf_heuristic",
@@ -127,6 +130,11 @@ func TestReasonStrings_Stable(t *testing.T) {
 		if got := r.String(); got != want {
 			t.Errorf("Reason(%d).String()=%q want %q", r, got, want)
 		}
+	}
+	// Confirm both opt-out and opt-in collapse to the same identifier
+	// (the bare "OLLAMA_USE_AIRLLM") — matches the legacy DecideEngine contract.
+	if ReasonExplicitOptOut.String() != ReasonExplicitOptIn.String() {
+		t.Fatal("opt-out and opt-in must collapse to the same back-compat identifier")
 	}
 }
 

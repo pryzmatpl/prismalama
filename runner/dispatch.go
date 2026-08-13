@@ -59,14 +59,20 @@ const (
 )
 
 // String returns the stable identifier for the reason (logs, JSON, capabilities).
+//
+// Back-compat: the pre-Phase-0 contract (enforced by runner/dispatch_test.go
+// + integration/ship_dispatch_test.go) required OLLAMA_USE_AIRLLM (without a
+// =0/=1 suffix) for the env-var toggle. Keep that exact identifier so the
+// tests + existing log scrapers keep working. New variants use a stable,
+// descriptive identifier.
 func (r Reason) String() string {
 	switch r {
 	case ReasonExplicitOptOut:
-		return "OLLAMA_USE_AIRLLM=0"
+		return "OLLAMA_USE_AIRLLM"
 	case ReasonExplicitOptIn:
-		return "OLLAMA_USE_AIRLLM=1"
+		return "OLLAMA_USE_AIRLLM"
 	case ReasonMultiGGUF:
-		return "OLLAMA_MULTI_GGUF=1"
+		return "OLLAMA_MULTI_GGUF"
 	case ReasonSafetensorsIndex:
 		return "model.safetensors.index.json"
 	case ReasonSafetensorsShards:
