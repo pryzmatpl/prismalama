@@ -33,7 +33,7 @@ Coverage is **partial** when tests skip (missing models, GPU, or env flags).
 
 ## Ship gate (release bar)
 
-After a feature lands, run integration proof then build **`prismalama-ollama`**: **`make ship-check`** (or **`scripts/ship-check.sh`**). Quick loop without packaging: **`make ship-check-fast`**. See **`docs/DEVELOPER.md`** (§ Ship gate).
+After a feature lands, run integration proof then build **`prismalama-ollama`**: **`make ship-check`** (or **`scripts/ship-check.sh`**). Quick loop without packaging: **`make ship-check-fast`**. See **`docs/DEVELOPER.md`** (§ Ship gate) and **`docs/SHIP_CHECK.md`** for prerequisites, env vars, failure modes, and `--list`/`--help` flags.
 
 ## Running Tests
 

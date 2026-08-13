@@ -8,6 +8,8 @@ import (
 
 type MiniMaxRenderer struct{}
 
+func (r *MiniMaxRenderer) LeadingBOS() string { return "" }
+
 func (r *MiniMaxRenderer) Render(messages []api.Message, tools []api.Tool, thinkValue *api.ThinkValue) (string, error) {
 	var sb strings.Builder
 

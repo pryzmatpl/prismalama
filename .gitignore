@@ -28,6 +28,7 @@ ollama-test
 
 # Go
 *.exe
+<<<<<<< HEAD
 *.dll
 *.so
 *.dylib
@@ -47,3 +48,13 @@ ollama/
 
 # Local PKGBUILD markers (do not commit)
 .prismalama_cuda
+=======
+.idea
+test_data
+*.crt
+__debug_bin*
+llama/build
+llama/vendor
+/ollama
+integration/testdata/models/
+>>>>>>> upstream/main

@@ -656,7 +656,7 @@ func (s *Server) completion(w http.ResponseWriter, r *http.Request) {
 		Grammar:        req.Grammar,
 	}
 
-	seq, err := s.NewSequence(req.Prompt, req.Images, NewSequenceParams{
+	seq, err := s.NewSequence(req.Prompt, req.Media, NewSequenceParams{
 		numPredict:     req.Options.NumPredict,
 		stop:           req.Options.Stop,
 		numKeep:        req.Options.NumKeep,

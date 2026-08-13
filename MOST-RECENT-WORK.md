@@ -1,4 +1,6 @@
 ---
+> **→ see [NEXT.md](./NEXT.md) for the current phase (Phase 0 / JAISIU-2156) and in-flight tickets. This file remains the BC4 + GPU-detection history.**
+
 ## Goal
 - Get BC4 weight-as-image inference working with GPU-enabled builds and verify GPU detection/benchmarks.
 

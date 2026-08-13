@@ -109,6 +109,15 @@ The **default GGUF path** is **llama.cpp** embedded under `llama/` (Go bindings 
 
 **Arch Linux / global deploys:** pin `FETCH_HEAD` in `Makefile.sync` to a **commit SHA** for reproducible binaries; branch names are fine for development only.
 
+**Patch audit (Phase 0 / JAISIU-2159):** every local patch in `llama/patches/` is listed in **`llama/patches/README.md`** with its `Subject:` header and a bisect policy (`safe to upstream` vs `keep local`). The Makefile exposes a CI guard:
+
+```bash
+make -f Makefile.sync sync-audit-check     # fails if README is stale vs FETCH_HEAD
+make -f Makefile.sync print-patches-audit  # lists every patch + subject line
+```
+
+When bumping `FETCH_HEAD`, refresh the README's "Pinned commit" + "Last full audit" lines and add a row to the audit history table.
+
 **Arch package (this repo):** root **`PKGBUILD`** builds Prismalama from source (CMake GGML CPU/HIP/Vulkan → `/usr/lib/ollama/rocm`, Go `ollama`, AirLLM under `/usr/share/ollama`). Run **`makepkg -sf`** or **`./build-rocm.sh`**; see **`README-PKGBUILD.md`**. Set **`PRISMALAMA_AMDGPU_TARGETS`** before `makepkg` if not `gfx1100`. After any change to **Go runners** or **`llm/`**, rebuild and reinstall, then restart the service — a stale **`/usr/bin/ollama`** will not pick up fixes. On Arch, the usual loop is **`sudo makepkg -sfi`** in the directory containing **`PKGBUILD`**, then **`sudo systemctl restart ollama`** (**`-s`** deps, **`-f`** force rebuild, **`-i`** install).
 
 **Submodule note:** `src/ollama` may still ship its own `Makefile.sync` from upstream Ollama. Align it with the Prismalama fork when you merge the submodule or build from a unified tree.

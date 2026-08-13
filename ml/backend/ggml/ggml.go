@@ -1093,6 +1093,11 @@ func (t *Tensor) Floats() (data []float32) {
 	return
 }
 
+// BackendGet copies tensor data from the backend (GPU or CPU) and returns it as
+// float32. For pure-CPU tensors this is identical to Floats(); for GPU-backed
+// tensors the sync callback ensures the data is flushed before reading.
+func (t *Tensor) BackendGet() []float32 { return t.Floats() }
+
 func tensorSet[S ~[]E, E byte | float32 | int32](t *Tensor, s S) {
 	if len(s) == 0 {
 		return
@@ -1958,4 +1963,37 @@ func (t *Tensor) ChunkSections(ctx ml.Context, dim int, sections ...int) []ml.Te
 		panic("sections do not sum to tensor dimension")
 	}
 	return s
+}
+
+// Conv1DDW implements a 1-D depthwise convolution using ggml_conv_1d.
+// kernel (weight) has shape [kernel_size, 1, channels]; t has shape [length, channels].
+func (t *Tensor) Conv1DDW(ctx ml.Context, weight ml.Tensor, s, p, d int) ml.Tensor {
+	return &Tensor{
+		b: t.b,
+		t: C.ggml_conv_1d(ctx.(*Context).ctx, weight.(*Tensor).t, t.t, C.int(s), C.int(p), C.int(d)),
+	}
+}
+
+// SSMScan implements the selective scan operator (Mamba S6) via ggml_ssm_scan.
+func (t *Tensor) SSMScan(ctx ml.Context, x, dt, A, B, C2, ids ml.Tensor) ml.Tensor {
+	return &Tensor{
+		b: t.b,
+		t: C.ggml_ssm_scan(ctx.(*Context).ctx, t.t, x.(*Tensor).t, dt.(*Tensor).t, A.(*Tensor).t, B.(*Tensor).t, C2.(*Tensor).t, ids.(*Tensor).t),
+	}
+}
+
+// PadExt pads t with independent amounts on each side of each dimension.
+func (t *Tensor) PadExt(ctx ml.Context, lp0, rp0, lp1, rp1, lp2, rp2, lp3, rp3 int) ml.Tensor {
+	return &Tensor{
+		b: t.b,
+		t: C.ggml_pad_ext(ctx.(*Context).ctx, t.t, C.int(lp0), C.int(rp0), C.int(lp1), C.int(rp1), C.int(lp2), C.int(rp2), C.int(lp3), C.int(rp3)),
+	}
+}
+
+// SetInplace copies src into t at the given byte offset without allocating a new tensor.
+func (t *Tensor) SetInplace(ctx ml.Context, src ml.Tensor, nb1, nb2, nb3, offset int) ml.Tensor {
+	return &Tensor{
+		b: t.b,
+		t: C.ggml_set_inplace(ctx.(*Context).ctx, t.t, src.(*Tensor).t, C.size_t(nb1), C.size_t(nb2), C.size_t(nb3), C.size_t(offset)),
+	}
 }

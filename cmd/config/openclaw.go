@@ -27,9 +27,9 @@ func (c *Openclaw) Run(model string, args []string) error {
 	}
 
 	models := []string{model}
-	if config, err := loadIntegration("openclaw"); err == nil && len(config.Models) > 0 {
+	if config, err := LoadIntegration("openclaw"); err == nil && len(config.Models) > 0 {
 		models = config.Models
-	} else if config, err := loadIntegration("clawdbot"); err == nil && len(config.Models) > 0 {
+	} else if config, err := LoadIntegration("clawdbot"); err == nil && len(config.Models) > 0 {
 		models = config.Models
 	}
 	if err := c.Edit(models); err != nil {

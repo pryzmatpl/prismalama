@@ -1,0 +1,139 @@
+# =============================================================================
+# PrismaLama Inference Server — AMD ROCm Build
+# JAISIU-2146
+#
+# Mirrors the working trellis.rocm.Dockerfile pattern:
+#   rocm/dev-ubuntu-24.04:7.2.4-complete → ROCm 7.2.4 SDK + Ubuntu 24.04
+#   ROCM_PATH=/opt/rocm
+#   GPU_ARCHS=gfx1100
+#   HSA_OVERRIDE_GFX_VERSION=11.0.0
+#   /dev/kfd + /dev/dri passthrough
+#
+# GPU: AMD Radeon RX 7900 XT/XTX/GRE (Navi 31 = gfx1100)
+#
+# Build (from /home/node/jaisiu):
+#   docker build -f prismalama.rocm.Dockerfile \
+#     -t prismalama:rocm .
+#
+# Run (RX 7900 host):
+#   docker run -d --name prismalama --restart unless-stopped \
+#     -p 11434:11434 \
+#     --device=/dev/kfd --device=/dev/dri --group-add video --group-add render \
+#     --ipc=host --shm-size 8g \
+#     -v prismalama:/root/.ollama \
+#     -e HSA_OVERRIDE_GFX_VERSION=11.0.0 \
+#     prismalama:rocm
+#
+# Recommended: use docker-compose -f docker-compose.prismalama.rocm.yml
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1 — builder: full ROCm 7.2 SDK + Go 1.24 + CMake/Ninja
+# -----------------------------------------------------------------------------
+ARG ROCM_BASE=rocm/dev-ubuntu-24.04:7.2.4-complete
+FROM ${ROCM_BASE} AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    CGO_ENABLED=1 \
+    ROCM_PATH=/opt/rocm \
+    HIP_PATH=/opt/rocm \
+    PATH=/opt/rocm/bin:/usr/local/go/bin:${PATH} \
+    AMDGPU_TARGETS=gfx1100 \
+    GPU_ARCHS=gfx1100 \
+    HSA_OVERRIDE_GFX_VERSION=11.0.0
+
+# Build deps + Vulkan ICD (ggml-vulkan build needs glslc; harmless on AMD)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl git \
+    build-essential cmake ninja-build pkg-config \
+    libvulkan1 libvulkan-dev mesa-vulkan-drivers vulkan-tools \
+    glslc glslang-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# Go (matches prismalama/go.mod)
+ARG GO_VERSION=1.24.1
+RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
+    | tar -C /usr/local -xz
+
+WORKDIR /src
+
+# Cache Go modules separately so a source-only change doesn't redownload
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Now bring the tree in full
+COPY ./ ./
+
+# GGML: CPU + HIP + Vulkan into /usr/lib/ollama/rocm (matches Ollama layout)
+# PrismaLama's own docker/gpu/Dockerfile uses the same flags.
+RUN cmake -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DGGML_BUILD=ON \
+        -DGGML_SHARED=ON \
+        -DGGML_BACKEND_DL=ON \
+        -DGGML_BACKEND_SHARED=ON \
+        -DGGML_CPU_ALL_VARIANTS=ON \
+        -DLLAMA_HIPBLAS=ON \
+        -DLLAMA_CUDA=OFF \
+        -DGGML_CUDA=OFF \
+        -DAMDGPU_TARGETS="${AMDGPU_TARGETS}" \
+        -DOLLAMA_RUNNER_DIR=rocm \
+    && cmake --build build --parallel "$(nproc)" \
+    && cmake --install build --prefix /usr 2>&1 | tail -30
+
+# Go binary (the ollama-compatible PrismaLama server)
+RUN go build -trimpath -buildmode=pie -o /usr/bin/ollama \
+        -ldflags "-w -s -X=github.com/ollama/ollama/version.Version=prismalama-rocm" \
+        .
+
+# Runner entrypoint pulled in verbatim from the submodule
+# (referenced via the local build context, which contains ./prismalama/)
+# operator-defined entrypoint skipped in this build context
+
+# -----------------------------------------------------------------------------
+# Stage 2 — runtime: slim Ubuntu + ROCm runtime libs only
+# -----------------------------------------------------------------------------
+FROM rocm/dev-ubuntu-24.04:7.2.4-complete AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    OLLAMA_LIBRARY_PATH=/usr/lib/ollama/rocm \
+    OLLAMA_HOST=0.0.0.0:11434 \
+    OLLAMA_MODELS=/home/ollama/.ollama \
+    OLLAMA_KEEP_ALIVE=24h \
+    OLLAMA_NUM_PARALLEL=2 \
+    OLLAMA_MAX_LOADED_MODELS=1 \
+    HIP_VISIBLE_DEVICES=0 \
+    CUDA_VISIBLE_DEVICES="" \
+    HSA_OVERRIDE_GFX_VERSION=11.0.0 \
+    AMDGPU_TARGETS=gfx1100 \
+    PATH=/opt/rocm/bin:${PATH} \
+    LD_LIBRARY_PATH=/usr/lib/ollama/rocm:/opt/rocm/lib
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /home/ollama/.ollama /usr/lib/ollama/rocm \
+    && useradd -m -s /bin/bash ollama \
+    && chown -R ollama:ollama /home/ollama/.ollama /usr/lib/ollama
+
+# Copy artifacts from builder
+COPY --from=builder /usr/bin/ollama /usr/bin/ollama
+COPY --from=builder /usr/lib/ollama/ /usr/lib/ollama/
+COPY --from=builder /opt/rocm/lib/   /opt/rocm/lib/
+COPY --from=builder /usr/local/bin/prismalama-entrypoint.sh /usr/local/bin/prismalama-entrypoint.sh
+
+EXPOSE 11434
+
+USER ollama
+WORKDIR /home/ollama
+
+ENTRYPOINT ["/usr/local/bin/prismalama-entrypoint.sh"]
+CMD ["serve"]
+
+# -----------------------------------------------------------------------------
+# Healthcheck — same shape as the trellis one, but hitting PrismaLama's
+# Ollama-compatible /api/tags endpoint
+# -----------------------------------------------------------------------------
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
+    CMD curl -fsS http://localhost:11434/api/tags >/dev/null 2>&1 || exit 1

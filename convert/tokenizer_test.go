@@ -184,11 +184,89 @@ func TestParseTokenizer(t *testing.T) {
 				},
 				SpecialVocabulary: []*SpecialVocabulary{
 					{Type: "pad", Content: "<pad>", ID: 0, AddToken: false},
-					{Type: "eos", Content: "<eos>", ID: 1, AddToken: false},
-					{Type: "bos", Content: "<bos>", ID: 2, AddToken: true},
+					{Type: "eos", Content: "<eos>", ID: 1, AddToken: false, AddTokenSet: true},
+					{Type: "bos", Content: "<bos>", ID: 2, AddToken: true, AddTokenSet: true},
 					{Type: "unk", Content: "<unk>", ID: 3, AddToken: false},
 				},
 				Pre: "default",
+			},
+		},
+		{
+			name: "llama-bpe pretokenizer and control tokens",
+			fsys: createTokenizerFS(t, t.TempDir(), map[string]io.Reader{
+				"tokenizer.json": strings.NewReader(`{
+					"added_tokens": [
+						{"id": 1, "content": "<|startoftext|>", "special": true},
+						{"id": 6, "content": "<|im_start|>", "special": true},
+						{"id": 7, "content": "<|im_end|>", "special": true},
+						{"id": 8, "content": "<|tool_list_start|>", "special": true},
+						{"id": 9, "content": "<|tool_list_end|>", "special": true},
+						{"id": 10, "content": "<|tool_call_start|>", "special": true},
+						{"id": 11, "content": "<|tool_call_end|>", "special": true},
+						{"id": 12, "content": "<|tool_response_start|>", "special": true},
+						{"id": 13, "content": "<|tool_response_end|>", "special": true},
+						{"id": 396, "content": "<image>", "special": true},
+						{"id": 64400, "content": "<think>", "special": true},
+						{"id": 64401, "content": "</think>", "special": true}
+					],
+					"model": {
+						"vocab": {
+							"<|startoftext|>": 1,
+							"<|im_start|>": 6,
+							"<|im_end|>": 7,
+							"<|tool_list_start|>": 8,
+							"<|tool_list_end|>": 9,
+							"<|tool_call_start|>": 10,
+							"<|tool_call_end|>": 11,
+							"<|tool_response_start|>": 12,
+							"<|tool_response_end|>": 13,
+							"<image>": 396,
+							"<think>": 64400,
+							"</think>": 64401
+						}
+					},
+					"pre_tokenizer": {
+						"type": "Sequence",
+						"pretokenizers": [
+							{
+								"type": "Split",
+								"pattern": {
+									"Regex": "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r\\n\\p{L}\\p{N}]?\\p{L}+|\\p{N}{1,3}| ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+"
+								},
+								"behavior": "Isolated",
+								"invert": false
+							},
+							{
+								"type": "ByteLevel",
+								"add_prefix_space": false,
+								"trim_offsets": true,
+								"use_regex": false
+							}
+						]
+					}
+				}`),
+			}),
+			want: &Tokenizer{
+				Vocabulary: &Vocabulary{
+					Model: "gpt2",
+					Tokens: []string{
+						"<|startoftext|>",
+						"<|im_start|>",
+						"<|im_end|>",
+						"<|tool_list_start|>",
+						"<|tool_list_end|>",
+						"<|tool_call_start|>",
+						"<|tool_call_end|>",
+						"<|tool_response_start|>",
+						"<|tool_response_end|>",
+						"<image>",
+						"<think>",
+						"</think>",
+					},
+					Scores: []float32{1, 6, 7, 8, 9, 10, 11, 12, 13, 396, 64400, 64401},
+					Types:  []int32{3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3},
+				},
+				Pre: "llama-bpe",
 			},
 		},
 		{
@@ -302,10 +380,32 @@ func TestParseTokenizer(t *testing.T) {
 					Types:  []int32{3, 3, 3, 3},
 				},
 				SpecialVocabulary: []*SpecialVocabulary{
-					{Type: "eos", Content: "<eos>", ID: 1, IDs: []int32{1, 2, 3}, AddToken: false},
-					{Type: "bos", Content: "<bos>", ID: 0, AddToken: true},
+					{Type: "eos", Content: "<eos>", ID: 1, IDs: []int32{1, 2, 3}, AddToken: false, AddTokenSet: true},
+					{Type: "bos", Content: "<bos>", ID: 0, AddToken: true, AddTokenSet: true},
 				},
 				Pre: "default",
+			},
+		},
+		{
+			name: "qwen35 pretokenizer",
+			fsys: createTokenizerFS(t, t.TempDir(), map[string]io.Reader{
+				"tokenizer.json": strings.NewReader(`{
+					"pre_tokenizer": {
+						"type": "Sequence",
+						"pretokenizers": [
+							{
+								"type": "Split",
+								"pattern": {
+									"Regex": "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r\\n\\p{L}\\p{N}]?[\\p{L}\\p{M}]+|\\p{N}| ?[^\\s\\p{L}\\p{M}\\p{N}]+[\\r\\n]*|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+"
+								}
+							}
+						]
+					}
+				}`),
+			}),
+			want: &Tokenizer{
+				Vocabulary: &Vocabulary{Model: "gpt2"},
+				Pre:        "qwen35",
 			},
 		},
 	}
@@ -321,5 +421,25 @@ func TestParseTokenizer(t *testing.T) {
 				t.Errorf("unexpected tokenizer (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestModelParametersKVOmitsMissingAddToken(t *testing.T) {
+	kv := ModelParameters{}.KV(&Tokenizer{
+		Vocabulary: &Vocabulary{Model: "gpt2"},
+		SpecialVocabulary: []*SpecialVocabulary{
+			{Type: "bos", Content: "<bos>", ID: 1},
+			{Type: "eos", Content: "<eos>", ID: 2, AddToken: false, AddTokenSet: true},
+		},
+	})
+
+	if _, ok := kv["tokenizer.ggml.add_bos_token"]; ok {
+		t.Errorf("tokenizer.ggml.add_bos_token should be omitted when add_bos_token is absent")
+	}
+	if got := kv["tokenizer.ggml.bos_token_id"]; got != uint32(1) {
+		t.Errorf("tokenizer.ggml.bos_token_id = %v, want 1", got)
+	}
+	if got, ok := kv["tokenizer.ggml.add_eos_token"]; !ok || got != false {
+		t.Errorf("tokenizer.ggml.add_eos_token = %v, %v; want explicit false", got, ok)
 	}
 }

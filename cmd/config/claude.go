@@ -75,7 +75,7 @@ func (c *Claude) Run(model string, args []string) error {
 func (c *Claude) modelEnvVars(model string) []string {
 	primary := model
 	fast := model
-	if cfg, err := loadIntegration("claude"); err == nil && cfg.Aliases != nil {
+	if cfg, err := LoadIntegration("claude"); err == nil && cfg.Aliases != nil {
 		if p := cfg.Aliases["primary"]; p != "" {
 			primary = p
 		}
@@ -154,40 +154,7 @@ func (c *Claude) ConfigureAliases(ctx context.Context, model string, existingAli
 // SetAliases syncs the configured aliases to the Ollama server using prefix matching.
 // Cloud-only: for local models (fast is empty), we delete any existing aliases to
 // prevent stale routing to a previous cloud model.
-func (c *Claude) SetAliases(ctx context.Context, aliases map[string]string) error {
-	client, err := api.ClientFromEnvironment()
-	if err != nil {
-		return err
-	}
-
-	prefixes := []string{"claude-sonnet-", "claude-haiku-"}
-
-	if aliases["fast"] == "" {
-		for _, prefix := range prefixes {
-			_ = client.DeleteAliasExperimental(ctx, &api.AliasDeleteRequest{Alias: prefix})
-		}
-		return nil
-	}
-
-	prefixAliases := map[string]string{
-		"claude-sonnet-": aliases["primary"],
-		"claude-haiku-":  aliases["fast"],
-	}
-
-	var errs []string
-	for prefix, target := range prefixAliases {
-		req := &api.AliasRequest{
-			Alias:          prefix,
-			Target:         target,
-			PrefixMatching: true,
-		}
-		if err := client.SetAliasExperimental(ctx, req); err != nil {
-			errs = append(errs, prefix)
-		}
-	}
-
-	if len(errs) > 0 {
-		return fmt.Errorf("failed to set aliases: %v", errs)
-	}
-	return nil
+func (c *Claude) SetAliases(_ context.Context, aliases map[string]string) error {
+	// Persist aliases to the Ollama config store.
+	return SaveAliases("claude", aliases)
 }

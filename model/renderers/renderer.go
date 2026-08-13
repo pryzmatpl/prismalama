@@ -8,6 +8,7 @@ import (
 
 type Renderer interface {
 	Render(messages []api.Message, tools []api.Tool, think *api.ThinkValue) (string, error)
+	LeadingBOS() string
 }
 
 type (
@@ -42,12 +43,21 @@ func RenderWithRenderer(name string, msgs []api.Message, tools []api.Tool, think
 	return renderer.Render(msgs, tools, think)
 }
 
+func LeadingBOSForRenderer(name string) string {
+	renderer := rendererForName(name)
+	if renderer == nil {
+		return ""
+	}
+
+	return renderer.LeadingBOS()
+}
+
 func rendererForName(name string) Renderer {
 	if constructor, ok := registry.renderers[name]; ok {
 		return constructor()
 	}
 	switch name {
-	case "qwen3-coder", "qwen3.5", "qwen3_5", "qwen3-5":
+	case "qwen3-coder":
 		renderer := &Qwen3CoderRenderer{}
 		return renderer
 	case "qwen3-vl-instruct":
@@ -55,6 +65,9 @@ func rendererForName(name string) Renderer {
 		return renderer
 	case "qwen3-vl-thinking":
 		renderer := &Qwen3VLRenderer{isThinking: true, useImgTags: RenderImgTags}
+		return renderer
+	case "qwen3.5", "qwen3_5", "qwen3-5":
+		renderer := &Qwen35Renderer{isThinking: true, emitEmptyThinkOnNoThink: true, useImgTags: RenderImgTags}
 		return renderer
 	case "cogito":
 		renderer := &CogitoRenderer{isThinking: true}
@@ -78,20 +91,24 @@ func rendererForName(name string) Renderer {
 		return renderer
 	case "nemotron-3-nano":
 		return &Nemotron3NanoRenderer{}
+	case "gemma4", "gemma4-small":
+		return &Gemma4Renderer{useImgTags: RenderImgTags}
+	case "gemma4-large":
+		return &Gemma4Renderer{useImgTags: RenderImgTags, emptyBlockOnNothink: true}
 	case "functiongemma":
 		return &FunctionGemmaRenderer{}
 	case "glm-4.7":
 		return &GLM47Renderer{}
 	case "glm-ocr":
-		return &GlmOcrRenderer{}
+		return &GlmOcrRenderer{useImgTags: RenderImgTags}
 	case "lfm2":
-		return &LFM2Renderer{IsThinking: false}
+		return &LFM2Renderer{IsThinking: false, useImgTags: RenderImgTags}
 	case "lfm2-thinking":
-		renderer := &LFM2Renderer{IsThinking: true}
-		return renderer
+		return &LFM2Renderer{IsThinking: true, useImgTags: RenderImgTags}
 	case "minimax-m2":
-		renderer := &MiniMaxRenderer{}
-		return renderer
+		return &MiniMaxRenderer{}
+	case "laguna":
+		return &LagunaRenderer{}
 	default:
 		return nil
 	}
