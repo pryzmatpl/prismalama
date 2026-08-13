@@ -92,13 +92,13 @@ print-defaults:
 	@echo "# Dockerfile.gpu"
 	@grep -nE '^ENV (OLLAMA|AIRLLM|HIP_|PRISMALAMA)' Dockerfile.gpu | sed 's/^/Dockerfile.gpu: /' || true
 	@echo "# docker/arch/Dockerfile"
-	@grep -nE '^ENV (OLLAMA|AIRLLM|HIP_|PRISMALAMA)' docker/arch/Dockerfile | sed 's/^/docker/arch/Dockerfile: /' || true
+	@grep -nE '^ENV (OLLAMA|AIRLLM|HIP_|PRISMALAMA)' docker/arch/Dockerfile | awk 'BEGIN{FS=":"; OFS=":"} {printf "docker/arch/Dockerfile:" $$1 ":" $$2 "\n"}' || true
 	@echo "# docker/arch/Dockerfile.prebuilt"
-	@grep -nE '^ENV (OLLAMA|AIRLLM|HIP_|PRISMALAMA)' docker/arch/Dockerfile.prebuilt | sed 's/^/docker/arch/Dockerfile.prebuilt: /' || true
+	@grep -nE '^ENV (OLLAMA|AIRLLM|HIP_|PRISMALAMA)' docker/arch/Dockerfile.prebuilt | awk 'BEGIN{FS=":"; OFS=":"} {printf "docker/arch/Dockerfile.prebuilt:" $$1 ":" $$2 "\n"}' || true
 	@echo "# docker/gpu/Dockerfile"
-	@grep -nE '^ENV (OLLAMA|AIRLLM|HIP_|PRISMALAMA)' docker/gpu/Dockerfile | sed 's/^/docker/gpu/Dockerfile: /' || true
+	@grep -nE '^ENV (OLLAMA|AIRLLM|HIP_|PRISMALAMA)' docker/gpu/Dockerfile | awk 'BEGIN{FS=":"; OFS=":"} {printf "docker/gpu/Dockerfile:" $$1 ":" $$2 "\n"}' || true
 	@echo "# docker/test/Dockerfile"
-	@grep -nE '^ENV (OLLAMA|AIRLLM|HIP_|PRISMALAMA)' docker/test/Dockerfile | sed 's/^/docker/test/Dockerfile: /' || true
+	@grep -nE '^ENV (OLLAMA|AIRLLM|HIP_|PRISMALAMA)' docker/test/Dockerfile | awk 'BEGIN{FS=":"; OFS=":"} {printf "docker/test/Dockerfile:" $$1 ":" $$2 "\n"}' || true
 	@echo "# envconfig/config.go (Go canonical defaults)"
 	@grep -nE '^var (LayerStreaming|StreamingBudgetBytes|GpuOverhead|MmapAllowLowRamLinux|KeepAlive|EnableVulkan|MemoryPolicy|NumParallel|MaxLoadedModels)' envconfig/config.go | sed 's/^/envconfig: /' || true
 	@echo "# see docs/PACKAGING_DEFAULTS.md for the human-readable inventory + rationale"
