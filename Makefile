@@ -81,6 +81,28 @@ ship-check:
 ship-check-fast:
 	SHIP_GO_TEST_EXTRA='-run=TestBlueSky|TestShipMemoryPolicyEnv|TestShipAdaptiveMemoryEnv|TestShipGpuOverheadDefault|TestShipVulkanMmapDefault|TestShipEngineDispatchOptOut|TestShipEngineDispatchMultipartAirLLM|TestShipEngineKindString|TestShipLayerStreamingEnvDefault|TestShipLayerStreamingEnvEnable|TestShipStreamingBudgetDefault|TestShipStreamingBudgetOverride|TestShipStreamingLayerMapGGUF|TestShipStreamingBackendInterface|TestShipStreamingInferenceStreamerLifecycle|TestShipStreamingComputeBackendInterface' SHIP_INTEGRATION_TIMEOUT=5m SHIP_SKIP_PKG=1 ./scripts/ship-check.sh
 
+# Phase 0 / JAISIU-2160 — print every env var shipped by every Prismalama
+# artifact. CI MUST diff this output against docs/PACKAGING_DEFAULTS.md.
+.PHONY: print-defaults
+print-defaults:
+	@echo "# PKGBUILD (writes /etc/default/ollama)"
+	@grep -nE '^OLLAMA_[A-Z_]+=' PKGBUILD | sed 's/^/PKGBUILD: /' || true
+	@grep -nE '^AIRLLM_[A-Z_]+=' PKGBUILD | sed 's/^/PKGBUILD: /' || true
+	@grep -nE '^HIP_VISIBLE_DEVICES=' PKGBUILD | sed 's/^/PKGBUILD: /' || true
+	@echo "# Dockerfile.gpu"
+	@grep -nE '^ENV (OLLAMA|AIRLLM|HIP_|PRISMALAMA)' Dockerfile.gpu | sed 's/^/Dockerfile.gpu: /' || true
+	@echo "# docker/arch/Dockerfile"
+	@grep -nE '^ENV (OLLAMA|AIRLLM|HIP_|PRISMALAMA)' docker/arch/Dockerfile | sed 's/^/docker/arch/Dockerfile: /' || true
+	@echo "# docker/arch/Dockerfile.prebuilt"
+	@grep -nE '^ENV (OLLAMA|AIRLLM|HIP_|PRISMALAMA)' docker/arch/Dockerfile.prebuilt | sed 's/^/docker/arch/Dockerfile.prebuilt: /' || true
+	@echo "# docker/gpu/Dockerfile"
+	@grep -nE '^ENV (OLLAMA|AIRLLM|HIP_|PRISMALAMA)' docker/gpu/Dockerfile | sed 's/^/docker/gpu/Dockerfile: /' || true
+	@echo "# docker/test/Dockerfile"
+	@grep -nE '^ENV (OLLAMA|AIRLLM|HIP_|PRISMALAMA)' docker/test/Dockerfile | sed 's/^/docker/test/Dockerfile: /' || true
+	@echo "# envconfig/config.go (Go canonical defaults)"
+	@grep -nE '^var (LayerStreaming|StreamingBudgetBytes|GpuOverhead|MmapAllowLowRamLinux|KeepAlive|EnableVulkan|MemoryPolicy|NumParallel|MaxLoadedModels)' envconfig/config.go | sed 's/^/envconfig: /' || true
+	@echo "# see docs/PACKAGING_DEFAULTS.md for the human-readable inventory + rationale"
+
 .PHONY: docker-test-build
 docker-test-build:
 	docker build -f docker/test/Dockerfile -t prismalama-test .
