@@ -207,7 +207,7 @@ func (b *Backend) loadRawTensor(
 	tts []*C.struct_ggml_tensor,
 	reportProgress func(uint64),
 ) error {
-	bts := make([]byte, 128*format.KibiByte)
+	bts := make([]byte, 1*format.MebiByte)
 	var s uint64
 	for s < t.Size() {
 		n, err := io.ReadFull(sr, bts[:min(len(bts), int(t.Size()-s))])

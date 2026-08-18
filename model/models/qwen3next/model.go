@@ -3,6 +3,7 @@ package qwen3next
 import (
 	"cmp"
 	"fmt"
+	"log/slog"
 	"math"
 
 	"github.com/ollama/ollama/fs"
@@ -45,6 +46,10 @@ type Options struct {
 	// Per-layer type from GGUF metadata
 	isRecurrent []bool
 
+	// IMRoPE sections from GGUF (llama.cpp LLAMA_ROPE_TYPE_IMROPE).
+	// qwen35 / qwen35moe publish rope.dimension_sections, typically [11, 11, 10, 0].
+	mropeSections []int
+
 	// Pre-computed masks for chunked attention (created once per forward pass)
 	masks *Masks
 }
@@ -53,8 +58,18 @@ func (o Options) headDim() int {
 	return cmp.Or(o.keyLength, o.valueLength, o.hiddenSize/o.numHeads)
 }
 
+func (o Options) usesIMRoPE() bool {
+	return len(o.mropeSections) > 0
+}
+
 func (o Options) applyRotaryPositionEmbeddings(ctx ml.Context, states, positions ml.Tensor) ml.Tensor {
-	opts := []func(*rope.Options){rope.WithTypeNeoX()}
+	var opts []func(*rope.Options)
+	if o.usesIMRoPE() {
+		// llama.cpp llama_model_rope_type(QWEN35/QWEN35MOE) → LLAMA_ROPE_TYPE_IMROPE
+		opts = []func(*rope.Options){rope.WithInterleaveMRoPE(o.mropeSections)}
+	} else {
+		opts = []func(*rope.Options){rope.WithTypeNeoX()}
+	}
 	if o.ropeType == "yarn" {
 		attnFactor := float32(1.0 / (1.0 + 0.1*math.Log(float64(o.ropeScale))))
 		opts = append(opts,
@@ -65,6 +80,43 @@ func (o Options) applyRotaryPositionEmbeddings(ctx ml.Context, states, positions
 	}
 	ropeDim := cmp.Or(o.ropeDim, o.headDim())
 	return nn.RoPE(ctx, states, positions, ropeDim, o.ropeBase, 1./o.ropeScale, opts...)
+}
+
+const mropeAxes = 4
+
+func intSections(raw []int32) []int {
+	if len(raw) == 0 {
+		return nil
+	}
+	if len(raw) == 3 {
+		raw = append(append([]int32(nil), raw...), 0)
+	}
+	out := make([]int, len(raw))
+	for i, v := range raw {
+		out[i] = int(v)
+	}
+	return out
+}
+
+func ropeSectionsFromConfig(c fs.Config) []int {
+	for _, key := range []string{"rope.dimension_sections", "mrope_sections", "rope.mrope_section"} {
+		if s := intSections(c.Ints(key)); len(s) > 0 {
+			return s
+		}
+	}
+	return nil
+}
+
+// mropePositionIDs expands 1D token positions into ggml IMRoPE layout:
+// concatenated [time..., height..., width..., extra...] with extra left at 0.
+// Text tokens share the same id on time/height/width (qwen3vl / llama.cpp).
+func mropePositionIDs(positions []int32) []int32 {
+	n := len(positions)
+	out := make([]int32, n*mropeAxes)
+	copy(out[0:n], positions)
+	copy(out[n:2*n], positions)
+	copy(out[2*n:3*n], positions)
+	return out
 }
 
 // Operator is the interface for attention-like operators
@@ -220,7 +272,11 @@ type Model struct {
 }
 
 func (m *Model) Forward(ctx ml.Context, batch input.Batch) (ml.Tensor, error) {
-	positions := ctx.Input().FromInts(batch.Positions, len(batch.Positions))
+	pos := batch.Positions
+	if m.usesIMRoPE() {
+		pos = mropePositionIDs(batch.Positions)
+	}
+	positions := ctx.Input().FromInts(pos, len(pos))
 
 	hiddenStates := m.TokenEmbedding.Forward(ctx, batch.Inputs)
 
@@ -249,6 +305,9 @@ func (m *Model) Forward(ctx ml.Context, batch input.Batch) (ml.Tensor, error) {
 }
 
 func (m *Model) Shift(ctx ml.Context, layer int, key, shift ml.Tensor) (ml.Tensor, error) {
+	if m.usesIMRoPE() {
+		shift = shift.Repeat(ctx, 1, mropeAxes).Reshape(ctx, -1)
+	}
 	return m.applyRotaryPositionEmbeddings(ctx, key, shift), nil
 }
 
@@ -319,11 +378,12 @@ func New(c fs.Config) (model.Model, error) {
 					return int(v)
 				}
 			}
-			return 0
+			return int(c.Uint("attention.head_count_kv"))
 		}(),
 		keyLength:             int(c.Uint("attention.key_length")),
 		valueLength:           int(c.Uint("attention.value_length")),
 		ropeDim:               int(c.Uint("rope.dimension_count")),
+		mropeSections:         ropeSectionsFromConfig(c),
 		eps:                   c.Float("attention.layer_norm_rms_epsilon"),
 		ropeType:              c.String("rope.scaling.type"),
 		ropeBase:              c.Float("rope.freq_base"),
@@ -341,7 +401,7 @@ func New(c fs.Config) (model.Model, error) {
 		isRecurrent:           isRecurrent,
 	}
 	if opts.numKVHeads == 0 {
-		return nil, fmt.Errorf("qwen3next: attention.head_count_kv array must include at least one non-zero value")
+		return nil, fmt.Errorf("qwen3next: attention.head_count_kv must be non-zero")
 	}
 
 	// Calculate cache dimensions
@@ -358,6 +418,10 @@ func New(c fs.Config) (model.Model, error) {
 	headKDim := opts.ssmDState
 	if headKDim != headVDim && headKDim > 0 && headVDim > 0 {
 		return nil, fmt.Errorf("qwen3next: headKDim (%d) != headVDim (%d) not supported; state computations require equal dimensions", headKDim, headVDim)
+	}
+
+	if len(opts.mropeSections) > 0 {
+		slog.Info("qwen3next: IMRoPE", "sections", opts.mropeSections, "rope_dim", opts.ropeDim, "head_dim", opts.headDim())
 	}
 
 	m := Model{

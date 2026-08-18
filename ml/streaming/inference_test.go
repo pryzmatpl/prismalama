@@ -142,7 +142,33 @@ func TestOnBlockDoneKeepsBlocksWhenModelFitsBudget(t *testing.T) {
 	}
 }
 
-func TestOnBlockDoneEvictsWhenOverBudget(t *testing.T) {
+func TestOnBlockDoneEvictsWhenBudgetZero(t *testing.T) {
+	path := writeTestGGUF(t)
+	g := decodeTestGGUF(t, path)
+	lm, err := BuildLayerMap(g)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	is := NewInferenceStreamer(nil, path, lm)
+	is.SetBudgetBytes(0)
+	is.loadedWeights[0] = true
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	is.file = f
+	defer is.Close()
+
+	if !is.OnBlockDone(0) {
+		t.Fatal("OnBlockDone(0) returned false")
+	}
+	if is.loadedWeights[0] {
+		t.Fatal("expected block 0 to be evicted when budget is 0")
+	}
+}
+
+func TestOnBlockDoneKeepsWhenBudgetSetEvenIfModelLarger(t *testing.T) {
 	path := writeTestGGUF(t)
 	g := decodeTestGGUF(t, path)
 	lm, err := BuildLayerMap(g)
@@ -163,8 +189,8 @@ func TestOnBlockDoneEvictsWhenOverBudget(t *testing.T) {
 	if !is.OnBlockDone(0) {
 		t.Fatal("OnBlockDone(0) returned false")
 	}
-	if is.loadedWeights[0] {
-		t.Fatal("expected block 0 to be evicted when over budget")
+	if !is.loadedWeights[0] {
+		t.Fatal("partial-offload models larger than the budget must stay resident; eviction does not free HIP buffers")
 	}
 }
 

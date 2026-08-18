@@ -34,6 +34,15 @@ func TestParseTags(t *testing.T) {
 				},
 			},
 		},
+		{
+			value: "ssm_dt.bias,alt:ssm_dt",
+			want: Tag{
+				name: "ssm_dt.bias",
+				alternatives: []string{
+					"ssm_dt",
+				},
+			},
+		},
 	}
 
 	for _, tt := range cases {
@@ -159,6 +168,39 @@ func TestPopulateFieldsAlternateName(t *testing.T) {
 		Tensor: &fakeTensor{Name: "leaf"},
 	}, m); diff != "" {
 		t.Errorf("populateFields() set incorrect values (-want +got):\n%s", diff)
+	}
+}
+
+func TestPopulateQwen35SSMDTBias(t *testing.T) {
+	type gatedDeltaNet struct {
+		SSMDT ml.Tensor `gguf:"ssm_dt.bias,alt:ssm_dt"`
+		SSMA  ml.Tensor `gguf:"ssm_a"`
+	}
+	type fakeLayer struct {
+		Operator *gatedDeltaNet
+	}
+	type fakeModel struct {
+		Layers [1]fakeLayer `gguf:"blk"`
+	}
+
+	m := fakeModel{Layers: [1]fakeLayer{{Operator: &gatedDeltaNet{}}}}
+	v := reflect.ValueOf(&m)
+	v.Elem().Set(populateFields(Base{b: &fakeBackend{
+		names: []string{
+			"blk.0.ssm_dt.bias",
+			"blk.0.ssm_a",
+		},
+	}}, v.Elem()))
+
+	if m.Layers[0].Operator == nil || m.Layers[0].Operator.SSMDT == nil {
+		t.Fatal("qwen35moe GGUF names blk.N.ssm_dt.bias; populateFields must bind SSMDT")
+	}
+	got := m.Layers[0].Operator.SSMDT.(*fakeTensor).Name
+	if got != "blk.0.ssm_dt.bias" {
+		t.Fatalf("SSMDT name = %q", got)
+	}
+	if m.Layers[0].Operator.SSMA == nil {
+		t.Fatal("expected ssm_a")
 	}
 }
 

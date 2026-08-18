@@ -37,12 +37,12 @@ type GatedDeltaNet struct {
 	// Optimized path: pre-split QKV and gate
 	SSMQKV       *nn.Linear  `gguf:"attn_qkv"`  // -> Q, K, V (concatenated)
 	SSMQKVGate   *nn.Linear  `gguf:"attn_gate"` // -> Z gate
-	SSMBetaAlpha *nn.Linear  `gguf:"ssm_ba"`     // -> beta, alpha (qwen3next)
+	SSMBetaAlpha *nn.Linear  `gguf:"ssm_ba"`    // -> beta, alpha (qwen3next)
 	SSMBeta      *nn.Linear  `gguf:"ssm_beta"`  // qwen35 / qwen35moe
 	SSMAlpha     *nn.Linear  `gguf:"ssm_alpha"` // qwen35 / qwen35moe
 	SSMConv1D    *convKernel `gguf:"ssm_conv1d"`
-	SSMDT        ml.Tensor   `gguf:"ssm_dt"` // alpha bias
-	SSMA         ml.Tensor   `gguf:"ssm_a"`  // -A_log.exp()
+	SSMDT        ml.Tensor   `gguf:"ssm_dt.bias,alt:ssm_dt"` // alpha bias (llama.cpp / published GGUFs)
+	SSMA         ml.Tensor   `gguf:"ssm_a"`                  // -A_log.exp()
 	SSMNorm      *nn.RMSNorm `gguf:"ssm_norm"`
 	SSMOut       *nn.Linear  `gguf:"ssm_out"`
 
@@ -136,10 +136,18 @@ func (gdn *GatedDeltaNet) Forward(ctx ml.Context, hiddenStates, _ ml.Tensor, cac
 		return nil, errors.New("qwen3next: missing ssm_ba or ssm_beta/ssm_alpha projections")
 	}
 
+	if gdn.SSMDT == nil || gdn.SSMA == nil {
+		return nil, errors.New("qwen3next: missing ssm_dt.bias/ssm_a tensors")
+	}
+
 	// Compute gate: softplus(alpha + dt_bias) * -A
 	alphaBiased := alpha.Add(ctx, gdn.SSMDT)
 	alphaSoftplus := alphaBiased.Softplus(ctx)
 	gate := alphaSoftplus.Mul(ctx, gdn.SSMA)
+	// llama.cpp build_layer_attn_linear: reshape gate to [1, num_v_heads, n_seq_tokens, n_seqs]
+	// before delta-net. Leaving it as [heads, tokens, seqs] makes the chunked permute
+	// scramble the time/head axes (prefill garbage).
+	gate = gate.Reshape(ctx, 1, numVHeads, nSeqTokens, nSeqs)
 	qkvMixed = qkvMixed.Permute(ctx, 1, 0, 2, 3)
 
 	// Get conv state from cache
@@ -254,9 +262,9 @@ func (gdn *GatedDeltaNet) deltaNetAutoregressive(
 	// Reshape state: [headVDim, headVDim, numVHeads, nSeqs]
 	state = state.Reshape(ctx, headVDim, headVDim, numVHeads, nSeqs)
 
-	// Reshape gate and beta for broadcasting
-	gT := gate.Permute(ctx, 1, 0, 2, 3).Reshape(ctx, 1, 1, numVHeads, nSeqs)
-	betaT := beta.Permute(ctx, 1, 0, 2, 3).Reshape(ctx, 1, 1, numVHeads, nSeqs)
+	// llama.cpp AR: reshape gate/beta to [1, 1, H_v, n_seqs] for broadcast over state.
+	gT := gate.Reshape(ctx, 1, 1, numVHeads, nSeqs)
+	betaT := beta.Reshape(ctx, 1, 1, numVHeads, nSeqs)
 
 	// Apply exponential to gate
 	gT = gT.Exp(ctx)
@@ -330,7 +338,9 @@ func (gdn *GatedDeltaNet) deltaNetChunked(
 	q = q.Permute(ctx, 0, 2, 1, 3).Contiguous(ctx, headKDim, nTokens, numVHeads, nSeqs)
 	k = k.Permute(ctx, 0, 2, 1, 3).Contiguous(ctx, headKDim, nTokens, numVHeads, nSeqs)
 	v = v.Permute(ctx, 0, 2, 1, 3).Contiguous(ctx, headVDim, nTokens, numVHeads, nSeqs)
-	gate = gate.Permute(ctx, 2, 0, 3, 1).Contiguous(ctx, nTokens, 1, numVHeads, nSeqs)
+	// [1, H, T, B] → [T, 1, H, B] so CumSum runs along the token axis (llama.cpp
+	// permutes 0,2,1,3 then transposes the leading 1×T into T×1 before cumsum).
+	gate = gate.Permute(ctx, 2, 0, 1, 3).Contiguous(ctx, nTokens, 1, numVHeads, nSeqs)
 
 	beta = beta.Permute(ctx, 2, 0, 1, 3).Contiguous(ctx)
 	state = state.Reshape(ctx, headVDim, headVDim, numVHeads, nSeqs)

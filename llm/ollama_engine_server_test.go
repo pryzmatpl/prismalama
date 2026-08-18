@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ollama/ollama/api"
+	"github.com/ollama/ollama/format"
 	"github.com/ollama/ollama/ml"
 	"golang.org/x/sync/semaphore"
 )
@@ -42,26 +43,6 @@ func TestOllamaEngineGenerateArgs(t *testing.T) {
 	want := []string{"/usr/bin/ollama", "runner", "--ollama-engine", "--model", "/models/qwen.gguf", "--port", "12345"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("args %v want %v", got, want)
-	}
-}
-
-func TestGPULayersForEngine(t *testing.T) {
-	t.Parallel()
-	gpu := ml.DeviceInfo{DeviceID: ml.DeviceID{ID: "0000:0b:00.0", Library: "ROCm"}}
-	got := gpuLayersForEngine([]ml.DeviceInfo{gpu}, -1, 3)
-	if got.Sum() != 3 || got[0].ID != "0000:0b:00.0" {
-		t.Fatalf("auto offload = %v", got)
-	}
-	got = gpuLayersForEngine([]ml.DeviceInfo{gpu}, 0, 3)
-	if got.Sum() != 0 {
-		t.Fatalf("CPU-only should be empty, got %v", got)
-	}
-	got = gpuLayersForEngine([]ml.DeviceInfo{gpu}, 2, 8)
-	if got.Sum() != 2 || !slices.Equal(got[0].Layers, []int{0, 1}) {
-		t.Fatalf("capped offload = %v", got)
-	}
-	if gpuLayersForEngine(nil, -1, 4) != nil {
-		t.Fatal("no GPU should return nil")
 	}
 }
 
@@ -203,7 +184,7 @@ func TestOllamaEngineServerLoadAndCompletion(t *testing.T) {
 		gpus:    []ml.DeviceInfo{gpu},
 		ggml:    nil,
 		loadRequest: LoadRequest{
-			GPULayers: gpuLayersForEngine([]ml.DeviceInfo{gpu}, -1, 2),
+			GPULayers: ml.GPULayersList{{DeviceID: gpu.DeviceID, Layers: []int{0, 1}}},
 		},
 	}
 
@@ -253,5 +234,149 @@ func TestOllamaEngineServerCompletionCanceledBeforeHTTP(t *testing.T) {
 	err := s.Completion(ctx, CompletionRequest{Options: new(api.Options), Format: []byte(`"json"`)}, nil)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("err = %v; want context.Canceled", err)
+	}
+}
+
+func TestOllamaEngineLoadShrinksAfterOOM(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+
+	var commits atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		st := ServerStatusLaunched
+		if commits.Load() >= 2 {
+			st = ServerStatusReady
+		}
+		_ = json.NewEncoder(w).Encode(ServerStatusResponse{Status: st})
+	})
+	mux.HandleFunc("POST /load", func(w http.ResponseWriter, r *http.Request) {
+		var req LoadRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		n := commits.Add(1)
+		if n == 1 {
+			_ = json.NewEncoder(w).Encode(LoadResponse{
+				Success: false,
+				Error:   "insufficient memory - required allocations: GPU ROCm0 Weights too large",
+				Memory: ml.BackendMemory{GPUs: []ml.DeviceMemory{{
+					DeviceID: ml.DeviceID{ID: "0", Library: "ROCm"},
+					Weights:  []uint64{897024768, 897024768, 540352512},
+				}}},
+			})
+			return
+		}
+		if req.GPULayers.Sum() >= 3 {
+			http.Error(w, "retry must shrink GPU layers", http.StatusInternalServerError)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(LoadResponse{
+			Success: true,
+			Memory:  ml.BackendMemory{GPUs: []ml.DeviceMemory{{DeviceID: ml.DeviceID{ID: "0", Library: "ROCm"}, Weights: []uint64{1}}}},
+		})
+	})
+
+	srv := &http.Server{Handler: mux}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
+
+	gpu := ml.DeviceInfo{
+		DeviceID:    ml.DeviceID{ID: "0", Library: "ROCm"},
+		FreeMemory:  24 * format.GibiByte,
+		TotalMemory: 24 * format.GibiByte,
+	}
+	s := &ollamaEngineServer{
+		port:    ln.Addr().(*net.TCPAddr).Port,
+		client:  http.DefaultClient,
+		options: api.Options{Runner: api.Runner{NumGPU: -1, NumCtx: 256}},
+		gpus:    []ml.DeviceInfo{gpu},
+		loadRequest: LoadRequest{
+			GPULayers: ml.GPULayersList{{DeviceID: gpu.DeviceID, Layers: []int{0, 1, 2}}},
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	ids, err := s.Load(ctx, ml.SystemInfo{}, []ml.DeviceInfo{gpu}, false)
+	if err != nil {
+		t.Fatalf("Load after shrink: %v", err)
+	}
+	if commits.Load() < 2 {
+		t.Fatalf("expected a retry after OOM, commits=%d", commits.Load())
+	}
+	if s.loadRequest.GPULayers.Sum() >= 3 {
+		t.Fatalf("expected fewer than 3 GPU layers after shrink, got %v", s.loadRequest.GPULayers)
+	}
+	if len(ids) != 1 {
+		t.Fatalf("gpu ids = %+v", ids)
+	}
+}
+
+func TestOllamaEngineTokenizeDetokenize(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /tokenize", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Content string `json:"content"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if req.Content != "Say hi" {
+			http.Error(w, "unexpected content", http.StatusBadRequest)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string][]int{"tokens": {151644, 8948, 198}})
+	})
+	mux.HandleFunc("POST /detokenize", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Tokens []int `json:"tokens"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if !slices.Equal(req.Tokens, []int{151644, 8948, 198}) {
+			http.Error(w, "unexpected tokens", http.StatusBadRequest)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]string{"content": "Say hi"})
+	})
+
+	srv := &http.Server{Handler: mux}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
+
+	s := &ollamaEngineServer{
+		port:   ln.Addr().(*net.TCPAddr).Port,
+		client: http.DefaultClient,
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+
+	ids, err := s.Tokenize(ctx, "Say hi")
+	if err != nil {
+		t.Fatalf("Tokenize: %v", err)
+	}
+	if !slices.Equal(ids, []int{151644, 8948, 198}) {
+		t.Fatalf("tokens = %v", ids)
+	}
+	got, err := s.Detokenize(ctx, ids)
+	if err != nil {
+		t.Fatalf("Detokenize: %v", err)
+	}
+	if got != "Say hi" {
+		t.Fatalf("detokenize = %q", got)
 	}
 }

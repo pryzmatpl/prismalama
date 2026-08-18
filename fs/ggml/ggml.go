@@ -773,8 +773,7 @@ func (f GGML) GraphSize(context, batch uint64, numParallel int, kvCacheType stri
 			4*batch*(embedding+vocab)+embedding*vocab*105/128,
 			4*batch*(1+2*embedding+context*(1+heads))+4*embedding*context+embedding*embedding*9/16,
 		)
-	case "qwen2":
-	case "qwen35":
+	case "qwen2", "qwen3", "qwen3moe", "qwen35", "qwen35moe", "qwen3next", "qwen3vl", "qwen3vlmoe":
 		fullOffload = max(
 			4*batch*(embedding+vocab),
 			4*batch*(1+2*embedding+context+context*heads),

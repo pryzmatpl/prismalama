@@ -14,6 +14,10 @@ copied to `/usr/bin/ollama`) + HIP overlay + ROCR BDF shim. Image backup remains
 and generate all use that path. Proven 2026-08-18: `qwen3:0.6b` on ROCm /
 7900 XTX / 24 GiB, 29/29 layers offloaded, keep-resident
 (`OLLAMA_STREAMING_BUDGET` 4 GiB), warm ~106 tok/s for 16 tokens.
+`qwen35-uncensored` (qwen35moe Q8_0, 36.9 GB) loads with **26/41** layers on
+the XTX (layers 15..40), HTTP 200 generate, warm ~2 tok/s after IMRoPE.
+Decoded text is still not coherent (RoPE+GDN gate layout now match llama.cpp
+metadata; remaining GDN/MoE quality work).
 
 ## In-flight tickets
 
@@ -69,11 +73,17 @@ When all six checkboxes above tick:
 
 ## Recent decisions (chronological, latest first)
 
+- **2026-08-18** — qwen35moe decode path: IMRoPE (`WithInterleaveMRoPE` +
+  4-axis positions), GDN gate `[1,H,T,B]` before chunked delta-net, runner
+  `/tokenize`+`/detokenize` instead of dummy `[0,1,2,…]`. Load still 26/41
+  on the XTX. Text is still garbage — GDN/MoE follow-up.
+- **2026-08-18** — `qwen35-uncensored` operational on the XTX: VRAM-fitting
+  tail offload (`gpuLayersForEngine`), keep-resident after LoadStreaming
+  (evict-by-zero does not free HIP), bind `blk.N.ssm_dt.bias`. 26/41 layers
+  GPU, load ~20 s, generate HTTP 200. Decode quality still garbage — follow-up.
 - **2026-08-18** — `docs/STREAMING_BENCHMARK.md`: `qwen3:0.6b` keep-resident
-  117 tok/s on the XTX; `qwen35-uncensored` (36.9 GB) OOM at load because
-  ollama-engine still 100%-offloads before streaming alloc. llama.cpp not
-  packaged. llamarunner honors `OLLAMA_LAYER_STREAMING` via mmap + LayerMap log;
-  eval-callback streamer stays on ollamarunner (`streaming.Setup`).
+  117 tok/s on the XTX; `qwen35-uncensored` (36.9 GB) initially OOM at load
+  because ollama-engine 100%-offloaded. llama.cpp not packaged.
 - **2026-08-18** — ollama-engine generate client (`llm/ollama_engine_server.go`)
   landed. `NewLlamaServer` uses `runner --ollama-engine` when `llama-server`
   is absent. Live binary is `ollama-xtx-engine` (89 MiB Ubuntu). Restore path:

@@ -57,9 +57,37 @@ Warm 16-token generate on the same binary earlier the same morning: **106.1 tok/
 
 ## `qwen35-uncensored:latest` (>VRAM)
 
-`POST /api/generate` `num_predict=8` `num_ctx=256` at 2026-08-18T10:08:21Z returned **insufficient memory** in ~2 s. The ollama-engine generate client (`NewOllamaEngineServer`) currently assigns **every** repeating layer plus output to GPU 0 (`gpuLayersForEngine` auto = 100% offload) and `POST /load` commit fails before `LoadStreaming` / keep-evict can run.
+Architecture `qwen35moe` (Qwen3.5-35B-A3B Q8_0, 36.90 GB on disk, 40 repeating layers + output).
 
-This is a real gap, not a skipped test: a 36.9 GB GGUF cannot start on this 24 GiB card until load layout + streaming alloc reserve less than full weight VRAM.
+`gpuLayersForEngine` now packs a VRAM-fitting tail (llama.cpp `-ngl` convention) instead of 100% offload. Evict-by-zero is disabled when `OLLAMA_STREAMING_BUDGET>0` because it does not free HIP buffers.
+
+Measured 2026-08-18T10:32Z after the layout + `ssm_dt.bias` bind:
+
+| Item | Value |
+| --- | --- |
+| GPU offload | **26/41 layers** (`15..40` + output) |
+| Load | `streaming load: complete` 40 layers, 34.4 GiB in ~20 s |
+| Streamer | `keep-resident after full load` `budget_bytes=4294967296` |
+| `POST /api/generate` | `num_predict=8` `num_ctx=256` HTTP **200** |
+| `eval_count` / `eval_duration` | 8 / 9 683 807 289 ns → **0.83 tok/s** (cold, includes graph) |
+| Warm 16-token generate | **1.54 tok/s** (`eval_count=16`) |
+| Warm prompt | 15 tokens in 1.44 s → **10.4 tok/s** |
+| `rocm-smi` VRAM used | 25 431 359 488 B (~24.5 GiB of 24.0 GiB advertised) |
+| `/api/ps` `size_vram` | 24 866 991 872 B |
+
+Decoded text is **not yet coherent** after IMRoPE + GDN gate-layout fixes (see below). Load + generate on the XTX is proven.
+
+### Follow-up 2026-08-18T10:52Z (IMRoPE + GDN gate)
+
+`qwen3next` now matches llama.cpp `LLAMA_ROPE_TYPE_IMROPE`: `rope.dimension_sections=[11,11,10,0]`, `rope_dim=64`, 4-axis position IDs. GDN `ssm_alpha` gate is reshaped to `[1, H, T, B]` before chunked delta-net (the previous `[H,T,B]` permute scrambled the time axis on prefill).
+
+Log: `qwen3next: IMRoPE sections="[11 11 10 0]" rope_dim=64 head_dim=256`.
+
+Warm-ish 16-token generate after reload (`eval_duration` 7.53 s): **2.12 tok/s**. Decoded text changed vs NeoX (so RoPE is live) but is still not English. Next suspects: remaining GDN chunked-vs-llama.cpp differences, mixed CPU/GPU residual dtypes, MoE routing.
+
+`ollama-engine` `Tokenize` no longer returns dummy `[0,1,2,…]`; it calls the runner `/tokenize` using the model BPE.
+
+Earlier the same morning (10:08Z) the same tag returned **insufficient memory** in ~2 s because auto offload assigned every layer to GPU 0.
 
 ## vs stock llama.cpp
 
@@ -79,9 +107,9 @@ docker exec jaisiu-prismalama /opt/rocm/bin/rocm-smi --showproductname --showmem
 curl -sS http://127.0.0.1:11434/api/generate -d \
   '{"model":"qwen3:0.6b","prompt":"Write a haiku about GPUs.","stream":false,"options":{"num_predict":32,"temperature":0}}'
 
-# larger than VRAM (expected OOM until layout/streaming alloc is fixed)
-curl -sS http://127.0.0.1:11434/api/generate -d \
-  '{"model":"qwen35-uncensored:latest","prompt":"Say hi in one word.","stream":false,"options":{"num_predict":8,"num_ctx":256}}'
+# larger than VRAM — partial GPU offload (tail layers)
+curl -sS -m 1800 http://127.0.0.1:11434/api/generate -d \
+  '{"model":"qwen35-uncensored:latest","prompt":"Say hi in one word.","stream":false,"options":{"num_predict":8,"num_ctx":256,"temperature":0}}'
 
 docker logs --since 10m jaisiu-prismalama 2>&1 | grep -c 'kept block'
 docker logs --since 10m jaisiu-prismalama 2>&1 | grep -c 'evicted block'

@@ -20,7 +20,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode/utf8"
 
 	"golang.org/x/sync/semaphore"
 
@@ -66,7 +65,7 @@ func NewOllamaEngineServer(systemInfo ml.SystemInfo, gpus []ml.DeviceInfo, model
 	}
 
 	totalLayers := int(f.KV().BlockCount() + 1)
-	gpuLayers := gpuLayersForEngine(gpus, opts.NumGPU, totalLayers)
+	gpuLayers := gpuLayersForEngine(gpus, opts.NumGPU, f, opts, numParallel)
 	logGGMLGPUOffload(uint64(totalLayers), gpuLayers, false)
 
 	numThreads := opts.NumThread
@@ -140,23 +139,6 @@ func chatTemplateFromGGUF(f *ggml.GGML) *template.Template {
 		return nil
 	}
 	return t
-}
-
-// gpuLayersForEngine assigns layers to the first GPU. NumGPU 0 is CPU-only;
-// NumGPU < 0 (auto) offloads every layer and lets streaming handle VRAM.
-func gpuLayersForEngine(gpus []ml.DeviceInfo, numGPU, totalLayers int) ml.GPULayersList {
-	if numGPU == 0 || len(gpus) == 0 || totalLayers <= 0 {
-		return nil
-	}
-	n := totalLayers
-	if numGPU > 0 && numGPU < n {
-		n = numGPU
-	}
-	layers := make([]int, n)
-	for i := range layers {
-		layers[i] = i
-	}
-	return ml.GPULayersList{{DeviceID: gpus[0].DeviceID, Layers: layers}}
 }
 
 func ollamaEngineGenerateArgs(exe, modelPath string, port int) []string {
@@ -388,8 +370,7 @@ func (s *ollamaEngineServer) Load(ctx context.Context, _ ml.SystemInfo, gpus []m
 	if len(gpus) > 0 {
 		s.gpus = slicesClone(gpus)
 		if s.ggml != nil {
-			totalLayers := int(s.ggml.KV().BlockCount() + 1)
-			s.loadRequest.GPULayers = gpuLayersForEngine(gpus, s.options.NumGPU, totalLayers)
+			s.loadRequest.GPULayers = gpuLayersForEngine(gpus, s.options.NumGPU, s.ggml, s.options, s.loadRequest.Parallel)
 		}
 	}
 
@@ -404,30 +385,54 @@ func (s *ollamaEngineServer) Load(ctx context.Context, _ ml.SystemInfo, gpus []m
 		return gpuLayerDeviceIDs(s.loadRequest.GPULayers), nil
 	}
 
-	req := s.loadRequest
-	req.Operation = LoadOperationCommit
-	resp, err := s.initModel(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	if !resp.Success {
-		errMsg := resp.Error
-		if errMsg == "" {
-			errMsg = "load commit failed"
+	var lastErr string
+	for attempt := 0; attempt < maxLoadShrink; attempt++ {
+		req := s.loadRequest
+		req.Operation = LoadOperationCommit
+		resp, err := s.initModel(ctx, req)
+		if err != nil {
+			return nil, err
 		}
-		return nil, errors.New(errMsg)
+		if resp.Success {
+			if backendMemoryFromRunner(resp.Memory) {
+				s.mu.Lock()
+				s.mem = &resp.Memory
+				s.mu.Unlock()
+				resp.Memory.Log(slog.LevelInfo)
+			}
+			if err := s.waitForStatus(ctx, waitReady); err != nil {
+				return nil, err
+			}
+			return gpuLayerDeviceIDs(s.loadRequest.GPULayers), nil
+		}
+		lastErr = resp.Error
+		if lastErr == "" {
+			lastErr = "load commit failed"
+		}
+		if requireFull || s.options.NumGPU == 0 || !isInsufficientMemory(lastErr) {
+			return nil, errors.New(lastErr)
+		}
+		var next ml.GPULayersList
+		if len(gpus) > 0 {
+			next = shrinkGPULayers(s.loadRequest.GPULayers, resp.Memory, gpus[0])
+		} else {
+			next = dropLeadingGPULayer(s.loadRequest.GPULayers)
+		}
+		if next.Sum() >= s.loadRequest.GPULayers.Sum() && s.loadRequest.GPULayers.Sum() > 0 {
+			next = dropLeadingGPULayer(s.loadRequest.GPULayers)
+		}
+		slog.Warn("ollama-engine: shrinking GPU offload after insufficient memory",
+			"attempt", attempt+1,
+			"from", s.loadRequest.GPULayers.Sum(),
+			"to", next.Sum(),
+			"error", lastErr,
+		)
+		s.loadRequest.GPULayers = next
 	}
-	if backendMemoryFromRunner(resp.Memory) {
-		s.mu.Lock()
-		s.mem = &resp.Memory
-		s.mu.Unlock()
-		resp.Memory.Log(slog.LevelInfo)
+	if lastErr == "" {
+		lastErr = "load commit failed"
 	}
-
-	if err := s.waitForStatus(ctx, waitReady); err != nil {
-		return nil, err
-	}
-	return gpuLayerDeviceIDs(s.loadRequest.GPULayers), nil
+	return nil, errors.New(lastErr)
 }
 
 func gpuLayerDeviceIDs(layers ml.GPULayersList) []ml.DeviceID {
@@ -655,21 +660,66 @@ func (s *ollamaEngineServer) Embedding(ctx context.Context, input string) ([]flo
 	return resp.Embedding, resp.PromptEvalCount, nil
 }
 
-func (s *ollamaEngineServer) Tokenize(_ context.Context, content string) ([]int, error) {
-	n := utf8.RuneCountInString(content)
-	if n == 0 {
-		return nil, nil
+func (s *ollamaEngineServer) Tokenize(ctx context.Context, content string) ([]int, error) {
+	data, err := json.Marshal(map[string]string{"content": content})
+	if err != nil {
+		return nil, err
 	}
-	count := max(1, n/4)
-	out := make([]int, count)
-	for i := range out {
-		out[i] = i
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, s.endpoint("/tokenize"), bytes.NewReader(data))
+	if err != nil {
+		return nil, err
 	}
-	return out, nil
+	httpReq.Header.Set("Content-Type", "application/json")
+	res, err := s.httpClient().Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("ollama-engine tokenize: %w", err)
+	}
+	defer res.Body.Close()
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode >= 400 {
+		return nil, api.StatusError{StatusCode: res.StatusCode, ErrorMessage: strings.TrimSpace(string(body))}
+	}
+	var result struct {
+		Tokens []int `json:"tokens"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("ollama-engine tokenize decode: %w", err)
+	}
+	return result.Tokens, nil
 }
 
-func (s *ollamaEngineServer) Detokenize(_ context.Context, _ []int) (string, error) {
-	return "", errors.New("detokenize is not supported by the ollama-engine runner")
+func (s *ollamaEngineServer) Detokenize(ctx context.Context, tokens []int) (string, error) {
+	data, err := json.Marshal(map[string][]int{"tokens": tokens})
+	if err != nil {
+		return "", err
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, s.endpoint("/detokenize"), bytes.NewReader(data))
+	if err != nil {
+		return "", err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	res, err := s.httpClient().Do(httpReq)
+	if err != nil {
+		return "", fmt.Errorf("ollama-engine detokenize: %w", err)
+	}
+	defer res.Body.Close()
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", err
+	}
+	if res.StatusCode >= 400 {
+		return "", api.StatusError{StatusCode: res.StatusCode, ErrorMessage: strings.TrimSpace(string(body))}
+	}
+	var result struct {
+		Content string `json:"content"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("ollama-engine detokenize decode: %w", err)
+	}
+	return result.Content, nil
 }
 
 func (s *ollamaEngineServer) Close() error {

@@ -1088,6 +1088,77 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) tokenizer() (tokenizer.Tokenizer, error) {
+	if s.model == nil {
+		return nil, errors.New("model not loaded")
+	}
+	tok, ok := s.model.(tokenizer.Tokenizer)
+	if !ok {
+		return nil, errors.New("model has no tokenizer")
+	}
+	return tok, nil
+}
+
+func (s *Server) tokenize(w http.ResponseWriter, r *http.Request) {
+	tok, err := s.tokenizer()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	var req struct {
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, fmt.Sprintf("bad request: %s", err), http.StatusBadRequest)
+		return
+	}
+	ids, err := tok.Encode(req.Content, false)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	tokens := make([]int, len(ids))
+	for i, id := range ids {
+		tokens[i] = int(id)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(struct {
+		Tokens []int `json:"tokens"`
+	}{Tokens: tokens}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) detokenize(w http.ResponseWriter, r *http.Request) {
+	tok, err := s.tokenizer()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	var req struct {
+		Tokens []int `json:"tokens"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, fmt.Sprintf("bad request: %s", err), http.StatusBadRequest)
+		return
+	}
+	ids := make([]int32, len(req.Tokens))
+	for i, id := range req.Tokens {
+		ids[i] = int32(id)
+	}
+	content, err := tok.Decode(ids)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(struct {
+		Content string `json:"content"`
+	}{Content: content}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 func (s *Server) reserveWorstCaseGraph(prompt bool) error {
 	ctx := s.model.Backend().NewContext()
 	defer ctx.Close()
@@ -1211,12 +1282,12 @@ func (s *Server) allocModel(
 				var noMem ml.ErrNoMem
 				if errors.As(err, &noMem) {
 					panicErr = noMem
-				} else {
-					panic(r)
+					return
 				}
-			} else {
-				panic(r)
+				panicErr = err
+				return
 			}
+			panicErr = fmt.Errorf("allocModel panic: %v", r)
 		}
 	}()
 
@@ -1493,6 +1564,8 @@ func Execute(args []string) error {
 	mux.HandleFunc("POST /load", server.load)
 	mux.HandleFunc("POST /embedding", server.embeddings)
 	mux.HandleFunc("POST /completion", server.completion)
+	mux.HandleFunc("POST /tokenize", server.tokenize)
+	mux.HandleFunc("POST /detokenize", server.detokenize)
 	mux.HandleFunc("GET /health", server.health)
 
 	httpServer := http.Server{

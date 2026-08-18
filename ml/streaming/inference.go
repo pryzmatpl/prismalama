@@ -93,6 +93,16 @@ func (is *InferenceStreamer) PrepareForInference(ctx context.Context) error {
 	}
 	is.file = f
 
+	if is.keepResident() {
+		for i := range is.lm.Layers {
+			is.loadedWeights[i] = true
+		}
+		is.currentBlock = 0
+		slog.Info("streaming inference: keep-resident after full load",
+			"blocks", is.totalBlocks, "budget_bytes", is.budgetBytes)
+		return nil
+	}
+
 	outputIdx := len(is.lm.Layers) - 1
 	if outputIdx >= 0 && is.lm.Layers[outputIdx].Name == "output" {
 		if err := is.loadBlock(outputIdx); err != nil {
@@ -149,13 +159,16 @@ func (is *InferenceStreamer) OnBlockDone(blockIdx int) bool {
 	return true
 }
 
-// keepResident is true when the streaming budget can hold every layer, so
-// evicting a completed block would only add NVMe round-trips.
+// keepResident is true when eviction would not reclaim device memory.
+// evictBlock zeros tensors in-place and does not free HIP/CPU buffers, so
+// dropping a block cannot reduce VRAM — it only destroys weights that
+// LoadStreaming already placed. VRAM is bounded by GPULayers (partial
+// offload). Budget 0 is the explicit always-evict debug switch.
 func (is *InferenceStreamer) keepResident() bool {
 	if is.lm == nil || is.budgetBytes == 0 {
 		return false
 	}
-	return is.lm.FitsInBudget(is.budgetBytes) >= len(is.lm.Layers)
+	return true
 }
 
 // Close releases resources.
