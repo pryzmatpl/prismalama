@@ -167,3 +167,26 @@ func TestOnBlockDoneEvictsWhenOverBudget(t *testing.T) {
 		t.Fatal("expected block 0 to be evicted when over budget")
 	}
 }
+
+func TestSetupAndMapFromFile(t *testing.T) {
+	path := writeTestGGUF(t)
+	lm, err := MapFromFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lm.BlockCount != 2 {
+		t.Fatalf("BlockCount = %d want 2", lm.BlockCount)
+	}
+
+	is, err := Setup(context.Background(), nil, path, 1<<40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer is.Close()
+	if is.LayerMap() == nil || is.LayerMap().BlockCount != 2 {
+		t.Fatal("Setup should retain LayerMap")
+	}
+	if is.budgetBytes != 1<<40 {
+		t.Fatalf("budgetBytes = %d", is.budgetBytes)
+	}
+}

@@ -1303,34 +1303,19 @@ func (s *Server) loadModel() {
 }
 
 func (s *Server) initInferenceStreamer() {
-	f, err := os.Open(s.modelPath)
+	is, err := streaming.Setup(context.TODO(), s.model.Backend(), s.modelPath, envconfig.StreamingBudgetBytes())
 	if err != nil {
-		slog.Warn("streaming inference: could not open model for LayerMap", "error", err)
-		return
-	}
-	defer f.Close()
-
-	g, err := ggml.Decode(f, 0)
-	if err != nil {
-		slog.Warn("streaming inference: could not decode GGUF for LayerMap", "error", err)
-		return
-	}
-
-	lm, err := streaming.BuildLayerMap(g)
-	if err != nil {
-		slog.Warn("streaming inference: could not build LayerMap", "error", err)
-		return
-	}
-
-	is := streaming.NewInferenceStreamer(s.model.Backend(), s.modelPath, lm)
-	is.SetBudgetBytes(envconfig.StreamingBudgetBytes())
-	if err := is.PrepareForInference(context.TODO()); err != nil {
-		slog.Warn("streaming inference: prepare failed", "error", err)
-		is.Close()
+		slog.Warn("streaming inference: setup failed", "error", err)
 		return
 	}
 	s.inferenceStreamer = is
-	slog.Info("streaming inference: initialized", "blocks", lm.BlockCount, "total_weight_bytes", lm.TotalWeightBytes)
+	lm := is.LayerMap()
+	blocks, weightBytes := 0, uint64(0)
+	if lm != nil {
+		blocks = lm.BlockCount
+		weightBytes = lm.TotalWeightBytes
+	}
+	slog.Info("streaming inference: initialized", "blocks", blocks, "total_weight_bytes", weightBytes)
 }
 
 // load is the handler called by the Ollama server to process different

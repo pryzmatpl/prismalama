@@ -934,11 +934,14 @@ func (s *Server) load(w http.ResponseWriter, r *http.Request) {
 			Devices:      llamaIDs,
 			NumGpuLayers: numGPU,
 			MainGpu:      req.MainGPU,
-			UseMmap:      req.UseMmap && len(req.LoraPath) == 0,
+			UseMmap:      useMmapWithLayerStreaming(req.UseMmap && len(req.LoraPath) == 0, len(req.LoraPath), envconfig.LayerStreaming()),
 			TensorSplit:  tensorSplit,
 			Progress: func(progress float32) {
 				s.progress = progress
 			},
+		}
+		if envconfig.LayerStreaming() {
+			logLlamaRunnerStreaming(s.modelPath, envconfig.StreamingBudgetBytes())
 		}
 
 		s.status = llm.ServerStatusLoadingModel

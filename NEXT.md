@@ -24,8 +24,8 @@ and generate all use that path. Proven 2026-08-18: `qwen3:0.6b` on ROCm /
 | [JAISIU-2296](https://pryzmat.youtrack.cloud/issue/JAISIU-2296) | P1-1: HIP `libggml-hip.so` dlopen on gfx1100 — drop FA tiles D≥576                    | agent | In Progress |
 | [JAISIU-2297](https://pryzmat.youtrack.cloud/issue/JAISIU-2297) | P1-2: Keep GGUF blocks resident when they fit `OLLAMA_STREAMING_BUDGET`               | agent | In Progress |
 | [JAISIU-2298](https://pryzmat.youtrack.cloud/issue/JAISIU-2298) | P1-3: GPU discovery fallback when `llama-server` is missing                           | agent | In Progress |
-| [JAISIU-2299](https://pryzmat.youtrack.cloud/issue/JAISIU-2299) | P1-4: `docs/STREAMING_BENCHMARK.md` on this 7900 XTX                                  | tbd   | Submitted   |
-| [JAISIU-2300](https://pryzmat.youtrack.cloud/issue/JAISIU-2300) | P1-5: Wire streaming compute into `runner/llamarunner`                                | tbd   | Submitted   |
+| [JAISIU-2299](https://pryzmat.youtrack.cloud/issue/JAISIU-2299) | P1-4: `docs/STREAMING_BENCHMARK.md` on this 7900 XTX                                  | agent | In Progress |
+| [JAISIU-2300](https://pryzmat.youtrack.cloud/issue/JAISIU-2300) | P1-5: Wire streaming compute into `runner/llamarunner`                                | agent | In Progress |
 
 ## Phase 1 — first actions (post Phase 0 close)
 
@@ -69,10 +69,15 @@ When all six checkboxes above tick:
 
 ## Recent decisions (chronological, latest first)
 
+- **2026-08-18** — `docs/STREAMING_BENCHMARK.md`: `qwen3:0.6b` keep-resident
+  117 tok/s on the XTX; `qwen35-uncensored` (36.9 GB) OOM at load because
+  ollama-engine still 100%-offloads before streaming alloc. llama.cpp not
+  packaged. llamarunner honors `OLLAMA_LAYER_STREAMING` via mmap + LayerMap log;
+  eval-callback streamer stays on ollamarunner (`streaming.Setup`).
 - **2026-08-18** — ollama-engine generate client (`llm/ollama_engine_server.go`)
   landed. `NewLlamaServer` uses `runner --ollama-engine` when `llama-server`
   is absent. Live binary is `ollama-xtx-engine` (89 MiB Ubuntu). Restore path:
-  `/usr/bin/ollama.image-rocm`. Keep-resident proven (`kept_block=980`,
+  `/usr/bin/ollama.image-rocm`. Keep-resident proven (`kept_block` with
   `evicted_block=0` on `qwen3:0.6b` / 4 GiB budget).
 - **2026-08-18** — Phase 1 opened on host `prizm` (RX 7900 XTX). Live
   `qwen3:0.6b` generate on ROCm with `OLLAMA_LAYER_STREAMING=1`. HIP dlopen

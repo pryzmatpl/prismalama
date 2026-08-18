@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ollama/ollama/fs/ggml"
 	"github.com/ollama/ollama/ml"
 )
 
@@ -48,6 +49,41 @@ func (is *InferenceStreamer) SetBudgetBytes(budgetBytes uint64) {
 	is.budgetBytes = budgetBytes
 }
 
+// MapFromFile decodes GGUF metadata and builds a LayerMap (no backend).
+func MapFromFile(modelPath string) (*LayerMap, error) {
+	f, err := os.Open(modelPath)
+	if err != nil {
+		return nil, fmt.Errorf("streaming map: open: %w", err)
+	}
+	defer f.Close()
+	g, err := ggml.Decode(f, 0)
+	if err != nil {
+		return nil, fmt.Errorf("streaming map: decode: %w", err)
+	}
+	lm, err := BuildLayerMap(g)
+	if err != nil {
+		return nil, fmt.Errorf("streaming map: layer map: %w", err)
+	}
+	return lm, nil
+}
+
+// Setup builds a LayerMap from modelPath, applies budgetBytes, and prepares
+// the first blocks. Callers own Close(). Used by ollamarunner and llamarunner.
+func Setup(ctx context.Context, backend ml.Backend, modelPath string, budgetBytes uint64) (*InferenceStreamer, error) {
+	lm, err := MapFromFile(modelPath)
+	if err != nil {
+		return nil, err
+	}
+
+	is := NewInferenceStreamer(backend, modelPath, lm)
+	is.SetBudgetBytes(budgetBytes)
+	if err := is.PrepareForInference(ctx); err != nil {
+		is.Close()
+		return nil, err
+	}
+	return is, nil
+}
+
 // PrepareForInference loads the initial block weights (block 0 + output/embeddings)
 // and opens the model file for streaming reads.
 func (is *InferenceStreamer) PrepareForInference(ctx context.Context) error {
@@ -72,6 +108,14 @@ func (is *InferenceStreamer) PrepareForInference(ctx context.Context) error {
 
 	is.currentBlock = 0
 	return nil
+}
+
+// LayerMap returns the streamer's block map (nil if Setup failed).
+func (is *InferenceStreamer) LayerMap() *LayerMap {
+	if is == nil {
+		return nil
+	}
+	return is.lm
 }
 
 // OnBlockDone is the callback for the eval callback mechanism. It is called
