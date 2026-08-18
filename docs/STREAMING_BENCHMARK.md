@@ -59,23 +59,33 @@ Warm 16-token generate on the same binary earlier the same morning: **106.1 tok/
 
 Architecture `qwen35moe` (Qwen3.5-35B-A3B Q8_0, 36.90 GB on disk, 40 repeating layers + output).
 
-`gpuLayersForEngine` now packs a VRAM-fitting tail (llama.cpp `-ngl` convention) instead of 100% offload. Evict-by-zero is disabled when `OLLAMA_STREAMING_BUDGET>0` because it does not free HIP buffers.
+`gpuLayersForEngine` packs a VRAM-fitting tail of **routed-expert** tensors (llama.cpp `-ngl` convention) and pins attn/GDN/shared-expert of every repeating layer on GPU (`moe_split=true`). Evict-by-zero is disabled when `OLLAMA_STREAMING_BUDGET>0` because it does not free HIP buffers.
 
-Measured 2026-08-18T10:32Z after the layout + `ssm_dt.bias` bind:
+Measured 2026-08-18T11:49Z after MoE split offload:
+
+| Item | Value |
+| --- | --- |
+| GPU compute | all 40 repeating layers (GDN/attn) + output |
+| GPU routed experts | **24/41** (`moe_pin_non_expert_bytes=1585932800` ≈ 1.48 GiB) |
+| CPU routed experts | 17 repeating layers (`mul_mat_id` on host; batch < 32 so no HIP op-offload) |
+| Load | ~12 s (HTTP `load_duration`) |
+| Streamer | `keep-resident after full load` `budget_bytes=4294967296` |
+| Cold `num_predict=8` | **9.44 tok/s** (`eval_count=8`, `eval_duration=0.847 s`) |
+| Warm `num_predict=16` | **7.68 tok/s** (`eval_count=16`, `eval_duration=2.082 s`) |
+| Warm prompt | 6 tokens → **20.7 tok/s** |
+| `rocm-smi` VRAM used | 25 672 425 472 B (~24.7 GiB of 24.0 GiB advertised) |
+
+Previous same-day full-layer tail (26/41, GDN of layers 0–14 on CPU) was **~2 tok/s**. Split layout is ~4× on this host. Decoded text is still not coherent.
+
+Q8 MoE expert tensors are ~31.9 GiB of the 36.9 GB file; non-expert repeating weights are ~1.48 GiB. Full-layer HIP paging cannot beat PCIe; the next win is gathering the **8 active experts** (~25 MiB/layer) onto GPU rather than running those 17 CPU GEMMs.
+
+### Earlier 2026-08-18T10:32Z (full-layer tail, before MoE split)
 
 | Item | Value |
 | --- | --- |
 | GPU offload | **26/41 layers** (`15..40` + output) |
-| Load | `streaming load: complete` 40 layers, 34.4 GiB in ~20 s |
-| Streamer | `keep-resident after full load` `budget_bytes=4294967296` |
-| `POST /api/generate` | `num_predict=8` `num_ctx=256` HTTP **200** |
-| `eval_count` / `eval_duration` | 8 / 9 683 807 289 ns → **0.83 tok/s** (cold, includes graph) |
-| Warm 16-token generate | **1.54 tok/s** (`eval_count=16`) |
-| Warm prompt | 15 tokens in 1.44 s → **10.4 tok/s** |
-| `rocm-smi` VRAM used | 25 431 359 488 B (~24.5 GiB of 24.0 GiB advertised) |
-| `/api/ps` `size_vram` | 24 866 991 872 B |
-
-Decoded text is **not yet coherent** after IMRoPE + GDN gate-layout fixes (see below). Load + generate on the XTX is proven.
+| Warm 16-token generate | **1.54–2.12 tok/s** |
+| `rocm-smi` VRAM used | 25 431 359 488 B |
 
 ### Follow-up 2026-08-18T10:52Z (IMRoPE + GDN gate)
 

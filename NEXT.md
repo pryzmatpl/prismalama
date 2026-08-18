@@ -14,10 +14,7 @@ copied to `/usr/bin/ollama`) + HIP overlay + ROCR BDF shim. Image backup remains
 and generate all use that path. Proven 2026-08-18: `qwen3:0.6b` on ROCm /
 7900 XTX / 24 GiB, 29/29 layers offloaded, keep-resident
 (`OLLAMA_STREAMING_BUDGET` 4 GiB), warm ~106 tok/s for 16 tokens.
-`qwen35-uncensored` (qwen35moe Q8_0, 36.9 GB) loads with **26/41** layers on
-the XTX (layers 15..40), HTTP 200 generate, warm ~2 tok/s after IMRoPE.
-Decoded text is still not coherent (RoPE+GDN gate layout now match llama.cpp
-metadata; remaining GDN/MoE quality work).
+`qwen35-uncensored` (qwen35moe Q8_0, 36.9 GB): **MoE split offload** — attn/GDN of all 40 layers on GPU (~1.59 GiB), routed-expert tail 24/41 on GPU, remaining experts on CPU. Warm **~7.7 tok/s** (was ~2 tok/s with 15 full layers on CPU). Text still not coherent.
 
 ## In-flight tickets
 
@@ -73,6 +70,11 @@ When all six checkboxes above tick:
 
 ## Recent decisions (chronological, latest first)
 
+- **2026-08-18** — qwen35moe >VRAM: pin attn/GDN/shared-expert of every
+  layer on GPU (`moe_split=true`, ~1.59 GiB) and pack only routed-expert
+  tensors into remaining VRAM (24/41). Warm generate **7.68 tok/s** vs
+  ~2 tok/s when 15 full layers (including GDN) ran on CPU. Next: stream
+  the 8 active experts (~25 MiB/layer) onto GPU instead of CPU `mul_mat_id`.
 - **2026-08-18** — qwen35moe decode path: IMRoPE (`WithInterleaveMRoPE` +
   4-axis positions), GDN gate `[1,H,T,B]` before chunked delta-net, runner
   `/tokenize`+`/detokenize` instead of dummy `[0,1,2,…]`. Load still 26/41

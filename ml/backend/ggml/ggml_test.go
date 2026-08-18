@@ -1080,3 +1080,13 @@ func TestChunk(t *testing.T) {
 		})
 	}
 }
+
+func TestIsMoEExpertTensor(t *testing.T) {
+	t.Parallel()
+	if !isMoEExpertTensor("blk.0.ffn_down_exps.weight") {
+		t.Fatal("routed expert must match")
+	}
+	if isMoEExpertTensor("blk.0.ffn_down_shexp.weight") {
+		t.Fatal("shared expert must not match")
+	}
+}

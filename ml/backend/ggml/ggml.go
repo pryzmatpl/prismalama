@@ -135,6 +135,26 @@ type Backend struct {
 
 	// weightBuffers are the GGML contexts and buffers for allocating weights
 	weightBuffers map[*C.struct_ggml_context]C.ggml_backend_buffer_t
+
+	// moeExpertCPU is the number of repeating layers whose routed-expert
+	// tensors stayed on CPU while attn/GDN compute is on GPU.
+	moeExpertCPU int
+}
+
+func isMoEExpertTensor(name string) bool {
+	return strings.Contains(name, "_exps")
+}
+
+func hasMoEExpertTensors(meta *fsggml.GGML) bool {
+	if meta == nil {
+		return false
+	}
+	for _, t := range meta.Tensors().Items() {
+		if isMoEExpertTensor(t.Name) {
+			return true
+		}
+	}
+	return false
 }
 
 func goBackendDeviceID(dev C.ggml_backend_dev_t, props *C.struct_ggml_backend_dev_props) (id, library string) {
@@ -246,10 +266,35 @@ func New(modelPath string, params ml.BackendParams) (ml.Backend, error) {
 		return cpuDeviceBufferType
 	}
 
-	// repeating layers are assigned based on their index in reverse order, e.g. i / (block_count + 1)
+	// Expert tensors follow GPULayers. For MoE models larger than VRAM,
+	// attn/GDN/shared-expert weights of every repeating layer still go on
+	// GPU (they are ~1.5 GiB total vs ~32 GiB of experts). Compute/cache
+	// for those layers also stays on GPU so GDN does not run on CPU.
+	expertLayers := make([]deviceBufferType, blocks)
+	for i := range expertLayers {
+		expertLayers[i] = assignLayer(i)
+	}
+	moePin := len(gpuDeviceBufferTypes) > 0 && params.GPULayers.Sum() > 0 && hasMoEExpertTensors(meta)
+
 	layers := make([]deviceBufferType, blocks)
 	for i := range layers {
-		layers[i] = assignLayer(i)
+		if moePin {
+			layers[i] = gpuDeviceBufferTypes[0]
+		} else {
+			layers[i] = expertLayers[i]
+		}
+	}
+	moeExpertCPU := 0
+	if moePin {
+		for _, e := range expertLayers {
+			if C.ggml_backend_dev_type(e.d) == C.GGML_BACKEND_DEVICE_TYPE_CPU {
+				moeExpertCPU++
+			}
+		}
+		slog.Info("ggml: pinning non-expert MoE tensors on GPU",
+			"repeating_layers", blocks,
+			"expert_layers_cpu", moeExpertCPU,
+			"expert_layers_gpu", blocks-moeExpertCPU)
 	}
 
 	// outputs are assigned iff allowed by splits and configured number of gpu layers
@@ -362,7 +407,11 @@ func New(modelPath string, params ml.BackendParams) (ml.Backend, error) {
 			}
 
 			if layerIndex >= 0 {
-				createTensor(tensor{source: t}, layers[layerIndex].bts, layerIndex)
+				bts := layers[layerIndex].bts
+				if moePin && isMoEExpertTensor(t.Name) {
+					bts = expertLayers[layerIndex].bts
+				}
+				createTensor(tensor{source: t}, bts, layerIndex)
 			} else {
 				// load all other tensors on the cpu
 				createTensor(tensor{source: t}, input.bts, -1)
@@ -473,6 +522,7 @@ func New(modelPath string, params ml.BackendParams) (ml.Backend, error) {
 		btDeviceMemory: btDeviceMemory,
 		maxGraphNodes:  maxGraphNodes,
 		weightBuffers:  bbs,
+		moeExpertCPU:   moeExpertCPU,
 	}, nil
 }
 

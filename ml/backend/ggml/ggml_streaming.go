@@ -97,7 +97,12 @@ func (b *Backend) logOffloadingInfo() {
 	case C.GGML_BACKEND_DEVICE_TYPE_ACCEL:
 		slog.Info("offloading output layer to ACCEL")
 	}
-	slog.Info(fmt.Sprintf("offloaded %d/%d layers to GPU", gpuLayers, len(b.layers)+1))
+	slog.Info(fmt.Sprintf("offloaded %d/%d compute layers to GPU", gpuLayers, len(b.layers)+1))
+	if b.moeExpertCPU > 0 {
+		slog.Info("MoE split: attn/GDN on GPU; routed experts partially on CPU",
+			"expert_layers_cpu", b.moeExpertCPU,
+			"repeating_layers", len(b.layers))
+	}
 }
 
 // cleanupUnusedDevices frees backend state for devices not assigned to the scheduler.

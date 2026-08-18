@@ -9,6 +9,62 @@ import (
 	"github.com/ollama/ollama/ml"
 )
 
+func TestIsMoEExpertTensor(t *testing.T) {
+	t.Parallel()
+	if !isMoEExpertTensor("blk.0.ffn_gate_exps.weight") {
+		t.Fatal("routed expert weight must match")
+	}
+	if isMoEExpertTensor("blk.0.ffn_gate_shexp.weight") {
+		t.Fatal("shared expert must stay with attn/GDN")
+	}
+	if isMoEExpertTensor("blk.0.ssm_alpha.weight") {
+		t.Fatal("GDN tensors are not routed experts")
+	}
+}
+
+func TestPackGPULayersMoEPinsNonExperts(t *testing.T) {
+	t.Parallel()
+	const n = 41
+	totals := make([]uint64, n)
+	experts := make([]uint64, n)
+	kv := make([]uint64, 40)
+	for i := 0; i < 40; i++ {
+		experts[i] = 856895488            // ~0.797 GiB routed experts
+		totals[i] = experts[i] + 41943040 // ~0.039 GiB attn/GDN/shared
+		kv[i] = 16 << 20
+	}
+	totals[40] = 540352512
+	experts[40] = totals[40]
+	pinned := uint64(40) * 41943040
+
+	got := packGPULayers(totals, experts, kv, pinned, true, 21*format.GibiByte, -1)
+	if len(got) == 0 {
+		t.Fatal("expected expert tail to fit after pinning attn/GDN")
+	}
+	if got[0] == 0 {
+		t.Fatalf("36.9 GB MoE must not place every expert tensor on 24 GiB, got %v", got)
+	}
+	if got[len(got)-1] != 40 {
+		t.Fatalf("output should stay on GPU, got %v", got)
+	}
+	for i := 1; i < len(got); i++ {
+		if got[i] != got[i-1]+1 {
+			t.Fatalf("expert offload must stay a contiguous tail, got %v", got)
+		}
+	}
+
+	dense := packGPULayers(totals, totals, kv, 0, false, 21*format.GibiByte, -1)
+	if len(dense) == 0 {
+		t.Fatal("dense tail pack should still fit")
+	}
+	// GPULayers is the expert tail only. Attn/GDN of the unlisted layers
+	// still sit on GPU (ggml createTensor), so this count can be similar
+	// or slightly smaller than a full-layer dense tail.
+	if len(got) < 10 {
+		t.Fatalf("expected a substantial expert tail, got %d: %v", len(got), got)
+	}
+}
+
 func TestFitLayersFromEnd(t *testing.T) {
 	t.Parallel()
 	const layer = uint64(897024768)

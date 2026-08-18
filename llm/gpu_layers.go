@@ -49,6 +49,87 @@ func layerWeightBytes(f *ggml.GGML) []uint64 {
 	return sizes
 }
 
+// isMoEExpertTensor reports GGUF routed-expert weights (ffn_{gate,up,down}_exps).
+// Shared-expert tensors (*_shexp) are not experts and stay with attn/GDN.
+func isMoEExpertTensor(name string) bool {
+	return strings.Contains(name, "_exps")
+}
+
+func sumU64(xs []uint64) uint64 {
+	var n uint64
+	for _, x := range xs {
+		n += x
+	}
+	return n
+}
+
+// moeExpertBytes splits repeating-layer weights into routed-expert tensors vs
+// everything else (attn, GDN, router, shared experts). Output stays in experts[last]
+// so the tail pack still prefers keeping the head on GPU.
+func moeExpertBytes(f *ggml.GGML, totals []uint64) (experts []uint64, pinned uint64, hasMoE bool) {
+	if f == nil || len(totals) == 0 {
+		return totals, 0, false
+	}
+	experts = append([]uint64(nil), totals...)
+	blocks := len(totals) - 1
+	grouped := f.Tensors().GroupLayers()
+	for i := 0; i < blocks; i++ {
+		layer, ok := grouped[fmt.Sprintf("blk.%d", i)]
+		if !ok {
+			continue
+		}
+		var exp uint64
+		for name, t := range layer {
+			if t == nil {
+				continue
+			}
+			if isMoEExpertTensor(name) || isMoEExpertTensor(t.Name) {
+				exp += t.Size()
+			}
+		}
+		if exp == 0 {
+			continue
+		}
+		hasMoE = true
+		experts[i] = exp
+		if totals[i] > exp {
+			pinned += totals[i] - exp
+		}
+	}
+	return experts, pinned, hasMoE
+}
+
+// packGPULayers assigns GPU layers. Dense models keep a contiguous tail of
+// full layers. MoE models pin attn/GDN of every layer on GPU and only pack
+// routed-expert tensors into the remaining budget (plus KV for all layers,
+// because those layers compute on GPU). When some experts stay on CPU, one
+// extra expert-layer is reserved so a prefill MUL_MAT_ID op-offload cannot
+// hipMalloc the full expert tensor on top of a packed VRAM working set.
+func packGPULayers(totals, experts, kv []uint64, pinned uint64, hasMoE bool, budget uint64, maxLayers int) []int {
+	if !hasMoE || pinned == 0 {
+		return fitLayersFromEnd(totals, kv, budget, maxLayers)
+	}
+	allKV := sumU64(kv)
+	if pinned >= budget || budget-pinned <= allKV {
+		return fitLayersFromEnd(totals, kv, budget, maxLayers)
+	}
+	rest := budget - pinned - allKV
+	full := fitLayersFromEnd(experts, nil, rest, maxLayers)
+	if len(full) == len(experts) {
+		return full
+	}
+	var maxExp uint64
+	for i := 0; i < len(experts)-1; i++ {
+		if experts[i] > maxExp {
+			maxExp = experts[i]
+		}
+	}
+	if maxExp == 0 || rest <= maxExp {
+		return fitLayersFromEnd(totals, kv, budget, maxLayers)
+	}
+	return fitLayersFromEnd(experts, nil, rest-maxExp, maxLayers)
+}
+
 func layerWeightsKnown(weights []uint64) bool {
 	for _, w := range weights {
 		if w > 0 {
@@ -140,6 +221,8 @@ func engineGraphSize(f *ggml.GGML, opts api.Options, numParallel int) (kv []uint
 // NumGPU 0 is CPU-only. NumGPU < 0 (auto) fills the budget. NumGPU > 0 caps
 // the count (still packed from the end). Without GGUF sizes, auto does not
 // 100%-offload — that is what OOM'd qwen35-uncensored on 24 GiB.
+// MoE GGUFs pin attn/GDN of every layer and only count routed-expert
+// tensors toward the tail pack.
 func gpuLayersForEngine(gpus []ml.DeviceInfo, numGPU int, f *ggml.GGML, opts api.Options, numParallel int) ml.GPULayersList {
 	if numGPU == 0 || len(gpus) == 0 {
 		return nil
@@ -155,7 +238,8 @@ func gpuLayersForEngine(gpus []ml.DeviceInfo, numGPU int, f *ggml.GGML, opts api
 	}
 	kv, graph := engineGraphSize(f, opts, numParallel)
 	budget := gpuBudgetBytes(gpus[0], graph)
-	layers := fitLayersFromEnd(weights, kv, budget, numGPU)
+	experts, pinned, moe := moeExpertBytes(f, weights)
+	layers := packGPULayers(weights, experts, kv, pinned, moe, budget, numGPU)
 	slog.Info("ollama-engine GPU layout",
 		"gpu_layers", len(layers),
 		"total_layers", len(weights),
@@ -163,6 +247,8 @@ func gpuLayersForEngine(gpus []ml.DeviceInfo, numGPU int, f *ggml.GGML, opts api
 		"graph_bytes", graph,
 		"free_vram", gpus[0].FreeMemory,
 		"num_gpu", numGPU,
+		"moe_pin_non_expert_bytes", pinned,
+		"moe_split", moe,
 	)
 	if len(layers) == 0 {
 		return nil
