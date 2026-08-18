@@ -75,9 +75,22 @@ Measured 2026-08-18T11:49Z after MoE split offload:
 | Warm prompt | 6 tokens → **20.7 tok/s** |
 | `rocm-smi` VRAM used | 25 672 425 472 B (~24.7 GiB of 24.0 GiB advertised) |
 
-Previous same-day full-layer tail (26/41, GDN of layers 0–14 on CPU) was **~2 tok/s**. Split layout is ~4× on this host. Decoded text is still not coherent.
+Previous same-day full-layer tail (26/41, GDN of layers 0–14 on CPU) was **~2 tok/s**. Split layout is ~4× on this host.
 
-Q8 MoE expert tensors are ~31.9 GiB of the 36.9 GB file; non-expert repeating weights are ~1.48 GiB. Full-layer HIP paging cannot beat PCIe; the next win is gathering the **8 active experts** (~25 MiB/layer) onto GPU rather than running those 17 CPU GEMMs.
+### Follow-up 2026-08-18T13:05Z (fused GDN)
+
+Go AR/chunked GDN replaced with `ggml_gated_delta_net` (llama.cpp fused kernel). Decode is coherent.
+
+| Item | Value |
+| --- | --- |
+| Cold `Say hi in one word.` 8 tok | **9.34 tok/s**, response starts `Hello` |
+| Warm same prompt 16 tok | **8.75 tok/s**, `Hello` then chat-template spill after EOS |
+| Warm `What is 2+2?` 32 tok | **5.04 tok/s**, answer `4` then template spill |
+| `qwen3:0.6b` after binary swap | **94.7 tok/s** (cold 16 tok) |
+
+`scripts/xtx-generate-bench.sh` records these JSON lines. Remaining: stop on `eos` / `<|endoftext|>` so `num_predict` does not keep emitting `<|im_start|>`, and gather the 8 active experts off CPU.
+
+Q8 MoE expert tensors are ~31.9 GiB of the 36.9 GB file; non-expert repeating weights are ~1.48 GiB. Full-layer HIP paging cannot beat PCIe; the next speed win is gathering the **8 active experts** (~25 MiB/layer) onto GPU rather than running those 17 CPU GEMMs.
 
 ### Earlier 2026-08-18T10:32Z (full-layer tail, before MoE split)
 
@@ -117,9 +130,9 @@ docker exec jaisiu-prismalama /opt/rocm/bin/rocm-smi --showproductname --showmem
 curl -sS http://127.0.0.1:11434/api/generate -d \
   '{"model":"qwen3:0.6b","prompt":"Write a haiku about GPUs.","stream":false,"options":{"num_predict":32,"temperature":0}}'
 
-# larger than VRAM — partial GPU offload (tail layers)
-curl -sS -m 1800 http://127.0.0.1:11434/api/generate -d \
-  '{"model":"qwen35-uncensored:latest","prompt":"Say hi in one word.","stream":false,"options":{"num_predict":8,"num_ctx":256,"temperature":0}}'
+# larger than VRAM — fused GDN + MoE split
+./scripts/xtx-generate-bench.sh qwen35-uncensored:latest 16 256 'Say hi in one word.'
+./scripts/xtx-generate-bench.sh qwen3:0.6b 16 256 'Write a haiku about GPUs.'
 
 docker logs --since 10m jaisiu-prismalama 2>&1 | grep -c 'kept block'
 docker logs --since 10m jaisiu-prismalama 2>&1 | grep -c 'evicted block'

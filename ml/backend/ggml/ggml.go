@@ -1741,6 +1741,21 @@ func (t *Tensor) SSMConv(ctx ml.Context, kernel ml.Tensor) ml.Tensor {
 	}
 }
 
+func (t *Tensor) GatedDeltaNet(ctx ml.Context, k, v, gate, beta, state ml.Tensor) ml.Tensor {
+	return &Tensor{
+		b: t.b,
+		t: C.ggml_gated_delta_net(
+			ctx.(*Context).ctx,
+			t.t,
+			k.(*Tensor).t,
+			v.(*Tensor).t,
+			gate.(*Tensor).t,
+			beta.(*Tensor).t,
+			state.(*Tensor).t,
+		),
+	}
+}
+
 func (t *Tensor) AvgPool2D(ctx ml.Context, k, s int, p float32) ml.Tensor {
 	return &Tensor{
 		b: t.b,

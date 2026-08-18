@@ -185,6 +185,9 @@ type Tensor interface {
 	Conv1DDW(ctx Context, weight Tensor, s, p, d int) Tensor
 	SSMConv(ctx Context, kernel Tensor) Tensor
 	SSMScan(ctx Context, x, dt, A, B, C, ids Tensor) Tensor
+	// GatedDeltaNet is llama.cpp's fused GGML_OP_GATED_DELTA_NET.
+	// Receiver is q. Returns packed [output | new_state].
+	GatedDeltaNet(ctx Context, k, v, gate, beta, state Tensor) Tensor
 
 	IM2Col(ctx Context, weight Tensor, s0, s1, p0, p1, d0, d1 int) Tensor
 

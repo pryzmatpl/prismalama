@@ -3,32 +3,14 @@ package qwen3next
 import (
 	"errors"
 	"log/slog"
-	"math"
 
 	"github.com/ollama/ollama/ml"
 	"github.com/ollama/ollama/ml/nn"
 )
 
-const chunkSize = 64
-
-// TriType constants for triangular matrix operations
-const (
-	TriTypeUpperDiag = 0
-	TriTypeUpper     = 1
-	TriTypeLowerDiag = 2
-	TriTypeLower     = 3
-)
-
 // convKernel wraps the 1D convolution kernel tensor
 type convKernel struct {
 	Weight ml.Tensor `gguf:"weight"`
-}
-
-// Masks holds pre-computed mask tensors for chunked attention
-type Masks struct {
-	Causal   ml.Tensor // Lower triangular [chunkSize, chunkSize]
-	Identity ml.Tensor // Diagonal [chunkSize, chunkSize]
-	Diag     ml.Tensor // causal + identity
 }
 
 // GatedDeltaNet implements linear attention with SSM convolution and recurrent state.
@@ -48,25 +30,6 @@ type GatedDeltaNet struct {
 
 	// Layer index for cache access (set during model construction)
 	Layer int
-}
-
-// createMasks builds the constant mask tensors (called once, reused for all chunks)
-func createMasks(ctx ml.Context) *Masks {
-	ones := ctx.Input().Zeros(ml.DTypeF32, chunkSize, chunkSize)
-	ones = ones.Fill(ctx, 1.0)
-	causalMask := ones.Tri(ctx, TriTypeLower)
-
-	onesVec := ctx.Input().Zeros(ml.DTypeF32, chunkSize)
-	onesVec = onesVec.Fill(ctx, 1.0)
-	identity := onesVec.Diag(ctx)
-
-	diagMask := causalMask.Add(ctx, identity)
-
-	return &Masks{
-		Causal:   causalMask,
-		Identity: identity,
-		Diag:     diagMask,
-	}
 }
 
 func (gdn *GatedDeltaNet) Forward(ctx ml.Context, hiddenStates, _ ml.Tensor, cache *HybridCache, opts *Options) (ml.Tensor, error) {
@@ -194,28 +157,8 @@ func (gdn *GatedDeltaNet) Forward(ctx ml.Context, hiddenStates, _ ml.Tensor, cac
 	}
 	state = state.Reshape(ctx, headVDim, headVDim*numVHeads, 1, nSeqs)
 
-	// Repeat interleave Q and K if numKHeads != numVHeads
-	if numKHeads != numVHeads {
-		repeatFactor := numVHeads / numKHeads
-
-		qReshaped := qConv.Reshape(ctx, headKDim, 1, numKHeads*nSeqTokens*nSeqs)
-		kReshaped := kConv.Reshape(ctx, headKDim, 1, numKHeads*nSeqTokens*nSeqs)
-
-		qRepeated := qReshaped.Repeat4D(ctx, headKDim, repeatFactor, numKHeads*nSeqTokens*nSeqs, 1)
-		kRepeated := kReshaped.Repeat4D(ctx, headKDim, repeatFactor, numKHeads*nSeqTokens*nSeqs, 1)
-
-		qConv = qRepeated.Reshape(ctx, headKDim, numKHeads*repeatFactor, nSeqTokens, nSeqs)
-		kConv = kRepeated.Reshape(ctx, headKDim, numKHeads*repeatFactor, nSeqTokens, nSeqs)
-	}
-
-	// Choose computation mode based on sequence length
-	var attnOut ml.Tensor
-	if nSeqTokens == 1 {
-		attnOut = gdn.deltaNetAutoregressive(ctx, qConv, kConv, vConv, gate, beta, state, opts, layer, cache, betaPreSigmoid)
-	} else {
-		// Use pre-computed masks from opts (created once in Model.Forward)
-		attnOut = gdn.deltaNetChunked(ctx, qConv, kConv, vConv, gate, beta, state, opts.masks, opts, layer, cache, betaPreSigmoid)
-	}
+	// llama.cpp fused GDN broadcasts K-heads internally. Do not Repeat4D first.
+	attnOut := gdn.deltaNetFused(ctx, qConv, kConv, vConv, gate, beta, state, opts, layer, cache, betaPreSigmoid)
 
 	// Apply gated normalization
 	attnOut2D := attnOut.Contiguous(ctx, headVDim, numVHeads*nSeqTokens*nSeqs)
@@ -233,9 +176,9 @@ func (gdn *GatedDeltaNet) Forward(ctx ml.Context, hiddenStates, _ ml.Tensor, cac
 	return out.Reshape(ctx, out.Dim(0), nSeqTokens*nSeqs), nil
 }
 
-// deltaNetAutoregressive implements single-token state update.
-// NOTE: Assumes headKDim == headVDim (state shape is [headVDim, headVDim, numVHeads, nSeqs]).
-func (gdn *GatedDeltaNet) deltaNetAutoregressive(
+// deltaNetFused is llama.cpp build_delta_net_fused: L2-norm Q/K, then
+// GGML_OP_GATED_DELTA_NET (scale + recurrence live in the kernel).
+func (gdn *GatedDeltaNet) deltaNetFused(
 	ctx ml.Context,
 	q, k, v, gate, beta, state ml.Tensor,
 	opts *Options,
@@ -243,260 +186,47 @@ func (gdn *GatedDeltaNet) deltaNetAutoregressive(
 	cache *HybridCache,
 	betaPreSigmoid bool,
 ) ml.Tensor {
-	numVHeads := v.Dim(1)
 	headVDim := v.Dim(0)
-	nSeqs := q.Dim(3)
-
-	// L2 normalize Q and K
-	q = q.L2Norm(ctx, opts.eps)
-	k = k.L2Norm(ctx, opts.eps)
-
-	// Scale Q
-	scale := 1.0 / math.Sqrt(float64(headVDim))
-	q = q.Scale(ctx, scale)
-
-	if !betaPreSigmoid {
-		beta = beta.Sigmoid(ctx)
-	}
-
-	// Reshape state: [headVDim, headVDim, numVHeads, nSeqs]
-	state = state.Reshape(ctx, headVDim, headVDim, numVHeads, nSeqs)
-
-	// llama.cpp AR: reshape gate/beta to [1, 1, H_v, n_seqs] for broadcast over state.
-	gT := gate.Reshape(ctx, 1, 1, numVHeads, nSeqs)
-	betaT := beta.Reshape(ctx, 1, 1, numVHeads, nSeqs)
-
-	// Apply exponential to gate
-	gT = gT.Exp(ctx)
-
-	// state = state * g_t
-	state = state.Mul(ctx, gT)
-
-	// kv_mem = (state * k_t.unsqueeze(-1)).sum(dim=-2)
-	kTUnsqueezed := k.Reshape(ctx, 1, headVDim, numVHeads, nSeqs)
-	kvMem := state.Mul(ctx, kTUnsqueezed)
-	// Sum over dim=-2 (second dimension after permute)
-	kvMem = kvMem.Permute(ctx, 1, 0, 2, 3).Contiguous(ctx)
-	kvMem = kvMem.SumRows(ctx)
-	kvMem = kvMem.Permute(ctx, 1, 0, 2, 3)
-
-	// v_t with singleton dimension
-	vT := v.Reshape(ctx, headVDim, 1, numVHeads, nSeqs)
-
-	// delta = (v_t - kv_mem) * beta_t
-	vDiff := vT.Sub(ctx, kvMem)
-	delta := vDiff.Mul(ctx, betaT)
-
-	// state = state + k_t.unsqueeze(-1) * delta
-	kTUnsqueezedBroad := kTUnsqueezed.Repeat4D(ctx, headVDim, headVDim, numVHeads, nSeqs)
-	kTDelta := kTUnsqueezedBroad.Mul(ctx, delta)
-	state = state.Add(ctx, kTDelta)
-
-	// core_attn_out = (state * q_t.unsqueeze(-1)).sum(dim=-2)
-	qTUnsqueezed := q.Reshape(ctx, 1, headVDim, numVHeads, nSeqs)
-	stateQ := state.Mul(ctx, qTUnsqueezed)
-	stateQ = stateQ.Permute(ctx, 1, 0, 2, 3).Contiguous(ctx)
-	coreAttnOut := stateQ.SumRows(ctx)
-	coreAttnOut = coreAttnOut.Permute(ctx, 1, 0, 2, 3)
-
-	// Update delta state in cache
-	cache.UpdateDeltaState(ctx, layer, state.Reshape(ctx, headVDim, headVDim*numVHeads, nSeqs))
-
-	return coreAttnOut.Reshape(ctx, headVDim, numVHeads, 1, nSeqs)
-}
-
-// deltaNetChunked implements chunked computation for prefill.
-// NOTE: Assumes headKDim == headVDim (state shape is [headVDim, headVDim, numVHeads, nSeqs]).
-func (gdn *GatedDeltaNet) deltaNetChunked(
-	ctx ml.Context,
-	q, k, v, gate, beta, state ml.Tensor,
-	masks *Masks,
-	opts *Options,
-	layer int,
-	cache *HybridCache,
-	betaPreSigmoid bool,
-) ml.Tensor {
-	headKDim := q.Dim(0)
 	numVHeads := v.Dim(1)
-	headVDim := v.Dim(0)
 	nTokens := q.Dim(2)
 	nSeqs := q.Dim(3)
 
-	// L2 normalize Q and K
-	q = q.L2Norm(ctx, opts.eps)
-	k = k.L2Norm(ctx, opts.eps)
-
-	// Scale Q
-	scale := 1.0 / math.Sqrt(float64(headVDim))
-	q = q.Scale(ctx, scale)
-
+	q = q.L2Norm(ctx, opts.eps).Contiguous(ctx)
+	k = k.L2Norm(ctx, opts.eps).Contiguous(ctx)
+	v = v.Contiguous(ctx)
 	if !betaPreSigmoid {
 		beta = beta.Sigmoid(ctx)
 	}
+	gate = gate.Contiguous(ctx)
+	beta = beta.Contiguous(ctx)
+	state = state.Reshape(ctx, headVDim, headVDim, numVHeads, nSeqs).Contiguous(ctx)
 
-	// Permute tensors for chunked computation
-	q = q.Permute(ctx, 0, 2, 1, 3).Contiguous(ctx, headKDim, nTokens, numVHeads, nSeqs)
-	k = k.Permute(ctx, 0, 2, 1, 3).Contiguous(ctx, headKDim, nTokens, numVHeads, nSeqs)
-	v = v.Permute(ctx, 0, 2, 1, 3).Contiguous(ctx, headVDim, nTokens, numVHeads, nSeqs)
-	// [1, H, T, B] → [T, 1, H, B] so CumSum runs along the token axis (llama.cpp
-	// permutes 0,2,1,3 then transposes the leading 1×T into T×1 before cumsum).
-	gate = gate.Permute(ctx, 2, 0, 1, 3).Contiguous(ctx, nTokens, 1, numVHeads, nSeqs)
-
-	beta = beta.Permute(ctx, 2, 0, 1, 3).Contiguous(ctx)
-	state = state.Reshape(ctx, headVDim, headVDim, numVHeads, nSeqs)
-
-	// Compute padding
-	pad := (chunkSize - nTokens%chunkSize) % chunkSize
-	nChunks := (nTokens + pad) / chunkSize
-
-	// Pad tensors
-	if pad > 0 {
-		q = q.Pad(ctx, 0, pad, 0, 0)
-		k = k.Pad(ctx, 0, pad, 0, 0)
-		v = v.Pad(ctx, 0, pad, 0, 0)
-		gate = gate.Pad(ctx, pad, 0, 0, 0)
-		beta = beta.Pad(ctx, 0, pad, 0, 0)
-	}
-
-	// Use pre-computed masks (passed in, not recreated)
-	causalMask := masks.Causal
-	identity := masks.Identity
-	diagMask := masks.Diag
-	identity4D := identity.Reshape(ctx, chunkSize, chunkSize, 1, 1)
-
-	// v_beta = v * beta, k_beta = k * beta
-	vBeta := v.Mul(ctx, beta)
-	kBeta := k.Mul(ctx, beta)
-
-	// Reshape for chunked computation
-	q = q.Reshape(ctx, headKDim, chunkSize, nChunks, numVHeads*nSeqs)
-	k = k.Reshape(ctx, headKDim, chunkSize, nChunks, numVHeads*nSeqs)
-	kBeta = kBeta.Reshape(ctx, headKDim, chunkSize, nChunks, numVHeads*nSeqs)
-	vBeta = vBeta.Reshape(ctx, headVDim, chunkSize, nChunks, numVHeads*nSeqs)
-
-	gate = gate.Reshape(ctx, chunkSize, 1, nChunks, numVHeads*nSeqs)
-
-	// g_cumsum = cumsum(gate)
-	gCumsum := gate.CumSum(ctx)
-
-	// Compute decay mask
-	gcsI := gCumsum.Reshape(ctx, chunkSize, 1, nChunks, numVHeads*nSeqs)
-	gcsJ := gCumsum.Reshape(ctx, 1, chunkSize, nChunks, numVHeads*nSeqs)
-	gcsBroadcast := gcsJ.Repeat4D(ctx, chunkSize, chunkSize, nChunks, numVHeads*nSeqs)
-	decayMask := gcsBroadcast.Sub(ctx, gcsI)
-
-	decayMask = decayMask.Mul(ctx, diagMask)
-	decayMask = decayMask.Exp(ctx)
-	decayMask = decayMask.Mul(ctx, diagMask)
-
-	// k @ k_beta^T
-	kMulKBeta := k.Mulmat(ctx, kBeta)
-
-	// k_decay = k @ k_beta^T * decay_mask
-	kDecay := kMulKBeta.Mul(ctx, decayMask)
-
-	// attn = -k_decay * causal_mask
-	attn := kDecay.Neg(ctx).Mul(ctx, causalMask)
-
-	// Triangular solve: (I - attn_lower)^-1 @ attn
-	attnLower := attn.Mul(ctx, causalMask)
-	lhs := attnLower.Neg(ctx).Add(ctx, identity4D)
-	linSolve := lhs.SolveTri(ctx, attn, true, true, false)
-	attn = linSolve.Mul(ctx, causalMask)
-	attn = attn.Add(ctx, identity4D)
-
-	// v = v_beta^T @ attn
-	vBetaT := vBeta.Permute(ctx, 1, 0, 2, 3).Contiguous(ctx)
-	v = vBetaT.Mulmat(ctx, attn)
-
-	// Compute g_exp for state update
-	gCumsumT := gCumsum.Permute(ctx, 1, 0, 2, 3).Contiguous(ctx)
-	gExp := gCumsumT.Exp(ctx)
-
-	// kbeta_gexp = k_beta * g_exp
-	kBetaGExp := kBeta.Mul(ctx, gExp)
-
-	// k_cumdecay = attn @ kbeta_gexp^T
-	kBetaGExpT := kBetaGExp.Permute(ctx, 1, 0, 2, 3).Contiguous(ctx)
-	kCumdecay := attn.Mulmat(ctx, kBetaGExpT)
-	kCumdecay = kCumdecay.Permute(ctx, 1, 0, 2, 3).Contiguous(ctx)
-
-	// Pre-compute attn_kq = (k @ q) * decay_mask * diag_mask
-	attnKQ := k.Mulmat(ctx, q)
-	attnKQ = attnKQ.Mul(ctx, decayMask)
-	attnKQ = attnKQ.Mul(ctx, diagMask)
-
-	// Pre-compute g_last and key_gdiff
-	// g_last = view of last element in g_cumsum along chunk_size dimension
-	// We need to get the last row of gCumsum: shape [chunkSize, 1, nChunks, H*n_seqs] -> [1, 1, nChunks, H*n_seqs]
-	gLast := gCumsum.Slice(ctx, 0, chunkSize-1, chunkSize, 1).Contiguous(ctx, 1, 1, nChunks, numVHeads*nSeqs)
-	gLastExp := gLast.Exp(ctx)
-
-	// g_diff = -(g_cumsum - g_last) = g_last - g_cumsum
-	gDiff := gCumsum.Neg(ctx).Add(ctx, gLast)
-	gDiffExp := gDiff.Exp(ctx)
-
-	// Reshapes g_diff_exp to [1, chunkSize, nChunks, ...]
-	gDiffExpReshaped := gDiffExp.Reshape(ctx, 1, chunkSize, nChunks, numVHeads*nSeqs)
-	keyGDiff := k.Mul(ctx, gDiffExpReshaped)
-	keyGDiffT := keyGDiff.Permute(ctx, 1, 0, 2, 3).Contiguous(ctx)
-
-	// Process chunks and update state
-	var coreAttnOut ml.Tensor
-	newState := state
-
-	for chunk := range nChunks {
-		qChunk := q.Slice(ctx, 2, chunk, chunk+1, 1)
-		vChunk := v.Slice(ctx, 2, chunk, chunk+1, 1)
-		gExpChunk := gExp.Slice(ctx, 2, chunk, chunk+1, 1)
-		kCumdecayChunk := kCumdecay.Slice(ctx, 2, chunk, chunk+1, 1)
-		attnChunk := attnKQ.Slice(ctx, 2, chunk, chunk+1, 1) // Pre-computed!
-
-		// state^T - permute is needed but Contiguous creates a copy
-		stateT := newState.Permute(ctx, 1, 0, 2, 3).Contiguous(ctx, headVDim, headVDim, 1, numVHeads*nSeqs)
-
-		// v_prime = k_cumdecay @ state
-		vPrime := stateT.Mulmat(ctx, kCumdecayChunk)
-
-		// v_new = v - v_prime
-		vNew := vChunk.Sub(ctx, vPrime)
-		vNewT := vNew.Permute(ctx, 1, 0, 2, 3).Contiguous(ctx)
-
-		// attn_inter = (q * g_exp) @ state
-		qGExp := qChunk.Mul(ctx, gExpChunk)
-		attnInter := stateT.Mulmat(ctx, qGExp)
-
-		// core_attn_out = attn_inter + attn @ v_new
-		vAttn := vNewT.Mulmat(ctx, attnChunk)
-		coreAttnOutChunk := attnInter.Add(ctx, vAttn)
-
-		if coreAttnOut == nil {
-			coreAttnOut = coreAttnOutChunk
-		} else {
-			coreAttnOut = coreAttnOut.Concat(ctx, coreAttnOutChunk, 1)
-		}
-
-		// Update state for next chunk
-		gExpLastChunk := gLastExp.Slice(ctx, 2, chunk, chunk+1, 1)
-		kGDiffChunkT := keyGDiffT.Slice(ctx, 2, chunk, chunk+1, 1)
-		kgdMulVNew := vNewT.Mulmat(ctx, kGDiffChunkT)
-
-		// state = state * g_last + kgdmulvnew
-		gExpLastReshaped := gExpLastChunk.Contiguous(ctx).Reshape(ctx, 1, 1, numVHeads, nSeqs)
-		newState = newState.Mul(ctx, gExpLastReshaped)
-		newState = newState.Add(ctx, kgdMulVNew.Reshape(ctx, headVDim, headVDim, numVHeads, nSeqs))
-	}
-
-	// Final reshape
-	coreAttnOut = coreAttnOut.Contiguous(ctx, headVDim, chunkSize*nChunks, numVHeads, nSeqs)
-
-	// Slice to remove padding
-	if pad > 0 {
-		coreAttnOut = coreAttnOut.Slice(ctx, 1, 0, nTokens, 1)
-	}
-
-	// Update delta state in cache
+	packed := q.GatedDeltaNet(ctx, k, v, gate, beta, state)
+	out, newState := splitGatedDeltaNet(packed, ctx, headVDim, numVHeads, nTokens, nSeqs)
 	cache.UpdateDeltaState(ctx, layer, newState.Reshape(ctx, headVDim, headVDim*numVHeads, nSeqs))
+	return out
+}
 
-	return coreAttnOut.Permute(ctx, 0, 2, 1, 3).Contiguous(ctx, headVDim, numVHeads, nTokens, nSeqs)
+// splitGatedDeltaNet views fused GDN packed output the same way llama.cpp does:
+// result is [S*H, T*B + S*B]; first slab is attn out [S,H,T,B], second is
+// new state [S,S,H,B].
+func splitGatedDeltaNet(packed ml.Tensor, ctx ml.Context, s, h, tokens, seqs int) (out, state ml.Tensor) {
+	es := packed.Stride(0)
+	if es < 1 {
+		es = 4
+	}
+	outNB1 := s * es
+	outNB2 := s * h * es
+	outNB3 := s * h * tokens * es
+	out = packed.View(ctx, 0, s, outNB1, h, outNB2, tokens, outNB3, seqs)
+	stateOff := s * h * tokens * seqs * es
+	stNB1 := s * es
+	stNB2 := s * s * es
+	stNB3 := s * s * h * es
+	state = packed.View(ctx, stateOff, s, stNB1, s, stNB2, h, stNB3, seqs)
+	return out, state
+}
+
+func gatedDeltaNetPackedElems(s, h, tokens, seqs int) int {
+	return s * h * (tokens*seqs + s*seqs)
 }

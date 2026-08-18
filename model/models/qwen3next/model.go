@@ -49,9 +49,6 @@ type Options struct {
 	// IMRoPE sections from GGUF (llama.cpp LLAMA_ROPE_TYPE_IMROPE).
 	// qwen35 / qwen35moe publish rope.dimension_sections, typically [11, 11, 10, 0].
 	mropeSections []int
-
-	// Pre-computed masks for chunked attention (created once per forward pass)
-	masks *Masks
 }
 
 func (o Options) headDim() int {
@@ -281,9 +278,6 @@ func (m *Model) Forward(ctx ml.Context, batch input.Batch) (ml.Tensor, error) {
 	hiddenStates := m.TokenEmbedding.Forward(ctx, batch.Inputs)
 
 	cache := m.Cache.(*HybridCache)
-
-	// Create masks once per forward pass
-	m.Options.masks = createMasks(ctx)
 
 	for i, layer := range m.Layers {
 		cache.SetLayer(i)
