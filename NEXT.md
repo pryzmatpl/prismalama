@@ -6,19 +6,26 @@
 
 ## Current phase
 
-**Phase 0 — Stabilize** (in progress; target close: 2026-08-27).
+**Phase 1 — Streaming Core** (opened 2026-08-18 on the RX 7900 XTX host).
+Live serve is the Ubuntu `ollama-xtx-engine` binary (`~/.ollama/rocm-overlay/ollama-xtx-engine`
+copied to `/usr/bin/ollama`) + HIP overlay + ROCR BDF shim. Image backup remains
+`/usr/bin/ollama.image-rocm`. `NewLlamaServer` falls back to
+`runner --ollama-engine` when `llama-server` is missing: GPU discovery, load,
+and generate all use that path. Proven 2026-08-18: `qwen3:0.6b` on ROCm /
+7900 XTX / 24 GiB, 29/29 layers offloaded, keep-resident
+(`OLLAMA_STREAMING_BUDGET` 4 GiB), warm ~106 tok/s for 16 tokens.
 
 ## In-flight tickets
 
 | ID                                                              | Title                                                                                 | Owner | Status      |
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ----- | ----------- |
 | [JAISIU-2156](https://pryzmat.youtrack.cloud/issue/JAISIU-2156) | Epic — Prismalama North-Star (2026–2027)                                              | agent | Submitted   |
-| [JAISIU-2157](https://pryzmat.youtrack.cloud/issue/JAISIU-2157) | P0-1: Harden `runner/dispatch.go` (typed reasons, structured logging, expanded tests) | tbd   | Submitted   |
-| [JAISIU-2158](https://pryzmat.youtrack.cloud/issue/JAISIU-2158) | P0-2: Capabilities operator surface (env keys + backends, schema v2)                  | tbd   | Submitted   |
-| [JAISIU-2159](https://pryzmat.youtrack.cloud/issue/JAISIU-2159) | P0-3: `prismallama.cpp` upstream sync audit + `llama/patches/README.md`               | tbd   | Submitted   |
-| [JAISIU-2160](https://pryzmat.youtrack.cloud/issue/JAISIU-2160) | P0-4: Packaging defaults audit (PKGBUILD, `/etc/default/ollama`, Docker)              | tbd   | Submitted   |
-| [JAISIU-2161](https://pryzmat.youtrack.cloud/issue/JAISIU-2161) | P0-5: NEXT.md living roadmap + CHANGELOG hygiene (this ticket)                        | tbd   | In Progress |
-| [JAISIU-2162](https://pryzmat.youtrack.cloud/issue/JAISIU-2162) | P0-6: Verify integration suite + ship-check on a non-GPU host                         | tbd   | Submitted   |
+| [JAISIU-2295](https://pryzmat.youtrack.cloud/issue/JAISIU-2295) | Epic — Phase 1 Streaming Core                                                         | agent | In Progress |
+| [JAISIU-2296](https://pryzmat.youtrack.cloud/issue/JAISIU-2296) | P1-1: HIP `libggml-hip.so` dlopen on gfx1100 — drop FA tiles D≥576                    | agent | In Progress |
+| [JAISIU-2297](https://pryzmat.youtrack.cloud/issue/JAISIU-2297) | P1-2: Keep GGUF blocks resident when they fit `OLLAMA_STREAMING_BUDGET`               | agent | In Progress |
+| [JAISIU-2298](https://pryzmat.youtrack.cloud/issue/JAISIU-2298) | P1-3: GPU discovery fallback when `llama-server` is missing                           | agent | In Progress |
+| [JAISIU-2299](https://pryzmat.youtrack.cloud/issue/JAISIU-2299) | P1-4: `docs/STREAMING_BENCHMARK.md` on this 7900 XTX                                  | tbd   | Submitted   |
+| [JAISIU-2300](https://pryzmat.youtrack.cloud/issue/JAISIU-2300) | P1-5: Wire streaming compute into `runner/llamarunner`                                | tbd   | Submitted   |
 
 ## Phase 1 — first actions (post Phase 0 close)
 
@@ -62,6 +69,15 @@ When all six checkboxes above tick:
 
 ## Recent decisions (chronological, latest first)
 
+- **2026-08-18** — ollama-engine generate client (`llm/ollama_engine_server.go`)
+  landed. `NewLlamaServer` uses `runner --ollama-engine` when `llama-server`
+  is absent. Live binary is `ollama-xtx-engine` (89 MiB Ubuntu). Restore path:
+  `/usr/bin/ollama.image-rocm`. Keep-resident proven (`kept_block=980`,
+  `evicted_block=0` on `qwen3:0.6b` / 4 GiB budget).
+- **2026-08-18** — Phase 1 opened on host `prizm` (RX 7900 XTX). Live
+  `qwen3:0.6b` generate on ROCm with `OLLAMA_LAYER_STREAMING=1`. HIP dlopen
+  required dropping FA tiles D≥512/576/640; ROCm 7.2 rejects PCI BDF in
+  `ROCR_VISIBLE_DEVICES` (shim + `rocrVisibleDeviceToken` → `"0"`).
 - **2026-08-13** — Phase 0 scoped to 6 subtasks under JAISIU-2156 (Telegram 10:39 UTC brief).
 - **2026-08-13** — Decision: Phase 0 work happens on `devel`, MR per subtask.
 - **2026-08-13** — Decision: prior agent doc drift snapshotted to

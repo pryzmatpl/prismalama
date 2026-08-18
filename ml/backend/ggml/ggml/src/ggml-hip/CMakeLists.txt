@@ -58,8 +58,10 @@ list(APPEND GGML_HEADERS_ROCM "../../include/ggml-cuda.h")
 
 file(GLOB   GGML_SOURCES_ROCM "../ggml-cuda/*.cu")
 file(GLOB   SRCS "../ggml-cuda/template-instances/fattn-tile*.cu")
-# Exclude D>=576 tile kernels: exceed HIP local memory limit (67584 > 65536)
-list(FILTER SRCS EXCLUDE REGEX "dkq(576|640)")
+# Exclude tile kernels that cannot compile or link on HIP/gfx1100 (JAISIU-2296):
+# - dkq576/640: LDS 67584 > 65536; fattn-tile.cu must not call those templates
+# - dkq512: __launch_bounds__ min>max (amdgpu_flat_work_group_size) on current ROCm
+list(FILTER SRCS EXCLUDE REGEX "dkq(512|576|640)")
 list(APPEND GGML_SOURCES_ROCM ${SRCS})
 file(GLOB   SRCS "../ggml-cuda/template-instances/fattn-mma*.cu")
 list(APPEND GGML_SOURCES_ROCM ${SRCS})

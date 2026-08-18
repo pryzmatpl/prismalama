@@ -40,6 +40,7 @@ import (
 	"github.com/ollama/ollama/sample"
 	"github.com/ollama/ollama/tokenizer"
 
+	_ "github.com/ollama/ollama/ml/backend"
 	_ "github.com/ollama/ollama/model/models"
 )
 
@@ -1322,6 +1323,7 @@ func (s *Server) initInferenceStreamer() {
 	}
 
 	is := streaming.NewInferenceStreamer(s.model.Backend(), s.modelPath, lm)
+	is.SetBudgetBytes(envconfig.StreamingBudgetBytes())
 	if err := is.PrepareForInference(context.TODO()); err != nil {
 		slog.Warn("streaming inference: prepare failed", "error", err)
 		is.Close()

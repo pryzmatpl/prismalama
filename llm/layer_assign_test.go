@@ -1,3 +1,8 @@
+//go:build ignore
+
+// Orphaned: findBestFit / greedyFit were removed with the llmServer layout
+// state machine. Layer assignment for ollama-engine is gpuLayersForEngine.
+
 package llm
 
 import (

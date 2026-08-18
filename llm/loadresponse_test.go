@@ -1,3 +1,7 @@
+//go:build ignore
+
+// Orphaned: errLoadCommitFailed lived on the old llmServer load handshake.
+
 package llm
 
 import (

@@ -1,3 +1,9 @@
+//go:build ignore
+
+// Orphaned: TestLLMServerFitGPU / createLayout / llmServer.Completion target
+// the pre-llama-server layout state machine. HIP env helpers and generate
+// fallback tests live in ollama_engine_server_test.go.
+
 package llm
 
 import (

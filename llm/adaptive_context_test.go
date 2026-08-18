@@ -1,3 +1,7 @@
+//go:build ignore
+
+// Orphaned: adaptiveUsableBytes was removed with the llama.cpp runner layout.
+
 package llm
 
 import (

@@ -649,9 +649,11 @@ func (f FlashAttentionType) String() string {
 
 // rocrVisibleDeviceToken picks a value for ROCR_VISIBLE_DEVICES that HIP/ROCr
 // accept. GGML reports either numeric indices or PCI BDF / GPU-uuid strings.
-// Always preserve non-numeric IDs: mapping PCI ids to "0" breaks multi-GPU
-// AMD systems where ROCR device 0 is an iGPU/APU and the discrete card is
-// another index — the runner would then see the wrong GPU or no offload.
+// Numeric IDs (and numeric FilterID) are passed through. Non-numeric IDs
+// (PCI BDF) map to "0" because ROCm 7.2 rejects BDF tokens
+// (JAISIU-2296, gfx1100 / RX 7900 XTX: ROCR=0000:0b:00.0 → 0 devices,
+// ROCR=0 sees the card). Multi-GPU AMD boxes that mix iGPU + dGPU still
+// need a numeric index; FilterID is the scheduler's override for that.
 // Conflicts between user HIP_VISIBLE_DEVICES and ROCR are handled in StartRunner
 // (strip user HIP when the scheduler sets ROCR).
 func rocrVisibleDeviceToken(d DeviceInfo) string {
@@ -663,7 +665,7 @@ func rocrVisibleDeviceToken(d DeviceInfo) string {
 	if _, err := strconv.Atoi(d.ID); err == nil {
 		return d.ID
 	}
-	return d.ID
+	return "0"
 }
 
 // Given the list of GPUs this instantiation is targeted for,

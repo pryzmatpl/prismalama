@@ -41,10 +41,10 @@ const llamaServerDiscoveryWaitDelay = 5 * time.Second
 
 func llamaServerDiscoverDevices(ctx context.Context, libDirs []string, extraEnvs map[string]string) ([]ml.DeviceInfo, *llm.StatusWriter, error) {
 	status := llm.NewStatusWriter(llamaServerDiscoveryOutput(ctx))
-	llamaServer, err := llm.FindLlamaServer()
+	llamaServer, err := findLlamaServer()
 	if err != nil {
-		slog.Debug("llama-server not available for device discovery", "error", err)
-		return nil, status, err
+		slog.Info("llama-server not available for device discovery, falling back to ollama-engine", "error", err)
+		return ollamaEngineDiscover(ctx, libDirs, extraEnvs)
 	}
 
 	start := time.Now()

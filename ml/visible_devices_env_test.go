@@ -3,7 +3,6 @@
 package ml
 
 import (
-	"reflect"
 	"testing"
 )
 
@@ -15,10 +14,9 @@ func TestGetVisibleDevicesEnvROCmPCIUsesID(t *testing.T) {
 			FilterID: "",
 		},
 	}
-	got := GetVisibleDevicesEnv(gpus, true)
-	want := map[string]string{"ROCR_VISIBLE_DEVICES": "0000:0b:00.0"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetVisibleDevicesEnv: got %#v want %#v", got, want)
+	got := GetDevicesEnv(gpus)
+	if got["ROCR_VISIBLE_DEVICES"] != "0" {
+		t.Fatalf("GetDevicesEnv ROCR for PCI BDF: got %#v want ROCR_VISIBLE_DEVICES=0 (ROCm 7 rejects BDF)", got)
 	}
 }
 
@@ -30,10 +28,9 @@ func TestGetVisibleDevicesEnvROCmNumeric(t *testing.T) {
 			FilterID: "",
 		},
 	}
-	got := GetVisibleDevicesEnv(gpus, true)
-	want := map[string]string{"ROCR_VISIBLE_DEVICES": "1"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetVisibleDevicesEnv: got %#v want %#v", got, want)
+	got := GetDevicesEnv(gpus)
+	if got["ROCR_VISIBLE_DEVICES"] != "1" {
+		t.Fatalf("GetDevicesEnv ROCR numeric: got %#v want 1", got)
 	}
 }
 
@@ -45,20 +42,8 @@ func TestGetVisibleDevicesEnvROCmFilterID(t *testing.T) {
 			FilterID: "1",
 		},
 	}
-	got := GetVisibleDevicesEnv(gpus, true)
-	want := map[string]string{"ROCR_VISIBLE_DEVICES": "1"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetVisibleDevicesEnv: got %#v want %#v", got, want)
-	}
-}
-
-func TestGetVisibleDevicesEnvCUDAUnfiltered(t *testing.T) {
-	t.Parallel()
-	gpus := []DeviceInfo{
-		{DeviceID: DeviceID{ID: "0", Library: "CUDA"}},
-	}
-	got := GetVisibleDevicesEnv(gpus, false)
-	if len(got) != 0 {
-		t.Fatalf("expected empty env when CUDA mustFilter=false, got %#v", got)
+	got := GetDevicesEnv(gpus)
+	if got["ROCR_VISIBLE_DEVICES"] != "1" {
+		t.Fatalf("GetDevicesEnv ROCR FilterID: got %#v want 1", got)
 	}
 }

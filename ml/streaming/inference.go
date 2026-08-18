@@ -24,6 +24,11 @@ type InferenceStreamer struct {
 	totalBlocks   int
 	file          *os.File
 	loadedWeights map[int]bool
+	// budgetBytes is the VRAM/host residency cap. 0 means always-evict
+	// (legacy sliding window). When the full LayerMap fits, completed
+	// blocks stay resident so a model smaller than the budget does not
+	// reload every block on every token.
+	budgetBytes uint64
 }
 
 // NewInferenceStreamer creates a streamer for runtime inference weight management.
@@ -36,6 +41,11 @@ func NewInferenceStreamer(backend ml.Backend, modelPath string, lm *LayerMap) *I
 		totalBlocks:   lm.BlockCount,
 		loadedWeights: make(map[int]bool),
 	}
+}
+
+// SetBudgetBytes sets the residency budget used by OnBlockDone. 0 = always evict.
+func (is *InferenceStreamer) SetBudgetBytes(budgetBytes uint64) {
+	is.budgetBytes = budgetBytes
 }
 
 // PrepareForInference loads the initial block weights (block 0 + output/embeddings)
@@ -66,7 +76,8 @@ func (is *InferenceStreamer) PrepareForInference(ctx context.Context) error {
 
 // OnBlockDone is the callback for the eval callback mechanism. It is called
 // when the last node of block blockIdx has been computed. It loads the next
-// block's weights and evicts the current block's.
+// block's weights and evicts the current block unless the full model fits
+// in the streaming budget (keep-resident).
 func (is *InferenceStreamer) OnBlockDone(blockIdx int) bool {
 	is.mu.Lock()
 	defer is.mu.Unlock()
@@ -82,12 +93,25 @@ func (is *InferenceStreamer) OnBlockDone(blockIdx int) bool {
 	}
 
 	if blockIdx >= 0 && blockIdx < is.totalBlocks {
-		is.evictBlock(blockIdx)
-		slog.Debug("streaming inference: evicted block", "block", blockIdx)
+		if is.keepResident() {
+			slog.Debug("streaming inference: kept block", "block", blockIdx, "budget_bytes", is.budgetBytes)
+		} else {
+			is.evictBlock(blockIdx)
+			slog.Debug("streaming inference: evicted block", "block", blockIdx)
+		}
 	}
 
 	is.currentBlock = nextBlock
 	return true
+}
+
+// keepResident is true when the streaming budget can hold every layer, so
+// evicting a completed block would only add NVMe round-trips.
+func (is *InferenceStreamer) keepResident() bool {
+	if is.lm == nil || is.budgetBytes == 0 {
+		return false
+	}
+	return is.lm.FitsInBudget(is.budgetBytes) >= len(is.lm.Layers)
 }
 
 // Close releases resources.

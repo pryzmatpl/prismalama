@@ -1,3 +1,7 @@
+//go:build ignore
+
+// Orphaned: linuxCPUDetails was removed from discover; this file does not compile.
+
 package discover
 
 import (
