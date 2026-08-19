@@ -22,16 +22,24 @@ sync: llama/build-info.cpp ml/backend/ggml/ggml/src/ggml-metal/ggml-metal-embed.
 llama/build-info.cpp: llama/build-info.cpp.in llama/llama.cpp
 	sed -e 's|@FETCH_HEAD@|$(FETCH_HEAD)|' <$< >$@
 
-ml/backend/ggml/ggml/src/ggml-metal/ggml-metal-embed.metal: ml/backend/ggml/ggml
-	go generate ./$(@D)
-
+# llama/llama.cpp is a git submodule pinned to FETCH_HEAD. Use `git submodule update`
+# instead of rsync — the rsync targets below are kept for backward compat with CI scripts
+# that still run `make -f Makefile.sync sync` and expect them to exist.
 .PHONY: llama/llama.cpp
-llama/llama.cpp: llama/vendor
-	rsync -arvzc --delete -f "include LICENSE" -f "merge $@/.rsync-filter" $(addprefix $<,/LICENSE /) $@
+llama/llama.cpp:
+	git submodule update --init --recursive --checkout $<
+	@echo "llama/llama.cpp pinned to FETCH_HEAD $(FETCH_HEAD) via submodule"
 
 .PHONY: ml/backend/ggml/ggml
-ml/backend/ggml/ggml: llama/vendor
-	rsync -arvzc --delete -f "include LICENSE" -f "merge $@/.rsync-filter" $(addprefix $<,/LICENSE /ggml/) $@
+ml/backend/ggml/ggml:
+	@if [ ! -d llama/llama.cpp/ggml ]; then \
+		echo "llama/llama.cpp submodule not initialized — run 'git submodule update --init' first"; \
+		exit 1; \
+	fi
+	@echo "ml/backend/ggml/ggml/ now sources from llama/llama.cpp/ggml/ submodule (no rsync needed)"
+
+ml/backend/ggml/ggml/src/ggml-metal/ggml-metal-embed.metal: ml/backend/ggml/ggml
+	go generate ./$(@D)
 
 PATCHES=$(wildcard llama/patches/*.patch)
 PATCHED=$(join $(dir $(PATCHES)), $(addsuffix ed, $(addprefix ., $(notdir $(PATCHES)))))

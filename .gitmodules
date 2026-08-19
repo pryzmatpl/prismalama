@@ -1,3 +1,6 @@
 [submodule "src/airllm"]
 	path = src/airllm
 	url = https://github.com/piotroxp/airllm.git
+[submodule "llama/llama.cpp"]
+	path = llama/llama.cpp
+	url = https://github.com/piotroxp/prismallama.cpp.git

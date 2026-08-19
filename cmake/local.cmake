@@ -20,7 +20,7 @@ set(OLLAMA_VERSION "0.0.0" CACHE STRING "Ollama version embedded in the local Go
 #   error: declaration of 'events' as multidimensional array must have bounds
 #          for all dimensions except the first
 # See llama/vendor/ggml/CMakeLists.txt:184 for the canonical pin. Mirror the
-# default here so the local ggml build (ml/backend/ggml/ggml/src/CMakeLists.txt)
+# default here so the submodule ggml build (llama/llama.cpp/ggml/src/CMakeLists.txt)
 # stays buildable in isolation (e.g. inside the ROCm Docker build, which does
 # NOT include llama/vendor/ggml/CMakeLists.txt).
 set(GGML_SCHED_MAX_COPIES "4" CACHE STRING

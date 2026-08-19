@@ -14,9 +14,9 @@ func TestBC4ShaderCompilation(t *testing.T) {
 	}
 
 	shaderPath := filepath.Join(os.Getenv("OLLAMA_TEST_SHADER_PATH"),
-		"ml/backend/ggml/ggml/src/ggml-vulkan/vulkan-shaders/bc4_decompress.comp")
+		"llama/llama.cpp/ggml/src/ggml-vulkan/vulkan-shaders/bc4_decompress.comp")
 	if shaderPath == "" || os.Getenv("OLLAMA_TEST_SHADER_PATH") == "" {
-		shaderPath = "/home/prizm/prismalama/ml/backend/ggml/ggml/src/ggml-vulkan/vulkan-shaders/bc4_decompress.comp"
+		shaderPath = "/home/prizm/prismalama/llama/llama.cpp/ggml/src/ggml-vulkan/vulkan-shaders/bc4_decompress.comp"
 	}
 	if _, err := os.Stat(shaderPath); os.IsNotExist(err) {
 		t.Fatalf("BC4 decompress shader not found at %s", shaderPath)
@@ -33,8 +33,8 @@ func TestBC4ShaderCompilation(t *testing.T) {
 
 func TestBC4ShaderExists(t *testing.T) {
 	paths := []string{
-		"/home/prizm/prismalama/ml/backend/ggml/ggml/src/ggml-vulkan/vulkan-shaders/bc4_decompress.comp",
-		filepath.Join(os.Getenv("PWD"), "ml/backend/ggml/ggml/src/ggml-vulkan/vulkan-shaders/bc4_decompress.comp"),
+		"/home/prizm/prismalama/llama/llama.cpp/ggml/src/ggml-vulkan/vulkan-shaders/bc4_decompress.comp",
+		filepath.Join(os.Getenv("PWD"), "llama/llama.cpp/ggml/src/ggml-vulkan/vulkan-shaders/bc4_decompress.comp"),
 	}
 
 	var shaderPath string

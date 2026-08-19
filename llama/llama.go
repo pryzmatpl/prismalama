@@ -9,7 +9,7 @@ package llama
 #cgo CPPFLAGS: -I${SRCDIR}/llama.cpp/vendor
 #cgo CPPFLAGS: -I${SRCDIR}/llama.cpp/tools/mtmd
 #cgo CPPFLAGS: -I${SRCDIR}/llama.cpp/src
-#cgo CPPFLAGS: -I${SRCDIR}/../ml/backend/ggml/ggml/include
+#cgo CPPFLAGS: -I${SRCDIR}/llama.cpp/ggml/include
 
 #include <stdlib.h>
 #include "ggml.h"

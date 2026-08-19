@@ -58,10 +58,10 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY         ${OLLAMA_BUILD_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG   ${OLLAMA_BUILD_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE ${OLLAMA_BUILD_DIR})
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/ml/backend/ggml/ggml/src)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/ml/backend/ggml/ggml/src/include)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/ml/backend/ggml/ggml/src/ggml-cpu)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/ml/backend/ggml/ggml/src/ggml-cpu/amx)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/llama/llama.cpp/ggml/src)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/llama/llama.cpp/ggml/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/llama/llama.cpp/ggml/src/ggml-cpu)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/llama/llama.cpp/ggml/src/ggml-cpu/amx)
 
 add_compile_definitions(NDEBUG GGML_VERSION=0x0 GGML_COMMIT=0x0)
 
@@ -73,7 +73,7 @@ set(GGML_VERSION_PATCH 0)
 set(GGML_VERSION "${GGML_VERSION_MAJOR}.${GGML_VERSION_MINOR}.${GGML_VERSION_PATCH}")
 
 set(GGML_CPU ON)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ml/backend/ggml/ggml/src)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/llama/llama.cpp/ggml/src)
 set_property(TARGET ggml PROPERTY EXCLUDE_FROM_ALL TRUE)
 
 # Determine CPU variants: when GGML_CPU_ALL_VARIANTS is ON, the base target is ggml-cpu-x64, not ggml-cpu
@@ -106,7 +106,7 @@ if(LLAMA_CUDA)
         endif()
 
         find_package(CUDAToolkit)
-        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ml/backend/ggml/ggml/src/ggml-cuda)
+        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/llama/llama.cpp/ggml/src/ggml-cuda)
         install(TARGETS ggml-cuda
             RUNTIME_DEPENDENCIES
                 DIRECTORIES ${CUDAToolkit_BIN_DIR} ${CUDAToolkit_BIN_DIR}/x64 ${CUDAToolkit_LIBRARY_DIR}
@@ -142,7 +142,7 @@ if(LLAMA_HIPBLAS)
 
         if(AMDGPU_TARGETS)
             find_package(hip REQUIRED)
-            add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ml/backend/ggml/ggml/src/ggml-hip)
+            add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/llama/llama.cpp/ggml/src/ggml-hip)
 
             if (WIN32)
                 target_compile_definitions(ggml-hip PRIVATE GGML_CUDA_NO_PEER_COPY)
@@ -179,7 +179,7 @@ endif()
 if(NOT APPLE)
     find_package(Vulkan)
     if(Vulkan_FOUND)
-        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ml/backend/ggml/ggml/src/ggml-vulkan)
+        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/llama/llama.cpp/ggml/src/ggml-vulkan)
         install(TARGETS ggml-vulkan
             RUNTIME_DEPENDENCIES
                 PRE_INCLUDE_REGEXES vulkan
