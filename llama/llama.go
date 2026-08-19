@@ -169,6 +169,14 @@ func kvCacheTypeFromStr(s string) C.enum_ggml_type {
 type Context struct {
 	c          *C.struct_llama_context
 	numThreads int
+
+	// blockCbStateMu guards blockCbState + blockCbHandlePin for
+	// SetBlockCallback. Held only briefly during install/clear; the
+	// callback itself runs without the lock (cgo handle is read-only
+	// after install).
+	blockCbStateMu   sync.Mutex
+	blockCbState     *blockCallbackState
+	blockCbHandlePin runtime.Pinner
 }
 
 var ErrKvCacheFull = errors.New("could not find a kv cache slot")
@@ -189,6 +197,82 @@ func (c *Context) Decode(batch *Batch) error {
 	}
 
 	return nil
+}
+
+// BlockCallbackFn is the user callback installed via Context.SetBlockCallback.
+// blockIdx is the index of the transformer block whose last compute node
+// just completed. Return 1 (non-zero) to continue compute, 0 to abort the
+// remaining graph. The callback must be cheap — it runs on the compute
+// thread and should not allocate or perform I/O.
+type BlockCallbackFn func(blockIdx int) int
+
+// blockCallbackState holds the Go callback + cgo handle. It is pinned for
+// the lifetime of the installed callback and released when SetBlockCallback
+// is called again or Close is invoked.
+type blockCallbackState struct {
+	fn     BlockCallbackFn
+	handle cgo.Handle
+}
+
+//export llamaBlockCallback
+func llamaBlockCallback(userData unsafe.Pointer, blockIdx C.int) C.int {
+	h := *(*cgo.Handle)(userData)
+	st := h.Value().(*blockCallbackState)
+	return C.int(st.fn(int(blockIdx)))
+}
+
+// SetBlockCallback installs (or clears, when fn == nil) a per-block eval
+// callback on the llama_context. The callback fires once per transformer
+// block during llama_decode().
+//
+// This is the public Go surface for JAISIU-2319-A's C API. The Go runner
+// currently drives the same behavior through ml.StreamingComputeBackend
+// (see ml/backend/ggml/ggml_eval_callback.go), which uses the GGML
+// scheduler's eval callback directly. This method exposes the same
+// semantics via the llama_context-level API, which is useful for tooling
+// and tests that don't have an ml.Backend.
+//
+// The callback fn must remain valid for as long as it is installed. The
+// caller is responsible for calling SetBlockCallback(nil) before
+// discarding fn. (The runner wires cleanup automatically; see
+// ml/backend/ggml/ggml_eval_callback.go's PrepareStreamingCompute for
+// the canonical path.)
+func (c *Context) SetBlockCallback(fn BlockCallbackFn) {
+	c.blockCbStateMu.Lock()
+	defer c.blockCbStateMu.Unlock()
+
+	if fn == nil {
+		C.llama_set_block_callback(c.c, nil, nil)
+		// Best-effort: release any state we cached.
+		if c.blockCbState != nil {
+			c.blockCbState.handle.Delete()
+			c.blockCbHandlePin.Unpin()
+			c.blockCbState = nil
+		}
+		return
+	}
+
+	// Release any previous handle before installing a new one.
+	if c.blockCbState != nil {
+		c.blockCbState.handle.Delete()
+		c.blockCbHandlePin.Unpin()
+		c.blockCbState = nil
+	}
+
+	st := &blockCallbackState{fn: fn, handle: cgo.NewHandle(st)}
+	h := st.handle
+
+	// Pin the handle so the Go runtime keeps its address stable while
+	// the C side holds a pointer to it. The pin is replaced (Unpinned
+	// above) on every new install or clear.
+	c.blockCbHandlePin.Pin(&h)
+	c.blockCbState = st
+
+	C.llama_set_block_callback(
+		c.c,
+		C.llama_block_cb(C.llamaBlockCallback),
+		unsafe.Pointer(&h),
+	)
 }
 
 func (c *Context) Model() *Model {

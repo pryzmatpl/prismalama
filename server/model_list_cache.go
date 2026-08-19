@@ -17,6 +17,7 @@ import (
 
 	"github.com/ollama/ollama/api"
 	"github.com/ollama/ollama/fs/ggml"
+	fsgguf "github.com/ollama/ollama/fs/gguf"
 	"github.com/ollama/ollama/manifest"
 	"github.com/ollama/ollama/model/parsers"
 	ollamatemplate "github.com/ollama/ollama/template"
@@ -390,13 +391,26 @@ func buildModelListSummary(name model.Name, mf *manifest.Manifest) (modelListSum
 		summary.Capabilities = appendModelListCapability(summary.Capabilities, model.CapabilityVision)
 	}
 
-	if cfg.ModelFormat == "safetensors" && isGemma4Renderer(cfg.Renderer) {
-		summary.Capabilities = slices.DeleteFunc(summary.Capabilities, func(c model.Capability) bool {
+	summary.Capabilities = filterUnsupportedModelListCapabilities(summary.Capabilities, cfg)
+
+	return summary, nil
+}
+
+func filterUnsupportedModelListCapabilities(capabilities []model.Capability, cfg model.ConfigV2) []model.Capability {
+	if cfg.ModelFormat == "safetensors" && (isGemma4Renderer(cfg.Renderer) || isNemotron3NanoSafetensorsConfig(cfg)) {
+		capabilities = slices.DeleteFunc(capabilities, func(c model.Capability) bool {
 			return c == model.CapabilityVision || c == model.CapabilityAudio
 		})
 	}
+	// Mirrors suppressAudioCapability in images.go so /api/tags and /api/show
+	// agree for safetensors models whose MLX runner serves vision but not audio.
+	if cfg.ModelFormat == "safetensors" && cfg.Renderer == "glimmer" {
+		capabilities = slices.DeleteFunc(capabilities, func(c model.Capability) bool {
+			return c == model.CapabilityAudio
+		})
+	}
 
-	return summary, nil
+	return capabilities
 }
 
 func readModelListConfig(mf *manifest.Manifest) (model.ConfigV2, error) {
@@ -707,6 +721,10 @@ func skipModelListGGUFValue(r io.Reader, byteOrder binary.ByteOrder, version uin
 }
 
 func skipModelListGGUFArray(r io.Reader, byteOrder binary.ByteOrder, version uint32, arrayType uint32, count uint64) error {
+	if _, err := checkedModelListGGUFLength(count, "array size", fsgguf.MaxArraySize); err != nil {
+		return err
+	}
+
 	var size uint64
 	switch arrayType {
 	case modelListGGUFTypeUint8, modelListGGUFTypeInt8, modelListGGUFTypeBool:
@@ -727,6 +745,10 @@ func skipModelListGGUFArray(r io.Reader, byteOrder binary.ByteOrder, version uin
 	default:
 		return fmt.Errorf("unsupported gguf array type %d", arrayType)
 	}
+
+	if count > uint64(maxModelListGGUFInt64())/size {
+		return fmt.Errorf("gguf array byte length %d*%d exceeds maximum %d", count, size, maxModelListGGUFInt64())
+	}
 	return discardModelListGGUFBytes(r, int64(count*size))
 }
 
@@ -736,15 +758,16 @@ func readModelListGGUFString(r io.Reader, byteOrder binary.ByteOrder, version ui
 		return "", err
 	}
 
-	if length == 0 {
-		return "", nil
+	n, err := checkedModelListGGUFLength(length, "string", fsgguf.MaxStringLength)
+	if err != nil {
+		return "", err
 	}
 
-	bts := make([]byte, length)
+	bts := make([]byte, n)
 	if _, err := io.ReadFull(r, bts); err != nil {
 		return "", err
 	}
-	if version == 1 && bts[len(bts)-1] == 0 {
+	if version == 1 && len(bts) > 0 && bts[len(bts)-1] == 0 {
 		bts = bts[:len(bts)-1]
 	}
 	return string(bts), nil
@@ -755,7 +778,12 @@ func skipModelListGGUFString(r io.Reader, byteOrder binary.ByteOrder, version ui
 	if err := binary.Read(r, byteOrder, &length); err != nil {
 		return err
 	}
-	return discardModelListGGUFBytes(r, int64(length))
+
+	n, err := checkedModelListGGUFLength(length, "string", fsgguf.MaxStringLength)
+	if err != nil {
+		return err
+	}
+	return discardModelListGGUFBytes(r, int64(n))
 }
 
 func discardModelListGGUFBytes(r io.Reader, n int64) error {
@@ -764,6 +792,24 @@ func discardModelListGGUFBytes(r io.Reader, n int64) error {
 	}
 	_, err := io.CopyN(io.Discard, r, n)
 	return err
+}
+
+func checkedModelListGGUFLength(n uint64, kind string, max uint64) (int, error) {
+	if n > uint64(maxModelListGGUFInt()) {
+		return 0, fmt.Errorf("gguf %s %d exceeds maximum %d", kind, n, maxModelListGGUFInt())
+	}
+	if n > max {
+		return 0, fmt.Errorf("gguf %s %d exceeds maximum %d", kind, n, max)
+	}
+	return int(n), nil
+}
+
+func maxModelListGGUFInt() int {
+	return int(^uint(0) >> 1)
+}
+
+func maxModelListGGUFInt64() int64 {
+	return 1<<63 - 1
 }
 
 func appendModelListCapabilities(capabilities []model.Capability, values ...model.Capability) []model.Capability {

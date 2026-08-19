@@ -343,8 +343,8 @@ func TestFindBestFit_LargeGapInFreeMemory(t *testing.T) {
 
 	// One GPU has tons of memory, another barely any
 	gpus := []ml.DeviceInfo{
-		{FreeMemory: 1 * 1024 * 1024 * 1024},                      // 1GB
-		{FreeMemory: 200 * 1024 * 1024 * 1024},                     // 200GB
+		{FreeMemory: 1 * 1024 * 1024 * 1024},   // 1GB
+		{FreeMemory: 200 * 1024 * 1024 * 1024}, // 200GB
 	}
 
 	result := findBestFit(layers, gpus, -1, false)

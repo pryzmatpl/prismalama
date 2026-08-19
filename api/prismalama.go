@@ -24,10 +24,10 @@ type PrismalamaCapabilitiesResponse struct {
 	} `json:"airllm"`
 
 	LayerStreaming struct {
-		Enabled         bool   `json:"enabled"`
-		BudgetBytes     uint64 `json:"budget_bytes"`
-		Semantics       string `json:"semantics"`
-		EnableEnv       string `json:"enable_environment_variable"`
+		Enabled     bool   `json:"enabled"`
+		BudgetBytes uint64 `json:"budget_bytes"`
+		Semantics   string `json:"semantics"`
+		EnableEnv   string `json:"enable_environment_variable"`
 	} `json:"layer_streaming"`
 
 	Environment struct {
@@ -39,32 +39,32 @@ type PrismalamaCapabilitiesResponse struct {
 		OLLAMA_MMAP_ALLOW_LOW_RAM string `json:"ollama_mmap_allow_low_ram,omitempty"`
 
 		// v2 additions — additive, all optional
-		OLLAMA_KEEP_ALIVE             string `json:"ollama_keep_alive,omitempty"`
-		OLLAMA_GPU_OVERHEAD_RAW       string `json:"ollama_gpu_overhead_raw,omitempty"`
-		OLLAMA_STREAMING_BUDGET_RAW   string `json:"ollama_streaming_budget_raw,omitempty"`
-		OLLAMA_LIBRARY_PATH           string `json:"ollama_library_path,omitempty"`
-		HIP_VISIBLE_DEVICES           string `json:"hip_visible_devices,omitempty"`
-		AIRLLM_DEVICE                 string `json:"airllm_device,omitempty"`
-		AIRLLM_COMPRESSION            string `json:"airllm_compression,omitempty"`
-		PRISMALAMA_AIRLLM_PYTHONPATH  string `json:"prismalama_airllm_pythonpath,omitempty"`
+		OLLAMA_KEEP_ALIVE            string `json:"ollama_keep_alive,omitempty"`
+		OLLAMA_GPU_OVERHEAD_RAW      string `json:"ollama_gpu_overhead_raw,omitempty"`
+		OLLAMA_STREAMING_BUDGET_RAW  string `json:"ollama_streaming_budget_raw,omitempty"`
+		OLLAMA_LIBRARY_PATH          string `json:"ollama_library_path,omitempty"`
+		HIP_VISIBLE_DEVICES          string `json:"hip_visible_devices,omitempty"`
+		AIRLLM_DEVICE                string `json:"airllm_device,omitempty"`
+		AIRLLM_COMPRESSION           string `json:"airllm_compression,omitempty"`
+		PRISMALAMA_AIRLLM_PYTHONPATH string `json:"prismalama_airllm_pythonpath,omitempty"`
 	} `json:"environment"`
 
 	// Resolved — numeric env vars parsed to bytes (or durations), with human-readable form.
 	// Additive; v1 clients ignore this block.
 	Resolved struct {
-		GpuOverheadBytes       uint64 `json:"gpu_overhead_bytes,omitempty"`
-		GpuOverheadHuman       string `json:"gpu_overhead_human,omitempty"`
-		StreamingBudgetBytes   uint64 `json:"streaming_budget_bytes,omitempty"`
-		StreamingBudgetHuman   string `json:"streaming_budget_human,omitempty"`
+		GpuOverheadBytes     uint64 `json:"gpu_overhead_bytes,omitempty"`
+		GpuOverheadHuman     string `json:"gpu_overhead_human,omitempty"`
+		StreamingBudgetBytes uint64 `json:"streaming_budget_bytes,omitempty"`
+		StreamingBudgetHuman string `json:"streaming_budget_human,omitempty"`
 	} `json:"resolved"`
 
 	// Build — machine-readable build info (v2; additive).
 	Build struct {
-		Version     string `json:"version,omitempty"`
-		GoVersion   string `json:"go_version,omitempty"`
-		GOOS        string `json:"goos,omitempty"`
-		GOARCH      string `json:"goarch,omitempty"`
-		CompiledAt  string `json:"compiled_at,omitempty"`
+		Version    string `json:"version,omitempty"`
+		GoVersion  string `json:"go_version,omitempty"`
+		GOOS       string `json:"goos,omitempty"`
+		GOARCH     string `json:"goarch,omitempty"`
+		CompiledAt string `json:"compiled_at,omitempty"`
 	} `json:"build"`
 
 	// Backends — best-effort probe of which GGML backends were discovered at startup.
@@ -89,12 +89,12 @@ type PrismalamaCapabilitiesResponse struct {
 // and the probe call did not panic. Either can be false on hosts without the
 // matching toolchain (HIP, CUDA, Vulkan ICD, Metal, CPU).
 type BackendInfo struct {
-	Name        string `json:"name"`                  // "hip" | "cuda" | "vulkan" | "cpu" | "metal"
-	Discovered  bool   `json:"discovered"`            // .so / framework present
-	Loaded      bool   `json:"loaded"`                // dlopen / framework probe ok
-	LibraryPath string `json:"library_path,omitempty"`// absolute path if discovered
-	Version     string `json:"version,omitempty"`     // if reported by backend
-	Error       string `json:"error,omitempty"`       // diagnostic if Loaded=false
+	Name        string `json:"name"`                   // "hip" | "cuda" | "vulkan" | "cpu" | "metal"
+	Discovered  bool   `json:"discovered"`             // .so / framework present
+	Loaded      bool   `json:"loaded"`                 // dlopen / framework probe ok
+	LibraryPath string `json:"library_path,omitempty"` // absolute path if discovered
+	Version     string `json:"version,omitempty"`      // if reported by backend
+	Error       string `json:"error,omitempty"`        // diagnostic if Loaded=false
 }
 
 // DispatchDecisionSnapshot is the JSON-serializable view of an EngineDecision.
@@ -110,14 +110,14 @@ type DispatchDecisionSnapshot struct {
 // DispatchRequest is the body of POST /api/prismalama/dispatch.
 // model_path is the only required field; env_override is optional (testing only).
 type DispatchRequest struct {
-	ModelPath    string            `json:"model_path"`
-	EnvOverride  map[string]string `json:"env_override,omitempty"` // reserved for tests; ignored in production
+	ModelPath   string            `json:"model_path"`
+	EnvOverride map[string]string `json:"env_override,omitempty"` // reserved for tests; ignored in production
 }
 
 // DispatchResponse is the JSON returned by POST /api/prismalama/dispatch.
 // model_path echoes the request; if non-empty, the response also includes
 // the resolved EngineDecision trace so operators can see the rule sequence.
 type DispatchResponse struct {
-	ModelPath string                    `json:"model_path"`
-	Decision  DispatchDecisionSnapshot  `json:"decision"`
+	ModelPath string                   `json:"model_path"`
+	Decision  DispatchDecisionSnapshot `json:"decision"`
 }

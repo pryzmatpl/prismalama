@@ -26,35 +26,36 @@ import (
 	"github.com/ollama/ollama/format"
 	"github.com/ollama/ollama/llm"
 	"github.com/ollama/ollama/ml"
-	"github.com/ollama/ollama/x/imagegen"
 	"github.com/ollama/ollama/x/imagegen/manifest"
 )
 
 // Client wraps an MLX runner subprocess to implement llm.LlamaServer for LLM models.
 type Client struct {
-	port          int
-	modelName     string
-	contextLength atomic.Int64
-	memory        atomic.Uint64
-	done          chan struct{}
-	doneErr       error // valid after done is closed
-	client        *http.Client
-	status        *llm.StatusWriter
-	mu            sync.Mutex
-	cmd           *exec.Cmd
+	port              int
+	modelName         string
+	contextLength     atomic.Int64
+	softContextLength int // recommended limit to avoid poor performance
+	memory            atomic.Uint64
+	done              chan struct{}
+	doneErr           error // valid after done is closed
+	client            *http.Client
+	status            *llm.StatusWriter
+	mu                sync.Mutex
+	cmd               *exec.Cmd
 }
 
 // NewClient prepares a new MLX runner client for LLM models.
 // The subprocess is not started until Load() is called.
-func NewClient(modelName string) (*Client, error) {
-	if err := imagegen.CheckPlatformSupport(); err != nil {
+func NewClient(modelName string, softContextLength int) (*Client, error) {
+	if err := checkPlatformSupport(); err != nil {
 		return nil, err
 	}
 
 	c := &Client{
-		modelName: modelName,
-		done:      make(chan struct{}),
-		client:    http.DefaultClient,
+		modelName:         modelName,
+		softContextLength: softContextLength,
+		done:              make(chan struct{}),
+		client:            http.DefaultClient,
 	}
 
 	modelManifest, err := manifest.LoadManifest(modelName)
@@ -66,9 +67,23 @@ func NewClient(modelName string) (*Client, error) {
 	return c, nil
 }
 
+func checkPlatformSupport() error {
+	switch runtime.GOOS {
+	case "darwin":
+		if runtime.GOARCH != "arm64" {
+			return fmt.Errorf("MLX on macOS requires Apple Silicon (arm64), got %s", runtime.GOARCH)
+		}
+		return nil
+	case "linux", "windows":
+		return nil
+	default:
+		return fmt.Errorf("MLX is not supported on %s", runtime.GOOS)
+	}
+}
+
 // WaitUntilRunning waits for the subprocess to be ready.
 func (c *Client) WaitUntilRunning(ctx context.Context) error {
-	timeout := time.After(2 * time.Minute)
+	timeout := time.After(envconfig.LoadTimeout())
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
@@ -97,6 +112,7 @@ func (c *Client) WaitUntilRunning(ctx context.Context) error {
 
 type CompletionRequest struct {
 	Prompt      string
+	Media       []llm.MediaData
 	Options     api.Options
 	Logprobs    bool
 	TopLogprobs int
@@ -140,6 +156,7 @@ func (c *Client) Close() error {
 func (c *Client) Completion(ctx context.Context, req llm.CompletionRequest, fn func(llm.CompletionResponse)) error {
 	creq := CompletionRequest{
 		Prompt:      req.Prompt,
+		Media:       req.Media,
 		Logprobs:    req.Logprobs,
 		TopLogprobs: req.TopLogprobs,
 	}
@@ -221,6 +238,13 @@ func (c *Client) ApplyChatTemplate(ctx context.Context, req llm.ChatRequest) (st
 
 func (c *Client) ContextLength() int {
 	return int(c.contextLength.Load())
+}
+
+func (c *Client) reportedContextLength(modelContextLength int) int {
+	if c.softContextLength > 0 && (modelContextLength == 0 || c.softContextLength < modelContextLength) {
+		return c.softContextLength
+	}
+	return modelContextLength
 }
 
 // Detokenize implements llm.LlamaServer.
@@ -421,7 +445,7 @@ func (c *Client) Ping(ctx context.Context) error {
 		return err
 	}
 
-	c.contextLength.Store(int64(status.ContextLength))
+	c.contextLength.Store(int64(c.reportedContextLength(status.ContextLength)))
 	c.memory.Store(status.Memory)
 
 	return nil

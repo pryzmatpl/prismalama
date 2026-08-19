@@ -2,12 +2,17 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { getModels } from "@/api";
 import { Model } from "@/gotypes";
+import { Model } from "@/gotypes";
+import { getModels } from "@/api";
+import { useMemo } from "react";
 import { useCloudStatus } from "./useCloudStatus";
 import { useFeaturedModels } from "./useFeaturedModels";
 
 export function useModels(searchQuery = "") {
   const { cloudDisabled } = useCloudStatus();
   const { data: recommendations, isLoading: recommendationsLoading } = useFeaturedModels();
+  const { data: recommendations, isLoading: recommendationsLoading } =
+    useFeaturedModels();
   const localQuery = useQuery<Model[], Error>({
     queryKey: ["models", searchQuery],
     queryFn: () => getModels(searchQuery),
@@ -28,11 +33,16 @@ export function useModels(searchQuery = "") {
     // then everything else from /api/tags in tags order.
     const recommended = featured.map(
       (name) => local.find((m) => m.model === name) || new Model({ model: name }),
+      (name) =>
+        local.find((m) => m.model === name) || new Model({ model: name }),
     );
     const rest = local.filter((m) => !featuredSet.has(m.model));
     const merged = [...recommended, ...rest];
 
     const visible = cloudDisabled ? merged.filter((m) => !m.isCloud()) : merged;
+    const visible = cloudDisabled
+      ? merged.filter((m) => !m.isCloud())
+      : merged;
     return filterBySearch(visible, searchQuery);
   }, [localQuery.data, searchQuery, cloudDisabled, recommendations]);
 

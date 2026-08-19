@@ -50,11 +50,11 @@ func (h *WeightImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	layers := meta.Tensors().GroupLayers()
 
 	response := gin.H{
-		"model":      modelPath,
+		"model":        modelPath,
 		"architecture": meta.KV().Architecture(),
-		"block_count": meta.KV().BlockCount(),
+		"block_count":  meta.KV().BlockCount(),
 		"tensor_count": len(tensors),
-		"layers":      h.formatLayers(layers),
+		"layers":       h.formatLayers(layers),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -193,13 +193,13 @@ func (h *WeightLayerImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	default:
 		min, max, mean, stddev := img.Stats()
 		response := gin.H{
-			"layer":       layerIdx,
-			"name":        bigTensor.Name,
-			"shape":       []int{rows, cols},
-			"image_width": img.Width,
-			"image_height": img.Height,
-			"tensor_bytes": bigTensor.Size(),
-			"image_bytes":  img.Width * img.Height * 4,
+			"layer":             layerIdx,
+			"name":              bigTensor.Name,
+			"shape":             []int{rows, cols},
+			"image_width":       img.Width,
+			"image_height":      img.Height,
+			"tensor_bytes":      bigTensor.Size(),
+			"image_bytes":       img.Width * img.Height * 4,
 			"compression_ratio": float64(rows*cols*4) / float64(img.Width*img.Height*4),
 			"stats": gin.H{
 				"min":    min,
@@ -230,11 +230,11 @@ func (h *WeightLayerImageHandler) formatLayerInfo(layer map[string]*ggml.Tensor)
 	}
 
 	return gin.H{
-		"tensor_count":    len(layer),
-		"total_bytes":     totalSize,
-		"biggest_tensor":  biggestTensor,
-		"biggest_bytes":   biggestSize,
-		"tensors":         tensorNames,
+		"tensor_count":   len(layer),
+		"total_bytes":    totalSize,
+		"biggest_tensor": biggestTensor,
+		"biggest_bytes":  biggestSize,
+		"tensors":        tensorNames,
 	}
 }
 
@@ -269,8 +269,8 @@ func (h *WeightImageStatsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	layers := meta.Tensors().GroupLayers()
 
 	stats := gin.H{
-		"architecture": meta.KV().Architecture(),
-		"block_count": meta.KV().BlockCount(),
+		"architecture":  meta.KV().Architecture(),
+		"block_count":   meta.KV().BlockCount(),
 		"total_tensors": len(tensors),
 	}
 
@@ -295,11 +295,11 @@ func (h *WeightImageStatsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 		totalWeightBytes += layerSize
 
 		layerStats = append(layerStats, gin.H{
-			"name":        name,
-			"size_bytes":  layerSize,
-			"biggest":     bigName,
+			"name":          name,
+			"size_bytes":    layerSize,
+			"biggest":       bigName,
 			"biggest_bytes": bigSize,
-			"shapes":      shapes,
+			"shapes":        shapes,
 		})
 	}
 

@@ -1,57 +1,18 @@
-# makepkg / local Go output (avoid clobbering or colliding with ollama/ directory)
-prismalama-ollama
-
-# Build artifacts
-build/
-build_ollama_airllm/
-build_ollama_airllm_rocm/
-pkg/
-src/
-!src/
-!src/prismalama/
-*.pkg.tar.zst
-*.tar.zst
-ollama-bin
-ollama-test
-
-# Temporary files
-*.log
-*.tmp
 .DS_Store
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Go
+.vscode
+.env
+.venv
+.swp
+dist
+build
+.cache
+.gocache
 *.exe
-*.dll
-*.so
-*.dylib
-
-# Test binary
-*.test
-
-# Output of the go coverage tool
-*.out
-
-# Dependency directories
-vendor/
-/ollama
-
-# Submodules initialized flag
-.submodules_initialized
-
-# Local PKGBUILD markers (do not commit)
-.prismalama_cuda
-
-# Build / test data
+.idea
 test_data
 *.crt
 __debug_bin*
 llama/build
 llama/vendor
+/ollama
 integration/testdata/models/

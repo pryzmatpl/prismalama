@@ -1,5 +1,7 @@
 import type React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "react-dom/server";
+import type React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type MockStreamdownProps = {
@@ -11,7 +13,9 @@ type MockStreamdownProps = {
 };
 
 const streamdownMock = vi.hoisted(() => vi.fn((props: MockStreamdownProps) => props.children));
-
+const streamdownMock = vi.hoisted(() =>
+  vi.fn((props: MockStreamdownProps) => props.children),
+);
 vi.mock("streamdown", () => ({
   Streamdown: streamdownMock,
   defaultRehypePlugins: {
@@ -33,7 +37,9 @@ describe("StreamingMarkdownContent", () => {
 
   it("does not enable raw HTML parsing", () => {
     renderToStaticMarkup(<StreamingMarkdownContent content="<iframe></iframe>" />);
-
+    renderToStaticMarkup(
+      <StreamingMarkdownContent content="<iframe></iframe>" />,
+    );
     const props = streamdownMock.mock.calls[0][0];
     expect(props.rehypePlugins).toEqual(["katex"]);
     expect(props.rehypePlugins).not.toContain("raw");

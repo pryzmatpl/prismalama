@@ -1,6 +1,6 @@
 package ggml
 
-// #cgo CPPFLAGS: -I${SRCDIR}/ggml/src
+// #cgo CPPFLAGS: -I${SRCDIR}/../../../llama/llama.cpp/ggml/src
 // #include <stdlib.h>
 // #include <stdint.h>
 // #include "ggml.h"

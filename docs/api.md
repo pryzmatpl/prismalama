@@ -18,7 +18,6 @@
 - [Generate Embeddings](#generate-embeddings)
 - [List Running Models](#list-running-models)
 - [Version](#version)
-- [Experimental: Image Generation](#image-generation-experimental)
 
 ## Prismalama operator endpoint
 
@@ -54,7 +53,7 @@ Generate a response for a given prompt with a provided model. This is a streamin
 - `prompt`: the prompt to generate a response for
 - `suffix`: the text after the model response
 - `images`: (optional) a list of base64-encoded images (for multimodal models such as `llava`)
-- `think`: (for thinking models) should the model think before responding?
+- `think`: (for thinking models) should the model think before responding? Can be a boolean or a thinking level (`"low"`, `"medium"`, `"high"`, or `"max"`).
 
 Advanced parameters (optional):
 
@@ -66,15 +65,6 @@ Advanced parameters (optional):
 - `raw`: if `true` no formatting will be applied to the prompt. You may choose to use the `raw` parameter if you are specifying a full templated prompt in your request to the API
 - `keep_alive`: controls how long the model will stay loaded into memory following the request (default: `5m`)
 - `context` (deprecated): the context parameter returned from a previous request to `/generate`, this can be used to keep a short conversational memory
-
-Experimental image generation parameters (for image generation models only):
-
-> [!WARNING]
-> These parameters are experimental and may change in future versions.
-
-- `width`: width of the generated image in pixels
-- `height`: height of the generated image in pixels
-- `steps`: number of diffusion steps
 
 #### Structured outputs
 
@@ -512,7 +502,7 @@ Generate the next message in a chat with a provided model. This is a streaming e
 - `model`: (required) the [model name](#model-names)
 - `messages`: the messages of the chat, this can be used to keep a chat memory
 - `tools`: list of tools in JSON for the model to use if supported
-- `think`: (for thinking models) should the model think before responding?
+- `think`: (for thinking models) should the model think before responding? Can be a boolean or a thinking level (`"low"`, `"medium"`, `"high"`, or `"max"`).
 
 The `message` object has the following fields:
 
@@ -1197,7 +1187,7 @@ Create a model from:
 - a safetensors directory; or
 - a GGUF file.
 
-If you are creating a model from a safetensors directory or from a GGUF file, you must [create a blob](#create-a-blob) for each of the files and then use the file name and SHA256 digest associated with each blob in the `files` field.
+If you are creating a model from a safetensors directory or from a GGUF file, you must [push a blob](#push-a-blob) for each of the files and then use the file name and SHA256 digest associated with each blob in the `files` field.
 
 ### Parameters
 
@@ -1206,6 +1196,8 @@ If you are creating a model from a safetensors directory or from a GGUF file, yo
 - `files`: (optional) a dictionary of file names to SHA256 digests of blobs to create the model from
 - `adapters`: (optional) a dictionary of file names to SHA256 digests of blobs for LORA adapters
 - `template`: (optional) the prompt template for the model
+- `renderer`: (optional) the name of the renderer for the model
+- `parser`: (optional) the name of the parser for the model
 - `license`: (optional) a string or list of strings containing the license or licenses for the model
 - `system`: (optional) a string containing the system prompt for the model
 - `parameters`: (optional) a dictionary of parameters for the model (see [Modelfile](./modelfile.mdx#valid-parameters-and-values) for a list of parameters)
@@ -1883,57 +1875,5 @@ curl http://localhost:11434/api/version
 ```json
 {
   "version": "0.5.1"
-}
-```
-
-## Experimental Features
-
-### Image Generation (Experimental)
-
-> [!WARNING]
-> Image generation is experimental and may change in future versions.
-
-Image generation is now supported through the standard `/api/generate` endpoint when using image generation models. The API automatically detects when an image generation model is being used.
-
-See the [Generate a completion](#generate-a-completion) section for the full API documentation. The experimental image generation parameters (`width`, `height`, `steps`) are documented there.
-
-#### Example
-
-##### Request
-
-```shell
-curl http://localhost:11434/api/generate -d '{
-  "model": "x/z-image-turbo",
-  "prompt": "a sunset over mountains",
-  "width": 1024,
-  "height": 768
-}'
-```
-
-##### Response (streaming)
-
-Progress updates during generation:
-
-```json
-{
-  "model": "x/z-image-turbo",
-  "created_at": "2024-01-15T10:30:00.000000Z",
-  "completed": 5,
-  "total": 20,
-  "done": false
-}
-```
-
-##### Final Response
-
-```json
-{
-  "model": "x/z-image-turbo",
-  "created_at": "2024-01-15T10:30:15.000000Z",
-  "image": "iVBORw0KGgoAAAANSUhEUg...",
-  "done": true,
-  "done_reason": "stop",
-  "total_duration": 15000000000,
-  "load_duration": 2000000000
 }
 ```

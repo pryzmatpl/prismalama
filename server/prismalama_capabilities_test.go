@@ -64,7 +64,7 @@ func TestBuildPrismalamaCapabilities_SchemaV2(t *testing.T) {
 
 func TestBuildPrismalamaCapabilities_V2EnvironmentFields(t *testing.T) {
 	t.Setenv("OLLAMA_KEEP_ALIVE", "10m")
-	t.Setenv("OLLAMA_GPU_OVERHEAD", "1073741824") // 1 GiB
+	t.Setenv("OLLAMA_GPU_OVERHEAD", "1073741824")     // 1 GiB
 	t.Setenv("OLLAMA_STREAMING_BUDGET", "2147483648") // 2 GiB
 	t.Setenv("OLLAMA_LIBRARY_PATH", "/tmp/fake-lib")
 	t.Setenv("AIRLLM_DEVICE", "cuda:0")

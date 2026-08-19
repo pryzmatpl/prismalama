@@ -54,8 +54,9 @@ func TestVulkanBackendNotRegisteredAsMLBackend(t *testing.T) {
 // ggml-vulkan path used in server.go.
 //
 // The actual working Vulkan support for inference comes from:
-//   llama/vendor/ggml/src/ggml-vulkan/  (llama.cpp's Vulkan via ggml-backend-vulkan)
-//   llm/server.go                       (Vulkan handling, VulkanMemoryPolicy, etc.)
+//
+//	llama/vendor/ggml/src/ggml-vulkan/  (llama.cpp's Vulkan via ggml-backend-vulkan)
+//	llm/server.go                       (Vulkan handling, VulkanMemoryPolicy, etc.)
 //
 // The ml/backend/vulkan package exists independently and returns errNotImplemented
 // for all compute operations. It cannot be used for inference without significant

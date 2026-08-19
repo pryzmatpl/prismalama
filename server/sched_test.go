@@ -524,10 +524,10 @@ func TestSchedGetRunner(t *testing.T) {
 	s.getSystemInfoFn = getSystemInfoFn
 	s.newServerFn = a.newServer
 	slog.Info("a")
-	successCh1a, errCh1a := s.GetRunner(a.ctx, a.req.model, a.req.opts, a.req.sessionDuration)
+	successCh1a, errCh1a := s.getRunner(a.ctx, a.req.model, a.req.opts, a.req.sessionDuration, false, false, nil)
 	require.Len(t, s.pendingReqCh, 1)
 	slog.Info("b")
-	successCh1b, errCh1b := s.GetRunner(b.ctx, b.req.model, b.req.opts, b.req.sessionDuration)
+	successCh1b, errCh1b := s.getRunner(b.ctx, b.req.model, b.req.opts, b.req.sessionDuration, false, false, nil)
 	require.Len(t, s.pendingReqCh, 1)
 	require.Empty(t, successCh1b)
 	require.Len(t, errCh1b, 1)
@@ -551,7 +551,7 @@ func TestSchedGetRunner(t *testing.T) {
 
 	c.req.model.ModelPath = "bad path"
 	slog.Info("c")
-	successCh1c, errCh1c := s.GetRunner(c.ctx, c.req.model, c.req.opts, c.req.sessionDuration)
+	successCh1c, errCh1c := s.getRunner(c.ctx, c.req.model, c.req.opts, c.req.sessionDuration, false, false, nil)
 	// Starts in pending channel, then should be quickly processed to return an error
 	time.Sleep(50 * time.Millisecond) // Long enough for the "a" model to expire and unload
 	require.Empty(t, successCh1c)
@@ -586,7 +586,6 @@ func TestSchedGetRunnerUsesDigestKeyWhenModelPathEmpty(t *testing.T) {
 	s.loadedMu.Unlock()
 
 	reqModel := &Model{Name: "safetensors-b", Digest: "sha-b"}
-	successCh, errCh := s.GetRunner(ctx, reqModel, opts, nil)
 
 	require.Empty(t, successCh)
 	require.Empty(t, errCh)
@@ -615,7 +614,7 @@ func TestSchedGetRunnerReusesSameDigestWhenModelPathEmpty(t *testing.T) {
 	s.loadedMu.Unlock()
 
 	reqCtx, cancelReq := context.WithCancel(ctx)
-	successCh, errCh := s.GetRunner(reqCtx, &Model{Name: "safetensors-a-copy", Digest: "sha-a"}, opts, nil)
+	successCh, errCh := s.getRunner(reqCtx, &Model{Name: "safetensors-a-copy", Digest: "sha-a"}, opts, nil, false, false, nil)
 	cancelReq()
 
 	select {
@@ -725,7 +724,7 @@ func TestSchedPrematureExpired(t *testing.T) {
 	s.getGpuFn = getGpuFn
 	s.getSystemInfoFn = getSystemInfoFn
 	s.newServerFn = scenario1a.newServer
-	successCh1a, errCh1a := s.GetRunner(scenario1a.ctx, scenario1a.req.model, scenario1a.req.opts, scenario1a.req.sessionDuration)
+	successCh1a, errCh1a := s.getRunner(scenario1a.ctx, scenario1a.req.model, scenario1a.req.opts, scenario1a.req.sessionDuration, false, false, nil)
 	require.Len(t, s.pendingReqCh, 1)
 	s.Run(ctx)
 	select {
@@ -907,19 +906,21 @@ func TestResolveContextShift(t *testing.T) {
 	tests := []struct {
 		name  string
 		shift *bool
-		ctx   int
+		model *Model
 		want  bool
 	}{
-		{name: "unset small context keeps legacy shift", ctx: 128, want: true},
-		{name: "unset large context disables shift", ctx: contextShiftSmallContextLimit, want: false},
-		{name: "unset invalid context disables shift", ctx: 0, want: false},
-		{name: "explicit false wins for small context", shift: &falseValue, ctx: 128, want: false},
-		{name: "explicit true wins for large context", shift: &trueValue, ctx: 32768, want: true},
+		{name: "unset defaults to shift", want: true},
+		{name: "unset deepseek2 disables shift", model: &Model{Config: model.ConfigV2{ModelFamily: "deepseek2"}}, want: false},
+		{name: "unset deepseek2 family disables shift", model: &Model{Config: model.ConfigV2{ModelFamilies: []string{"llama", "deepseek2"}}}, want: false},
+		{name: "explicit false disables shift", shift: &falseValue, want: false},
+		{name: "explicit false disables shift for deepseek2", shift: &falseValue, model: &Model{Config: model.ConfigV2{ModelFamily: "deepseek2"}}, want: false},
+		{name: "explicit true enables shift", shift: &trueValue, want: true},
+		{name: "explicit true enables shift for deepseek2", shift: &trueValue, model: &Model{Config: model.ConfigV2{ModelFamily: "deepseek2"}}, want: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, resolveContextShift(tt.shift, tt.ctx))
+			require.Equal(t, tt.want, resolveContextShift(tt.shift, tt.model))
 		})
 	}
 }
@@ -2155,9 +2156,7 @@ func (s *mockLlm) HasExited() bool                                    { return f
 func (s *mockLlm) GetActiveDeviceIDs() []ml.DeviceID                  { return nil }
 func (s *mockLlm) ContextLength() int                                 { return s.contextLength }
 
-// TestImageGenRunnerCanBeEvicted verifies that an image generation model
-// loaded in the scheduler can be evicted when idle.
-func TestImageGenRunnerCanBeEvicted(t *testing.T) {
+func TestRunnerCanBeEvicted(t *testing.T) {
 	ctx, done := context.WithTimeout(t.Context(), 500*time.Millisecond)
 	defer done()
 
@@ -2165,33 +2164,28 @@ func TestImageGenRunnerCanBeEvicted(t *testing.T) {
 	s.getGpuFn = getGpuFn
 	s.getSystemInfoFn = getSystemInfoFn
 
-	// Simulate an image gen runner already loaded
-	imageGenRunner := &runnerRef{
-		model:           &Model{Name: "z-image", ModelPath: "/fake/image/model"},
-		modelPath:       "/fake/image/model",
+	loadedRunner := &runnerRef{
+		model:           &Model{Name: "test", ModelPath: "/fake/model"},
+		modelPath:       "/fake/model",
 		llama:           &mockLlm{vramSize: 21 * format.GigaByte, vramByGPU: map[ml.DeviceID]uint64{}},
 		sessionDuration: 5 * time.Millisecond,
 		refCount:        0, // idle
 	}
 
 	s.loadedMu.Lock()
-	s.loaded["/fake/image/model"] = imageGenRunner
+	s.loaded["/fake/model"] = loadedRunner
 	s.loadedMu.Unlock()
 
-	// Verify the image gen runner is loaded
 	s.loadedMu.Lock()
 	require.Len(t, s.loaded, 1)
 	s.loadedMu.Unlock()
 
-	// findRunnerToUnload should find the idle image gen runner
 	runner := s.findRunnerToUnload()
 	require.NotNil(t, runner)
-	require.Equal(t, "/fake/image/model", runner.modelPath)
+	require.Equal(t, "/fake/model", runner.modelPath)
 }
 
-// TestImageGenSchedulerCoexistence verifies that image generation models
-// can coexist with language models in the scheduler and VRAM is tracked correctly.
-func TestImageGenSchedulerCoexistence(t *testing.T) {
+func TestSchedulerTracksMultipleLoadedRunners(t *testing.T) {
 	ctx, done := context.WithTimeout(t.Context(), 500*time.Millisecond)
 	defer done()
 
@@ -2199,19 +2193,18 @@ func TestImageGenSchedulerCoexistence(t *testing.T) {
 	s.getGpuFn = getGpuFn
 	s.getSystemInfoFn = getSystemInfoFn
 
-	// Load both an imagegen runner and a language model runner
-	imageGenRunner := &runnerRef{
-		model:           &Model{Name: "flux", ModelPath: "/fake/flux/model"},
-		modelPath:       "/fake/flux/model",
+	firstRunner := &runnerRef{
+		model:           &Model{Name: "first", ModelPath: "/fake/first/model"},
+		modelPath:       "/fake/first/model",
 		llama:           &mockLlm{vramSize: 8 * format.GigaByte, vramByGPU: map[ml.DeviceID]uint64{{Library: "Metal"}: 8 * format.GigaByte}},
 		sessionDuration: 10 * time.Millisecond,
 		numParallel:     1,
 		refCount:        0,
 	}
 
-	langModelRunner := &runnerRef{
-		model:           &Model{Name: "llama3", ModelPath: "/fake/llama3/model"},
-		modelPath:       "/fake/llama3/model",
+	secondRunner := &runnerRef{
+		model:           &Model{Name: "second", ModelPath: "/fake/second/model"},
+		modelPath:       "/fake/second/model",
 		llama:           &mockLlm{vramSize: 4 * format.GigaByte, vramByGPU: map[ml.DeviceID]uint64{{Library: "Metal"}: 4 * format.GigaByte}},
 		sessionDuration: 10 * time.Millisecond,
 		numParallel:     1,
@@ -2219,18 +2212,16 @@ func TestImageGenSchedulerCoexistence(t *testing.T) {
 	}
 
 	s.loadedMu.Lock()
-	s.loaded["/fake/flux/model"] = imageGenRunner
-	s.loaded["/fake/llama3/model"] = langModelRunner
+	s.loaded["/fake/first/model"] = firstRunner
+	s.loaded["/fake/second/model"] = secondRunner
 	s.loadedMu.Unlock()
 
-	// Verify both are loaded
 	s.loadedMu.Lock()
 	require.Len(t, s.loaded, 2)
-	require.NotNil(t, s.loaded["/fake/flux/model"])
-	require.NotNil(t, s.loaded["/fake/llama3/model"])
+	require.NotNil(t, s.loaded["/fake/first/model"])
+	require.NotNil(t, s.loaded["/fake/second/model"])
 	s.loadedMu.Unlock()
 
-	// Verify updateFreeSpace accounts for both
 	gpus := []ml.DeviceInfo{
 		{
 			DeviceID:    ml.DeviceID{Library: "Metal"},
@@ -2240,7 +2231,6 @@ func TestImageGenSchedulerCoexistence(t *testing.T) {
 	}
 	s.updateFreeSpace(gpus)
 
-	// Free memory should be reduced by both models
 	expectedFree := uint64(24*format.GigaByte) - uint64(8*format.GigaByte) - uint64(4*format.GigaByte)
 	require.Equal(t, expectedFree, gpus[0].FreeMemory)
 }

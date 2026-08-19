@@ -15,7 +15,7 @@ type mockDevice struct {
 }
 
 func (m *mockDevice) Handle() uint64 { return m.handle }
-func (m *mockDevice) Name() string    { return m.name }
+func (m *mockDevice) Name() string   { return m.name }
 
 // errNotImplemented sentinel for matching the package-level error.
 var errNotImplemented = errors.New("vulkan backend: operation not implemented; " +
@@ -204,35 +204,35 @@ func TestVulkanMemoryPoolAllocate(t *testing.T) {
 		errContains string // substring that must appear in error message
 	}{
 		{
-			name:         "zero size allocation",
-			size:         0,
-			hint:         VulkanMemoryHint{},
-			wantNil:      true,
-			wantErr:      true,
+			name:        "zero size allocation",
+			size:        0,
+			hint:        VulkanMemoryHint{},
+			wantNil:     true,
+			wantErr:     true,
 			errContains: "VulkanMemoryPool.Allocate",
 		},
 		{
-			name:         "1 MiB device-local allocation",
-			size:         1024 * 1024,
-			hint:         VulkanMemoryHint{PreferredLocation: MemoryPropertyDeviceLocal},
-			wantNil:      true,
-			wantErr:      true,
+			name:        "1 MiB device-local allocation",
+			size:        1024 * 1024,
+			hint:        VulkanMemoryHint{PreferredLocation: MemoryPropertyDeviceLocal},
+			wantNil:     true,
+			wantErr:     true,
 			errContains: "VulkanMemoryPool.Allocate",
 		},
 		{
-			name:         "large host-visible allocation",
-			size:         4 * 1024 * 1024 * 1024,
-			hint:         VulkanMemoryHint{PreferredLocation: MemoryPropertyHostVisible | MemoryPropertyHostCoherent},
-			wantNil:      true,
-			wantErr:      true,
+			name:        "large host-visible allocation",
+			size:        4 * 1024 * 1024 * 1024,
+			hint:        VulkanMemoryHint{PreferredLocation: MemoryPropertyHostVisible | MemoryPropertyHostCoherent},
+			wantNil:     true,
+			wantErr:     true,
 			errContains: "not implemented",
 		},
 		{
-			name:         "1 GiB with explicit flush hint",
-			size:         1024 * 1024 * 1024,
-			hint:         VulkanMemoryHint{ExplicitFlush: true, CoherentWithDevice: true},
-			wantNil:      true,
-			wantErr:      true,
+			name:        "1 GiB with explicit flush hint",
+			size:        1024 * 1024 * 1024,
+			hint:        VulkanMemoryHint{ExplicitFlush: true, CoherentWithDevice: true},
+			wantNil:     true,
+			wantErr:     true,
 			errContains: "not implemented",
 		},
 	}
@@ -281,7 +281,7 @@ func TestVulkanMemoryPoolDeallocate(t *testing.T) {
 			alloc: nil,
 		},
 		{
-			name: "zero-initialized allocation",
+			name:  "zero-initialized allocation",
 			alloc: &VulkanMemoryPoolAllocation{},
 		},
 		{

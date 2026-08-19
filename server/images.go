@@ -31,6 +31,7 @@ import (
 	"github.com/ollama/ollama/thinking"
 	"github.com/ollama/ollama/types/model"
 	"github.com/ollama/ollama/version"
+	"github.com/ollama/ollama/x/mlxrunner/mlx"
 	"github.com/ollama/ollama/x/transfer"
 )
 
@@ -80,6 +81,9 @@ type Model struct {
 	ModelPaths         []string
 
 	Template *template.Template
+
+	capabilities       []model.Capability
+	capabilitiesCached bool
 }
 
 func (m *Model) IsMLX() bool {
@@ -107,6 +111,10 @@ const (
 
 // Capabilities returns the capabilities that the model supports
 func (m *Model) Capabilities() []model.Capability {
+	if m.capabilitiesCached {
+		return slices.Clone(m.capabilities)
+	}
+
 	capabilities := m.capabilitiesForTemplate(templateCapabilitySelected, nil)
 	if len(capabilities) == 0 {
 		slog.Warn("unknown capabilities for model", "model", m.Name)
@@ -273,11 +281,30 @@ func hasMoreCapabilities(candidate, current []model.Capability) bool {
 	return len(candidate) > len(current)
 }
 
-func shouldPreferChatTemplate(chatTemplate string, chatTemplateCaps []model.Capability, goTemplate *template.Template, goTemplateCaps []model.Capability) bool {
-	if !hasMoreCapabilities(chatTemplateCaps, goTemplateCaps) {
+func sameCapabilities(candidate, current []model.Capability) bool {
+	if len(candidate) != len(current) {
 		return false
 	}
-	return !goTemplateHasToolRoundTrip(goTemplate) || chatTemplateHasToolRoundTrip(chatTemplate)
+	for _, c := range candidate {
+		if !slices.Contains(current, c) {
+			return false
+		}
+	}
+	return true
+}
+
+func shouldPreferChatTemplate(chatTemplate string, chatTemplateCaps []model.Capability, goTemplate *template.Template, goTemplateCaps []model.Capability) bool {
+	if hasMoreCapabilities(chatTemplateCaps, goTemplateCaps) {
+		return !goTemplateHasToolRoundTrip(goTemplate) || chatTemplateHasToolRoundTrip(chatTemplate)
+	}
+
+	if !sameCapabilities(chatTemplateCaps, goTemplateCaps) ||
+		!slices.Contains(chatTemplateCaps, model.CapabilityTools) ||
+		!slices.Contains(goTemplateCaps, model.CapabilityTools) {
+		return false
+	}
+
+	return chatTemplateHasToolRoundTrip(chatTemplate) && !goTemplateHasToolRoundTrip(goTemplate)
 }
 
 func goTemplateEnvSet() bool {
@@ -437,7 +464,7 @@ func (m *Model) filterUnsupportedCapabilities(capabilities []model.Capability, m
 			return c == model.CapabilityAudio
 		})
 	}
-	if isGemma4Renderer(m.Config.Renderer) && m.Config.ModelFormat == "safetensors" {
+	if suppressVisionCapability(m) {
 		capabilities = slices.DeleteFunc(capabilities, func(c model.Capability) bool {
 			return c == model.CapabilityVision
 		})
@@ -446,8 +473,24 @@ func (m *Model) filterUnsupportedCapabilities(capabilities []model.Capability, m
 	return capabilities
 }
 
+func suppressVisionCapability(m *Model) bool {
+	if isGemma4Renderer(m.Config.Renderer) && m.Config.ModelFormat == "safetensors" {
+		return true
+	}
+
+	// The current MLX Nemotron path is text-only. Do not advertise vision for
+	// safetensors manifests until the runner can load and serve that modality.
+	return isNemotron3NanoSafetensors(m)
+}
+
 func suppressAudioCapability(m *Model, arch string) bool {
 	if isGemma4Renderer(m.Config.Renderer) && m.Config.ModelFormat == "safetensors" {
+		return true
+	}
+	if m.Config.ModelFormat == "safetensors" && m.Config.Renderer == "glimmer" {
+		return true
+	}
+	if isNemotron3NanoSafetensors(m) {
 		return true
 	}
 
@@ -459,6 +502,18 @@ func suppressAudioCapability(m *Model, arch string) bool {
 	}
 
 	return false
+}
+
+func isNemotron3NanoSafetensors(m *Model) bool {
+	return isNemotron3NanoSafetensorsConfig(m.Config)
+}
+
+func isNemotron3NanoSafetensorsConfig(cfg model.ConfigV2) bool {
+	return cfg.ModelFormat == "safetensors" &&
+		(cfg.Parser == "nemotron-3-nano" ||
+			cfg.Renderer == "nemotron-3-nano" ||
+			cfg.ModelFamily == "nemotron_h_omni" ||
+			slices.Contains(cfg.ModelFamilies, "nemotron_h_omni"))
 }
 
 func projectorHasAudio(f *gguf.File) bool {
@@ -749,6 +804,7 @@ func GetModel(name string) (*Model, error) {
 		slog.Warn("model is missing tokenizer.chat_template and Go TEMPLATE support is unavailable; chat responses may be poorly formatted", "model", m.Name, "env", "OLLAMA_GO_TEMPLATE=1")
 	}
 
+	// Prismalama: apply qwen3-coder parser/renderer defaults for qwen3/qwen3-5/qwen3.5 family models.
 	applyDefaultParserRenderer(m)
 
 	return m, nil
@@ -1002,6 +1058,12 @@ func PullModel(ctx context.Context, name string, regOpts *registryOptions, fn fu
 	if err != nil {
 		return fmt.Errorf("pull model manifest: %s", err)
 	}
+	if hasTensorLayers(mf.Layers) {
+		if err := mlx.CheckInit(); err != nil {
+			slog.Debug("MLX is unavailable for safetensors model pull", "error", err)
+			return errors.New("this model requires MLX support, but the MLX runtime is not available")
+		}
+	}
 
 	var layers []manifest.Layer
 	layers = append(layers, mf.Layers...)
@@ -1029,7 +1091,16 @@ func PullModel(ctx context.Context, name string, regOpts *registryOptions, fn fu
 		if err != nil {
 			return err
 		}
-		skipVerify[layer.Digest] = cacheHit
+		// If any download of a given digest was not a cache hit,
+		// always verify it. Without this guard, a config entry
+		// sharing a digest with a layer can overwrite the layer's
+		// false (needs verification) with true (cache hit), since
+		// the blob now exists on disk from the first download.
+		if existing, ok := skipVerify[layer.Digest]; !ok {
+			skipVerify[layer.Digest] = cacheHit
+		} else {
+			skipVerify[layer.Digest] = existing && cacheHit
+		}
 		delete(deleteMap, layer.Digest)
 	}
 

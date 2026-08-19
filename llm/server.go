@@ -103,19 +103,11 @@ func LoadModel(model string, maxArraySize int) (*ggml.GGML, error) {
 	return ggml.Decode(f, maxArraySize)
 }
 
-// findLlamaServerForGenerate is stubbable so tests can force the ollama-engine
-// path without a llama-server binary on disk (JAISIU-2298 leftover).
-var findLlamaServerForGenerate = FindLlamaServer
-
-func useOllamaEngineRunner() bool {
-	_, err := findLlamaServerForGenerate()
-	return err != nil
-}
-
-// NewLlamaServer creates a runner for the given model. When llama-server is
-// packaged it is used; otherwise the in-process ollama-engine runner is
-// spawned as `runner --ollama-engine` (image has no llama-server).
+// NewLlamaServer creates a new llama-server runner for the given model.
+// All GGML models are served via the upstream llama-server subprocess.
 func NewLlamaServer(systemInfo ml.SystemInfo, gpus []ml.DeviceInfo, modelPath string, f *ggml.GGML, adapters, projectors []string, opts api.Options, numParallel int, config LlamaServerConfig) (LlamaServer, error) {
+	slog.Info("using llama-server for model", "model", modelPath)
+
 	// Verify the requested context size is <= the model training size
 	trainCtx := f.KV().ContextLength()
 	if opts.NumCtx > int(trainCtx) && trainCtx > 0 {
@@ -123,12 +115,6 @@ func NewLlamaServer(systemInfo ml.SystemInfo, gpus []ml.DeviceInfo, modelPath st
 		opts.NumCtx = int(trainCtx)
 	}
 
-	if useOllamaEngineRunner() {
-		slog.Info("llama-server not available, using ollama-engine runner", "model", modelPath)
-		return NewOllamaEngineServer(systemInfo, gpus, modelPath, f, adapters, opts, numParallel)
-	}
-
-	slog.Info("using llama-server for model", "model", modelPath)
 	kvct := strings.ToLower(envconfig.KvCacheType())
 	return NewLlamaServerRunner(gpus, modelPath, f, adapters, projectors, opts, numParallel, kvct, config)
 }
@@ -235,12 +221,6 @@ type CompletionRequest struct {
 
 	// TopLogprobs specifies the number of most likely alternative tokens to return (0-20)
 	TopLogprobs int
-
-	// Image generation fields
-	Width  int32 `json:"width,omitempty"`
-	Height int32 `json:"height,omitempty"`
-	Steps  int32 `json:"steps,omitempty"`
-	Seed   int64 `json:"seed,omitempty"`
 }
 
 type ChatRequest struct {
@@ -309,13 +289,4 @@ type CompletionResponse struct {
 
 	// Logprobs contains log probability information if requested
 	Logprobs []Logprob `json:"logprobs,omitempty"`
-
-	// Image contains base64-encoded image data for image generation
-	Image string `json:"image,omitempty"`
-
-	// Step is the current step in image generation
-	Step int `json:"step,omitempty"`
-
-	// TotalSteps is the total number of steps for image generation
-	TotalSteps int `json:"total_steps,omitempty"`
 }

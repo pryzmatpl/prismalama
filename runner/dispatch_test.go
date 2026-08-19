@@ -114,17 +114,17 @@ func TestReasonStrings_Stable(t *testing.T) {
 	// to the bare identifier "OLLAMA_USE_AIRLLM" (see runner/dispatch_test.go's
 	// TestDecideEngine_ForceAirLLMEnv / _OptOutDisablesAirLLM).
 	cases := map[Reason]string{
-		ReasonUnknown:          "unknown",
-		ReasonExplicitOptOut:   "OLLAMA_USE_AIRLLM",
-		ReasonExplicitOptIn:    "OLLAMA_USE_AIRLLM",
-		ReasonMultiGGUF:        "OLLAMA_MULTI_GGUF",
-		ReasonSafetensorsIndex: "model.safetensors.index.json",
-		ReasonSafetensorsShards:"safetensors_shards",
-		ReasonConfigHF:         "config.json_hf_heuristic",
-		ReasonMultipartGGUF:    "multipart_gguf",
-		ReasonEmptyPath:        "empty_path",
-		ReasonPathMissing:      "path_missing",
-		ReasonDefaultGGML:      "default_ggml",
+		ReasonUnknown:           "unknown",
+		ReasonExplicitOptOut:    "OLLAMA_USE_AIRLLM",
+		ReasonExplicitOptIn:     "OLLAMA_USE_AIRLLM",
+		ReasonMultiGGUF:         "OLLAMA_MULTI_GGUF",
+		ReasonSafetensorsIndex:  "model.safetensors.index.json",
+		ReasonSafetensorsShards: "safetensors_shards",
+		ReasonConfigHF:          "config.json_hf_heuristic",
+		ReasonMultipartGGUF:     "multipart_gguf",
+		ReasonEmptyPath:         "empty_path",
+		ReasonPathMissing:       "path_missing",
+		ReasonDefaultGGML:       "default_ggml",
 	}
 	for r, want := range cases {
 		if got := r.String(); got != want {

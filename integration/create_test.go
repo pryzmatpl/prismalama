@@ -19,7 +19,7 @@ import (
 const testdataModelsDir = "testdata/models"
 
 // skipIfRemote skips the test if OLLAMA_HOST points to a non-local server.
-// Safetensors/imagegen creation requires localhost since it reads model files
+// Safetensors creation requires localhost since it reads model files.
 // from disk and uses the --experimental CLI path.
 func skipIfRemote(t *testing.T) {
 	t.Helper()
@@ -43,15 +43,13 @@ func skipIfRemote(t *testing.T) {
 	if ip != nil && (ip.IsLoopback() || ip.IsUnspecified()) {
 		return
 	}
-	t.Skipf("safetensors/imagegen creation requires a local server (OLLAMA_HOST=%s)", host)
+	t.Skipf("safetensors creation requires a local server (OLLAMA_HOST=%s)", host)
 }
 
 // findHFCLI returns the path to the HuggingFace CLI, or "" if not found.
 func findHFCLI() string {
-	for _, name := range []string{"huggingface-cli", "hf"} {
-		if p, err := exec.LookPath(name); err == nil {
-			return p
-		}
+	if p, err := exec.LookPath("hf"); err == nil {
+		return p
 	}
 	return ""
 }
@@ -138,7 +136,7 @@ func runOllamaCreate(ctx context.Context, t *testing.T, args ...string) {
 	}
 }
 
-func TestCreateSafetensorsLLM(t *testing.T) {
+func runCreateSafetensorsLLM(t *testing.T) {
 	if testModel != "" {
 		t.Skip("exercises create pipeline with a fixed source model, not applicable with model override")
 	}
@@ -216,7 +214,7 @@ func TestCreateSafetensorsLLM(t *testing.T) {
 	}
 }
 
-func TestCreateGGUF(t *testing.T) {
+func runCreateGGUF(t *testing.T) {
 	if testModel != "" {
 		t.Skip("exercises create pipeline with a fixed source model, not applicable with model override")
 	}

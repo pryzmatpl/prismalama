@@ -3,7 +3,11 @@ title: Quickstart
 ---
 
 Ollama is available on macOS, Windows, and Linux.
+Install Ollama and get your first response.
 
+## 1. Download Ollama
+
+Ollama runs on macOS, Windows, and Linux.
 <a
   href="https://ollama.com/download"
   target="_blank"
@@ -66,3 +70,45 @@ curl http://localhost:11434/api/chat -d '{
 ```
 
 See the [API documentation](/api) for Python, JavaScript, and other integrations.
+## 2. Open the menu
+
+Run `ollama` in your terminal to open the interactive menu:
+
+```shell
+ollama
+```
+
+From the menu you can:
+
+- **Run a model** - Start an interactive chat
+- **Launch tools** - [Claude Code](/integrations/claude-code), [OpenClaw](/integrations/openclaw), [VS Code](/integrations/vscode), and more
+
+## 3. Start a chat
+
+Run a model to start your first chat.
+
+```shell
+ollama run gemma4
+```
+
+Cloud models work the same way:
+
+```shell
+ollama run gemma4:cloud
+```
+
+Send your first message:
+
+```text
+Explain why the sky is blue in one paragraph.
+```
+
+To leave the chat, type:
+
+```shell
+/bye
+```
+
+## Next steps
+
+Use a model with an [integration](/integrations), make an [API request](/api/introduction), or browse more [models](https://ollama.com/search).

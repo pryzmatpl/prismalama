@@ -21,10 +21,10 @@ type PrefetchResult struct {
 // layers to be in flight, bounded by concurrency. Callers submit prefetch requests and
 // receive results via channels.
 type Prefetcher struct {
-	lm   *LayerMap
-	r    io.ReaderAt
-	sem  chan struct{} // bounds concurrent reads
-	mu   sync.Mutex
+	lm       *LayerMap
+	r        io.ReaderAt
+	sem      chan struct{} // bounds concurrent reads
+	mu       sync.Mutex
 	inflight map[int]bool
 }
 

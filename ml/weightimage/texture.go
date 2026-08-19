@@ -246,12 +246,12 @@ type TextureSampler struct {
 }
 
 const (
-	FilterNearest = 0
-	FilterLinear  = 1
-	FilterBilinear = 2
+	FilterNearest   = 0
+	FilterLinear    = 1
+	FilterBilinear  = 2
 	FilterTrilinear = 3
 
-	WrapClamp = 0
+	WrapClamp  = 0
 	WrapRepeat = 1
 	WrapMirror = 2
 )
@@ -293,18 +293,18 @@ func (s *BilinearSampler) Sample(u, v float32) (r, g, b, a float32) {
 		y1 = s.layout.Height - 1
 	}
 
-	 fx := x - float32(x0)
-	 fy := y - float32(y0)
+	fx := x - float32(x0)
+	fy := y - float32(y0)
 
 	p00 := s.samplePixel(x0, y0)
 	p10 := s.samplePixel(x1, y0)
 	p01 := s.samplePixel(x0, y1)
 	p11 := s.samplePixel(x1, y1)
 
-	 r = lerp(lerp(p00.r, p10.r, fx), lerp(p01.r, p11.r, fx), fy)
-	 g = lerp(lerp(p00.g, p10.g, fx), lerp(p01.g, p11.g, fx), fy)
-	 b = lerp(lerp(p00.b, p10.b, fx), lerp(p01.b, p11.b, fx), fy)
-	 a = lerp(lerp(p00.a, p10.a, fx), lerp(p01.a, p11.a, fx), fy)
+	r = lerp(lerp(p00.r, p10.r, fx), lerp(p01.r, p11.r, fx), fy)
+	g = lerp(lerp(p00.g, p10.g, fx), lerp(p01.g, p11.g, fx), fy)
+	b = lerp(lerp(p00.b, p10.b, fx), lerp(p01.b, p11.b, fx), fy)
+	a = lerp(lerp(p00.a, p10.a, fx), lerp(p01.a, p11.a, fx), fy)
 
 	return r, g, b, a
 }

@@ -12,9 +12,9 @@ import (
 // LayerInfo describes one transformer block (or the output layer) in a GGUF model,
 // with enough metadata to read its tensors from disk independently.
 type LayerInfo struct {
-	Index      int    // 0..N-1 for blk.0..blk.N-1; N for the output layer
-	Name       string // "blk.0", "blk.1", ..., "output"
-	ByteSize   uint64 // sum of all tensor sizes in this layer
+	Index       int    // 0..N-1 for blk.0..blk.N-1; N for the output layer
+	Name        string // "blk.0", "blk.1", ..., "output"
+	ByteSize    uint64 // sum of all tensor sizes in this layer
 	TensorCount int
 
 	// Tensors in this layer: name → offset from tensor data base, size.
@@ -23,17 +23,17 @@ type LayerInfo struct {
 
 // TensorRef is a single tensor's location in the GGUF file.
 type TensorRef struct {
-	Name       string
-	Offset     uint64 // byte offset from the tensor data base in the GGUF file
-	Size       uint64 // byte size of this tensor's data
+	Name   string
+	Offset uint64 // byte offset from the tensor data base in the GGUF file
+	Size   uint64 // byte size of this tensor's data
 }
 
 // LayerMap is the parsed view of a GGUF model's transformer blocks, ordered by layer index.
 type LayerMap struct {
-	Layers         []LayerInfo
-	TensorDataBase uint64 // absolute file offset where tensor payloads start
+	Layers           []LayerInfo
+	TensorDataBase   uint64 // absolute file offset where tensor payloads start
 	TotalWeightBytes uint64
-	BlockCount     int // number of transformer blocks (excludes output layer)
+	BlockCount       int // number of transformer blocks (excludes output layer)
 }
 
 // BuildLayerMap parses a decoded GGML model into a LayerMap. The GGML model must have been

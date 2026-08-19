@@ -127,20 +127,6 @@ type GenerateRequest struct {
 	// each with an associated log probability. Only applies when Logprobs is true.
 	// Valid values are 0-20. Default is 0 (only return the selected token's logprob).
 	TopLogprobs int `json:"top_logprobs,omitempty"`
-
-	// Experimental: Image generation fields (may change or be removed)
-
-	// Width is the width of the generated image in pixels.
-	// Only used for image generation models.
-	Width int32 `json:"width,omitempty"`
-
-	// Height is the height of the generated image in pixels.
-	// Only used for image generation models.
-	Height int32 `json:"height,omitempty"`
-
-	// Steps is the number of diffusion steps for image generation.
-	// Only used for image generation models.
-	Steps int32 `json:"steps,omitempty"`
 }
 
 // ChatRequest describes a request sent by [Client.Chat].
@@ -706,8 +692,11 @@ type CreateRequest struct {
 	// Messages is a list of messages added to the model before chat and generation requests.
 	Messages []Message `json:"messages,omitempty"`
 
+	// Renderer is the name of the renderer used when constructing a request to the model.
 	Renderer string `json:"renderer,omitempty"`
-	Parser   string `json:"parser,omitempty"`
+
+	// Parser is the name of the parser used to parse the output of the request.
+	Parser string `json:"parser,omitempty"`
 
 	// Requires is the minimum version of Ollama required by the model.
 	Requires string `json:"requires,omitempty"`
@@ -868,6 +857,36 @@ type StatusResponse struct {
 	Cloud CloudStatus `json:"cloud"`
 }
 
+// WebSearchRequest is the request for [Client.WebSearchExperimental].
+type WebSearchRequest struct {
+	Query      string `json:"query"`
+	MaxResults int    `json:"max_results,omitempty"`
+}
+
+// WebSearchResult is a single result from [Client.WebSearchExperimental].
+type WebSearchResult struct {
+	Title   string `json:"title"`
+	URL     string `json:"url"`
+	Content string `json:"content"`
+}
+
+// WebSearchResponse is the response from [Client.WebSearchExperimental].
+type WebSearchResponse struct {
+	Results []WebSearchResult `json:"results"`
+}
+
+// WebFetchRequest is the request for [Client.WebFetchExperimental].
+type WebFetchRequest struct {
+	URL string `json:"url"`
+}
+
+// WebFetchResponse is the response from [Client.WebFetchExperimental].
+type WebFetchResponse struct {
+	Title   string   `json:"title"`
+	Content string   `json:"content"`
+	Links   []string `json:"links,omitempty"`
+}
+
 // GenerateResponse is the response passed into [GenerateResponseFunc].
 type GenerateResponse struct {
 	// Model is the model name that generated the response.
@@ -908,20 +927,6 @@ type GenerateResponse struct {
 	// Logprobs contains log probability information for the generated tokens,
 	// if requested via the Logprobs parameter.
 	Logprobs []Logprob `json:"logprobs,omitempty"`
-
-	// Experimental: Image generation fields (may change or be removed)
-
-	// Image contains a base64-encoded generated image.
-	// Only present for image generation models.
-	Image string `json:"image,omitempty"`
-
-	// Completed is the number of completed steps in image generation.
-	// Only present for image generation models during streaming.
-	Completed int64 `json:"completed,omitempty"`
-
-	// Total is the total number of steps for image generation.
-	// Only present for image generation models during streaming.
-	Total int64 `json:"total,omitempty"`
 }
 
 // ModelDetails provides details about a model.
@@ -1100,7 +1105,7 @@ func DefaultOptions() Options {
 		TopP:             0.9,
 		TypicalP:         1.0,
 		RepeatLastN:      64,
-		RepeatPenalty:    1.1,
+		RepeatPenalty:    1.0,
 		PresencePenalty:  0.0,
 		FrequencyPenalty: 0.0,
 		Seed:             -1,

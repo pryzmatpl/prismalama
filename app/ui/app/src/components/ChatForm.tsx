@@ -7,6 +7,28 @@ import { ImageThumbnail } from "@/components/ImageThumbnail";
 import Logo from "@/components/Logo";
 import { ModelPicker } from "@/components/ModelPicker";
 import { WebSearchButton } from "@/components/WebSearchButton";
+import { ImageThumbnail } from "@/components/ImageThumbnail";
+import { isImageFile } from "@/utils/imageUtils";
+import {
+  useRef,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+} from "react";
+import {
+  useSendMessage,
+  useIsStreaming,
+  useCancelMessage,
+} from "@/hooks/useChats";
+import { useNavigate } from "@tanstack/react-router";
+import { useSelectedModel } from "@/hooks/useSelectedModel";
+import {
+  useHasVisionCapability,
+  useHasToolsCapability,
+} from "@/hooks/useModelCapabilities";
+import { useUser } from "@/hooks/useUser";
+import { DisplayLogin } from "@/components/DisplayLogin";
 import { ErrorEvent, Message } from "@/gotypes";
 import { useSendMessage, useIsStreaming, useCancelMessage } from "@/hooks/useChats";
 import { useCloudStatus } from "@/hooks/useCloudStatus";
@@ -14,6 +36,9 @@ import { useHasVisionCapability, useHasToolsCapability } from "@/hooks/useModelC
 import { useSelectedModel } from "@/hooks/useSelectedModel";
 import { useSettings } from "@/hooks/useSettings";
 import { useUser } from "@/hooks/useUser";
+import { useCloudStatus } from "@/hooks/useCloudStatus";
+import { ThinkButton } from "./ThinkButton";
+import { ErrorMessage } from "./ErrorMessage";
 import { processFiles } from "@/utils/fileValidation";
 import { isImageFile } from "@/utils/imageUtils";
 import { ErrorMessage } from "./ErrorMessage";
@@ -123,6 +148,11 @@ function ChatForm({
 
   const {
     settings: { webSearchEnabled, thinkEnabled, thinkLevel: settingsThinkLevel },
+    settings: {
+      webSearchEnabled,
+      thinkEnabled,
+      thinkLevel: settingsThinkLevel,
+    },
     setSettings,
   } = useSettings();
   const { cloudDisabled } = useCloudStatus();
@@ -147,6 +177,12 @@ function ChatForm({
       setSettings({ WebSearchEnabled: false });
     }
   }, [selectedModel?.model, supportsThinkToggling, thinkEnabled, webSearchEnabled, setSettings]);
+
+  useEffect(() => {
+    if (cloudDisabled && webSearchEnabled) {
+      setSettings({ WebSearchEnabled: false });
+    }
+  }, [cloudDisabled, webSearchEnabled, setSettings]);
 
   useEffect(() => {
     if (cloudDisabled && webSearchEnabled) {
@@ -242,6 +278,11 @@ function ChatForm({
   // Clear loginPromptFeature when user becomes authenticated or no features are enabled
   useEffect(() => {
     if (isAuthenticated || cloudDisabled || (!webSearchEnabled && !!selectedModel?.isCloud())) {
+    if (
+      isAuthenticated ||
+      cloudDisabled ||
+      (!webSearchEnabled && !!selectedModel?.isCloud())
+    ) {
       setLoginPromptFeature(null);
     }
   }, [isAuthenticated, webSearchEnabled, selectedModel, cloudDisabled]);
@@ -437,12 +478,17 @@ function ChatForm({
     // Prepare attachments for submission, excluding unsupported images
     const attachmentsToSend: FileAttachment[] = message.attachments
       .filter((att) => hasVisionCapability || !isImageFile(att.filename))
+      .filter(
+        (att) => hasVisionCapability || !isImageFile(att.filename),
+      )
       .map((att) => ({
         filename: att.filename,
         data: att.data || new Uint8Array(0), // Empty data for existing files
       }));
 
     const useWebSearch = supportsWebSearch && webSearchEnabled && !cloudDisabled;
+    const useWebSearch =
+      supportsWebSearch && webSearchEnabled && !cloudDisabled;
     const useThink = modelSupportsThinkingLevels
       ? thinkLevel
       : supportsThinkToggling
@@ -696,6 +742,55 @@ function ChatForm({
                       ? "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
                       : "bg-neutral-50 dark:bg-neutral-700/50 hover:bg-neutral-100 dark:hover:bg-neutral-700"
                   }`}
+              const isUnsupportedImage =
+                !hasVisionCapability && isImageFile(attachment.filename);
+              return (
+              <div
+                key={attachment.id}
+                className={`group flex items-center gap-2 py-2 px-3 rounded-lg transition-colors flex-shrink-0 ${
+                  isUnsupportedImage
+                    ? "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
+                    : "bg-neutral-50 dark:bg-neutral-700/50 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                }`}
+              >
+                {isImageFile(attachment.filename) ? (
+                  <ImageThumbnail
+                    image={{
+                      filename: attachment.filename,
+                      data: attachment.data || new Uint8Array(0),
+                    }}
+                    className="w-8 h-8 object-cover rounded-md flex-shrink-0"
+                  />
+                ) : (
+                  <svg
+                    className="w-4 h-4 text-neutral-400 dark:text-neutral-500 flex-shrink-0"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                )}
+                <div className="flex flex-col min-w-0">
+                  <span className={`text-sm max-w-36 truncate ${isUnsupportedImage ? "text-red-700 dark:text-red-300" : "text-neutral-700 dark:text-neutral-300"}`}>
+                    {attachment.filename}
+                  </span>
+                  {isUnsupportedImage && (
+                    <span className="text-xs text-red-600 dark:text-red-400 opacity-75">
+                      This model does not support images
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeFile(index)}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300 -mr-1 cursor-pointer"
+                  aria-label={`Remove ${attachment.filename}`}
                 >
                   {isImageFile(attachment.filename) ? (
                     <ImageThumbnail
@@ -748,6 +843,9 @@ function ChatForm({
                     </svg>
                   </button>
                 </div>
+                  </svg>
+                </button>
+              </div>
               );
             })}
             {message.fileErrors.map((fileError, index) => (

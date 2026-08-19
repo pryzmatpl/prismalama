@@ -8,7 +8,9 @@ import { useCloudStatus } from "./useCloudStatus";
 import { useRefetchModels } from "./useModels";
 import { createQueryBatcher } from "./useQueryBatcher";
 import { useSelectedModel } from "./useSelectedModel";
-
+import { useStreamingContext } from "@/contexts/StreamingContext";
+import { getModelCapabilities } from "@/api";
+import { useCloudStatus } from "./useCloudStatus";
 export const useChats = () => {
   return useQuery({
     queryKey: ["chats"],
@@ -500,6 +502,28 @@ export const useSendMessage = (chatId: string) => {
                     thinkingTimeStart: event.thinkingTimeStart,
                     thinkingTimeEnd: event.thinkingTimeEnd,
                     model: selectedModel.model,
+                  });
+                  newMessages[newMessages.length - 1] = updatedMessage;
+                } else {
+                  // No existing assistant message, create new one
+                  newMessages.push(
+                    new Message({
+                      role: "assistant",
+                      content: event.content,
+                      thinking: event.thinking,
+                      tool_calls: event.toolCalls,
+                      thinkingTimeStart: event.thinkingTimeStart,
+                      thinkingTimeEnd: event.thinkingTimeEnd,
+                      model: selectedModel.model,
+                    }),
+                  );
+                }
+
+                return {
+                  ...old,
+                  chat: new Chat({
+                    ...old.chat,
+                    messages: newMessages,
                   }),
                 );
               }

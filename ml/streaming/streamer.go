@@ -13,9 +13,9 @@ import (
 
 // StreamerConfig tunes the layer streaming orchestrator.
 type StreamerConfig struct {
-	BudgetBytes    uint64 // max bytes for resident layer weights (VRAM or host, depending on backend)
-	PrefetchAhead  int    // how many layers to prefetch ahead of the current compute layer (default 1)
-	IOConcurrency  int    // max parallel NVMe reads (default 2)
+	BudgetBytes   uint64 // max bytes for resident layer weights (VRAM or host, depending on backend)
+	PrefetchAhead int    // how many layers to prefetch ahead of the current compute layer (default 1)
+	IOConcurrency int    // max parallel NVMe reads (default 2)
 }
 
 // DefaultStreamerConfig returns a sensible baseline: 4 GiB budget, 1 layer prefetch, 2 I/O workers.

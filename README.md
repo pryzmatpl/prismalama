@@ -4,22 +4,21 @@
   </a>
 </p>
 
-![Prismalama Logo](logo.jpg)
+# Ollama
 
 Start building with open models.
 
 ## Download
 
-## Key Defaults
+### macOS
 
-| Setting                  | Default                                                                            | Purpose                                                                                  |
-| ------------------------ | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `OLLAMA_LAYER_STREAMING` | **`1`** in **`/etc/default/ollama`** (package); **unset ⇒ off** in raw `envconfig` | Layer-by-layer GGUF load / streaming path when supported                                 |
-| `OLLAMA_KEEP_ALIVE`      | `5m`                                                                               | Models unload after idle window (no startup preload)                                     |
-| Compute stack            | GGML (HIP / Vulkan / CPU per build)                                                | **`OLLAMA_VULKAN=1`** needed for Vulkan backends on Linux — see RUNTIME_DISPATCH         |
-| `OLLAMA_USE_AIRLLM`      | **`0`** (Arch package)                                                             | **`0`/`false`/`no`** disables **all** AirLLM routing; set **`1`** for HF / forced AirLLM |
+```shell
+curl -fsSL https://ollama.com/install.sh | sh
+```
 
-## Quick Start
+or [download manually](https://ollama.com/download/Ollama.dmg)
+
+### Windows
 
 ```shell
 irm https://ollama.com/install.ps1 | iex
@@ -27,13 +26,11 @@ irm https://ollama.com/install.ps1 | iex
 
 or [download manually](https://ollama.com/download/OllamaSetup.exe)
 
-# Start service
+### Linux
 
-sudo systemctl enable --now ollama
-
-# Run a model (loads on-demand, unloads after 5m idle)
-
-ollama run qwen2.5:3b "Hello"
+```shell
+curl -fsSL https://ollama.com/install.sh | sh
+```
 
 [Manual install instructions](https://docs.ollama.com/linux#manual-install)
 
@@ -58,7 +55,7 @@ The official [Ollama Docker image](https://hub.docker.com/r/ollama/ollama) `olla
 ollama
 ```
 
-You'll be prompted to run a model or connect Ollama to your existing agents or applications such as `Claude Code`, `OpenClaw`, `OpenCode` , `Codex`, `Copilot`, and more.
+You'll be prompted to run a model or connect Ollama to your existing agents or applications such as `Claude Code`, `OpenClaw`, `OpenCode` , `Codex`, `Copilot`,  and more.
 
 ### Coding
 
@@ -68,7 +65,7 @@ To launch a specific integration:
 ollama launch claude
 ```
 
-Supported integrations include [Claude Code](https://docs.ollama.com/integrations/claude-code), [Codex](https://docs.ollama.com/integrations/codex), [Copilot CLI](https://docs.ollama.com/integrations/copilot-cli), [Droid](https://docs.ollama.com/integrations/droid), and [OpenCode](https://docs.ollama.com/integrations/opencode).
+Supported integrations include [Claude Code](https://docs.ollama.com/integrations/claude-code), [Codex](https://docs.ollama.com/integrations/codex), [Copilot CLI](https://docs.ollama.com/integrations/copilot-cli), [DeepSeek Harness](https://docs.ollama.com/integrations/deepseek-harness), [Droid](https://docs.ollama.com/integrations/droid), and [OpenCode](https://docs.ollama.com/integrations/opencode).
 
 ### AI assistant
 
@@ -153,8 +150,7 @@ console.log(response.message.content);
 - [Modelfile reference](https://docs.ollama.com/modelfile)
 - [Building from source](https://github.com/ollama/ollama/blob/main/docs/development.md)
 
-For runtime changes that persist across package upgrades, create:
-`/etc/systemd/system/ollama.service.d/override.conf`
+## Community Integrations
 
 > Want to add your project? Open a pull request.
 

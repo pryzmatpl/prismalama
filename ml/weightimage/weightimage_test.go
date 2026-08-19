@@ -8,7 +8,7 @@ import (
 func TestWeightsToImage(t *testing.T) {
 	weights := make([]float32, 4096)
 	for i := range weights {
-		weights[i] = float32(i%256) / 127.5 - 1.0
+		weights[i] = float32(i%256)/127.5 - 1.0
 	}
 
 	img := WeightsToImage(weights, 64, 64)

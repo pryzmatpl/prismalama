@@ -21,15 +21,15 @@ func createTestGGUFFile(t *testing.T, tensors []*ggml.Tensor) string {
 	defer f.Close()
 
 	kv := ggml.KV{
-		"general.architecture":              "llama",
-		"llama.block_count":                  uint32(2),
-		"llama.embedding_length":             uint32(8),
-		"llama.attention.head_count":         uint32(2),
-		"llama.attention.head_count_kv":     uint32(2),
-		"llama.attention.key_length":         uint32(8),
-		"llama.rope.dimension_count":        uint32(8),
-		"llama.rope.freq_base":               float32(10000.0),
-		"llama.rope.freq_scale":              float32(1.0),
+		"general.architecture":                   "llama",
+		"llama.block_count":                      uint32(2),
+		"llama.embedding_length":                 uint32(8),
+		"llama.attention.head_count":             uint32(2),
+		"llama.attention.head_count_kv":          uint32(2),
+		"llama.attention.key_length":             uint32(8),
+		"llama.rope.dimension_count":             uint32(8),
+		"llama.rope.freq_base":                   float32(10000.0),
+		"llama.rope.freq_scale":                  float32(1.0),
 		"llama.attention.layer_norm_rms_epsilon": float32(1e-6),
 	}
 

@@ -285,6 +285,9 @@ export async function updateSettings(settings: Settings): Promise<{
 }
 
 export async function updateCloudSetting(enabled: boolean): Promise<CloudStatusResponse> {
+export async function updateCloudSetting(
+  enabled: boolean,
+): Promise<CloudStatusResponse> {
   const response = await fetch(`${API_BASE}/api/v1/cloud`, {
     method: "POST",
     headers: {
@@ -345,6 +348,9 @@ export async function getModelUpstreamInfo(
 
     if (!response.ok) {
       console.warn(`Failed to check upstream for ${model.model}: ${response.status}`);
+      console.warn(
+        `Failed to check upstream for ${model.model}: ${response.status}`,
+      );
       return { stale: false, exists: false };
     }
 
@@ -412,6 +418,13 @@ export async function getModelRecommendations(): Promise<ModelRecommendation[]> 
   const response = await fetch(`${API_BASE}/api/experimental/model-recommendations`);
   if (!response.ok) {
     throw new Error(`Failed to fetch model recommendations: ${response.statusText}`);
+  const response = await fetch(
+    `${API_BASE}/api/experimental/model-recommendations`,
+  );
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch model recommendations: ${response.statusText}`,
+    );
   }
   const data: ModelRecommendationsResponse = await response.json();
   return data.recommendations || [];

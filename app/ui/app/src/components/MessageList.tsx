@@ -76,6 +76,7 @@ export default function MessageList({
             } catch {
               /* ignored */
             }
+            } catch { /* ignored */ }
           }
         }
       }

@@ -7,7 +7,13 @@ import { useChat } from "./useChats";
 import { useCloudStatus } from "./useCloudStatus";
 import { useModels } from "./useModels";
 import { useSettings } from "./useSettings.ts";
-
+import { useModels } from "./useModels";
+import { useChat } from "./useChats";
+import { useSettings } from "./useSettings.ts";
+import { Model } from "@/gotypes";
+import { getTotalVRAM } from "@/utils/vram.ts";
+import { getInferenceCompute } from "@/api";
+import { useCloudStatus } from "./useCloudStatus";
 export function recommendDefaultModel(totalVRAM: number): string {
   const vram = Math.max(0, Number(totalVRAM) || 0);
 
@@ -34,7 +40,10 @@ export function useSelectedModel(currentChatId?: string, searchQuery?: string) {
   });
 
   const inferenceComputes = inferenceComputeResponse?.inferenceComputes || [];
-
+  const totalVRAM = useMemo(
+    () => getTotalVRAM(inferenceComputes),
+    [inferenceComputes],
+  );
   const totalVRAM = useMemo(() => getTotalVRAM(inferenceComputes), [inferenceComputes]);
 
   const recommendedModel = useMemo(() => recommendDefaultModel(totalVRAM), [totalVRAM]);
@@ -91,7 +100,12 @@ export function useSelectedModel(currentChatId?: string, searchQuery?: string) {
       null
     );
   }, [models, settings.selectedModel, cloudDisabled, recommendedModel]);
-
+  }, [
+    models,
+    settings.selectedModel,
+    cloudDisabled,
+    recommendedModel,
+  ]);
   useEffect(() => {
     if (!selectedModel) return;
 
@@ -107,7 +121,18 @@ export function useSelectedModel(currentChatId?: string, searchQuery?: string) {
       setSettings({ SelectedModel: selectedModel.model, TurboEnabled: false });
     }
   }, [selectedModel, cloudDisabled, settings.selectedModel]);
-
+    if (
+      !cloudDisabled &&
+      settings.turboEnabled &&
+      selectedModel.model !== settings.selectedModel
+    ) {
+      setSettings({ SelectedModel: selectedModel.model, TurboEnabled: false });
+    }
+  }, [
+    selectedModel,
+    cloudDisabled,
+    settings.selectedModel,
+  ]);
   // Set model from chat history when chat data loads
   useEffect(() => {
     // Only run this effect if we have a valid currentChatId
@@ -150,6 +175,9 @@ export function useSelectedModel(currentChatId?: string, searchQuery?: string) {
     const defaultModel =
       models.find((m) => m.model === recommendedModel) ||
       (cloudDisabled ? models.find((m) => !m.isCloud()) : models.find((m) => m.isCloud())) ||
+      (cloudDisabled
+        ? models.find((m) => !m.isCloud())
+        : models.find((m) => m.isCloud())) ||
       models.find((m) => m.digest === undefined || m.digest === "") ||
       models[0];
 
@@ -157,7 +185,13 @@ export function useSelectedModel(currentChatId?: string, searchQuery?: string) {
       setSettings({ SelectedModel: defaultModel.model });
     }
   }, [isLoading, inferenceComputes.length, models.length, settings.selectedModel, cloudDisabled]);
-
+  }, [
+    isLoading,
+    inferenceComputes.length,
+    models.length,
+    settings.selectedModel,
+    cloudDisabled,
+  ]);
   // Add the selected model to the models list if it's not already there
   const allModels = useMemo(() => {
     if (!selectedModel || models.find((m) => m.model === selectedModel.model)) {

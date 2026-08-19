@@ -20,7 +20,7 @@ var (
 	// Model path can be overridden via OLLAMA_TEST_MODEL_PATH env var.
 	// Defaults are example paths; tests skip gracefully when not found.
 	weightStreamingModelPath = os.Getenv("OLLAMA_TEST_MODEL_PATH")
-	weightStreamingGGUFGlob = "*-00001-of-*.gguf"
+	weightStreamingGGUFGlob  = "*-00001-of-*.gguf"
 )
 
 func skipIfNoWeightStreamingModel(t *testing.T) {

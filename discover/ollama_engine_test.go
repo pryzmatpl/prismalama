@@ -70,7 +70,7 @@ type infoRunner struct {
 	exited bool
 }
 
-func (r infoRunner) GetPort() int     { return r.port }
+func (r infoRunner) GetPort() int    { return r.port }
 func (r infoRunner) HasExited() bool { return r.exited }
 
 func TestGetDevicesFromRunnerReadsOllamaEngineInfo(t *testing.T) {

@@ -164,7 +164,9 @@ Ollama runs locally. We don't see your prompts or data when you run locally. Whe
 ## How do I disable Ollama's cloud features?
 
 Ollama can run in local only mode by disabling Ollama's cloud features. By turning off Ollama's cloud features, you will lose the ability to use Ollama's cloud models and web search.
+## How do I disable Ollama Cloud features?
 
+Ollama can run in local only mode by disabling Ollama's cloud features. By turning off Ollama's cloud features, you will lose the ability to use Ollama's cloud models and web search. 
 Set `disable_ollama_cloud` in `~/.ollama/server.json`:
 
 ```json
@@ -180,7 +182,7 @@ OLLAMA_NO_CLOUD=1
 ```
 
 Restart Ollama after changing configuration. Once disabled, Ollama's logs will show `Ollama cloud disabled: true`.
-
+Restart Ollama after changing configuration. Once disabled, Ollama's logs will show `Ollama cloud disabled: true`. 
 ## How can I expose Ollama on my network?
 
 Ollama binds 127.0.0.1 port 11434 by default. Change the bind address with the `OLLAMA_HOST` environment variable.
@@ -249,7 +251,7 @@ Refer to the section [above](#how-do-i-configure-ollama-server) for how to set e
 
 ## How can I use Ollama in Visual Studio Code?
 
-There is already a large collection of plugins available for VS Code as well as other editors that leverage Ollama. See the list of [extensions & plugins](https://github.com/ollama/ollama#extensions--plugins) at the bottom of the main repository readme.
+Install the [Ollama extension](https://marketplace.visualstudio.com/items?itemName=Ollama.ollama) to use Ollama models in VS Code Chat. See the [VS Code integration guide](./integrations/vscode.mdx) for setup and troubleshooting.
 
 ## How do I use Ollama with GPU acceleration in Docker?
 
@@ -344,7 +346,7 @@ When loading a new model, Ollama evaluates the required VRAM for the model again
 
 ## How can I enable Flash Attention?
 
-Flash Attention is a feature of most modern models that can significantly reduce memory usage as the context size grows. To enable Flash Attention, set the `OLLAMA_FLASH_ATTENTION` environment variable to `1` when starting the Ollama server.
+Flash Attention is a feature of most modern models that can significantly reduce memory usage as the context size grows. Ollama uses Flash Attention automatically when the selected backend and devices support it. To force Flash Attention on, set `OLLAMA_FLASH_ATTENTION=1` when starting the Ollama server. To disable it, set `OLLAMA_FLASH_ATTENTION=0`.
 
 ## How can I set the quantization type for the K/V cache?
 
@@ -411,5 +413,4 @@ Ollama for Windows and macOS register as a login item during installation. You c
 - In `Task Manager` go to the `Startup apps` tab, search for `ollama` then click `Disable`
 
 **MacOS**
-
 - Open `Settings` and search for "Login Items", find the `Ollama` entry under `Allow in the Background`, then click the slider to disable.

@@ -39,20 +39,20 @@ type stubConfig struct {
 	ints map[string][]int32
 }
 
-func (stubConfig) Architecture() string                  { return "qwen35moe" }
-func (stubConfig) String(string, ...string) string       { return "" }
-func (stubConfig) Uint(string, ...uint32) uint32         { return 0 }
-func (stubConfig) Float(string, ...float32) float32      { return 0 }
-func (stubConfig) Bool(string, ...bool) bool             { return false }
-func (stubConfig) Strings(string, ...[]string) []string  { return nil }
+func (stubConfig) Architecture() string                 { return "qwen35moe" }
+func (stubConfig) String(string, ...string) string      { return "" }
+func (stubConfig) Uint(string, ...uint32) uint32        { return 0 }
+func (stubConfig) Float(string, ...float32) float32     { return 0 }
+func (stubConfig) Bool(string, ...bool) bool            { return false }
+func (stubConfig) Strings(string, ...[]string) []string { return nil }
 func (c stubConfig) Ints(key string, _ ...[]int32) []int32 {
 	return c.ints[key]
 }
 func (stubConfig) Floats(string, ...[]float32) []float32 { return nil }
 func (stubConfig) Bools(string, ...[]bool) []bool        { return nil }
-func (stubConfig) Len() int                 { return 0 }
-func (stubConfig) Keys() iter.Seq[string]   { return func(func(string) bool) {} }
-func (stubConfig) Value(string) any         { return nil }
+func (stubConfig) Len() int                              { return 0 }
+func (stubConfig) Keys() iter.Seq[string]                { return func(func(string) bool) {} }
+func (stubConfig) Value(string) any                      { return nil }
 
 func TestRopeSectionsFromConfig(t *testing.T) {
 	var _ fs.Config = stubConfig{}

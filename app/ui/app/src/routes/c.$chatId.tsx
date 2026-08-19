@@ -6,6 +6,7 @@ import { ChatSidebar } from "@/components/ChatSidebar";
 import LaunchCommands from "@/components/LaunchCommands";
 import { SidebarLayout } from "@/components/layout/layout";
 import { useChat } from "@/hooks/useChats";
+import { useEffect, useRef } from "react";
 import { useSettings } from "@/hooks/useSettings";
 
 const launchSidebarRequestedKey = "ollama.launchSidebarRequested";

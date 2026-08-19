@@ -31,8 +31,8 @@ import (
 type GPUType string
 
 const (
-	GPUTypeAMD   GPUType = "amd"
-	GPUTypeNVIDIA GPUType = "nvidia"
+	GPUTypeAMD     GPUType = "amd"
+	GPUTypeNVIDIA  GPUType = "nvidia"
 	GPUTypeUnknown GPUType = "unknown"
 )
 
@@ -326,8 +326,8 @@ func buildGPUToNVMEProximityMap(topo GPUTopology, nvmeMountToNUMA map[string]int
 	for _, gpu := range topo.Devices {
 		gpuNUMA := gpu.NUMANode
 		var scored []struct {
-			mount   string
-			score   int
+			mount string
+			score int
 		}
 		for mount, devNUMA := range nvmeMountToNUMA {
 			dist := numaDistance(numaNodes, gpuNUMA, devNUMA)
@@ -562,8 +562,8 @@ type Server struct {
 	// After consecutiveErrorLimit errors, the runner starts failing fast instead of
 	// retrying. This prevents hammering a dead runner and allows faster fallback.
 	consecutiveErrors     int
-	consecutiveErrorLimit int   // defaults to 0; set to 5 in NewServer
-	lastError            string
+	consecutiveErrorLimit int // defaults to 0; set to 5 in NewServer
+	lastError             string
 }
 
 type statusResponse struct {
@@ -1054,14 +1054,14 @@ func (s *Server) completion(w http.ResponseWriter, r *http.Request) {
 
 // healthResponse extends llm.ServerStatusResponse with additional diagnostic fields.
 type healthResponse struct {
-	Status             llm.ServerStatus `json:"status"`
-	Progress           float32          `json:"progress"`
-	ModelPath          string           `json:"model_path"`
-	PythonAlive        bool             `json:"python_alive"`
-	PythonPID          int              `json:"python_pid,omitempty"`
-	ConsecutiveErrors  int              `json:"consecutive_errors"`
-	LastError          string           `json:"last_error,omitempty"`
-	ReadyForInference  bool             `json:"ready_for_inference"`
+	Status            llm.ServerStatus `json:"status"`
+	Progress          float32          `json:"progress"`
+	ModelPath         string           `json:"model_path"`
+	PythonAlive       bool             `json:"python_alive"`
+	PythonPID         int              `json:"python_pid,omitempty"`
+	ConsecutiveErrors int              `json:"consecutive_errors"`
+	LastError         string           `json:"last_error,omitempty"`
+	ReadyForInference bool             `json:"ready_for_inference"`
 }
 
 // recordError increments the consecutive error counter.

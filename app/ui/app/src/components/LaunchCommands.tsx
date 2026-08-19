@@ -1,6 +1,7 @@
 import CopyButton from "@/components/CopyButton";
 import { useSettings } from "@/hooks/useSettings";
-
+import { useSettings } from "@/hooks/useSettings";
+import CopyButton from "@/components/CopyButton";
 interface LaunchCommand {
   id: string;
   name: string;
@@ -26,6 +27,10 @@ const LAUNCH_COMMANDS: LaunchCommand[] = [
     name: "Codex App",
     command: "ollama launch codex-app",
     description: "An AI agent you can delegate real work to, by OpenAI",
+    id: "chatgpt",
+    name: "ChatGPT",
+    command: "ollama launch chatgpt",
+    description: "Complete work with ChatGPT",
     icon: "/launch-icons/codex-app.png",
     iconClassName: "h-full w-full",
   },
@@ -78,6 +83,14 @@ const LAUNCH_COMMANDS: LaunchCommand[] = [
     icon: "/launch-icons/droid.svg",
   },
   {
+    id: "dsh",
+    name: "DeepSeek Harness",
+    command: "ollama launch dsh",
+    description: "DeepSeek's open-source agent harness",
+    icon: "/launch-icons/deepseek-harness.svg",
+    iconClassName: "h-7 w-7",
+  },
+  {
     id: "pi",
     name: "Pi",
     command: "ollama launch pi",
@@ -118,6 +131,10 @@ export default function LaunchCommands() {
                   : `${item.iconClassName ?? "h-8 w-8"} rounded-sm`
               }
             />
+              <img src={item.icon} alt="" className={`${item.iconClassName ?? "h-8 w-8"} rounded-sm`} />
+            </picture>
+          ) : (
+            <img src={item.icon} alt="" className={item.borderless ? "h-full w-full rounded-xl" : `${item.iconClassName ?? "h-8 w-8"} rounded-sm`} />
           )}
         </div>
 
@@ -139,6 +156,7 @@ export default function LaunchCommands() {
               className="text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-200/60 dark:hover:bg-neutral-700/70"
               onCopy={() => {
                 setSettings({ LastHomeView: item.id }).catch(() => {});
+                setSettings({ LastHomeView: item.id }).catch(() => { });
               }}
             />
           </div>
@@ -154,11 +172,17 @@ export default function LaunchCommands() {
       >
         <div className="max-w-[730px] mx-auto w-full px-4 pt-4 pb-20 sm:px-6 sm:pt-6 sm:pb-24 lg:px-8 lg:pt-8 lg:pb-28">
           <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Launch</h1>
+          <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">
+            Launch
+          </h1>
           <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
             Copy a command and run it in your terminal.
           </p>
 
           <div className="mt-6 grid gap-7">{LAUNCH_COMMANDS.map(renderCommandCard)}</div>
+          <div className="mt-6 grid gap-7">
+            {LAUNCH_COMMANDS.map(renderCommandCard)}
+          </div>
         </div>
       </section>
     </main>

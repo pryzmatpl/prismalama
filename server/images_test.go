@@ -2,14 +2,17 @@ package server
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/ollama/ollama/api"
 	"github.com/ollama/ollama/fs/ggml"
 	"github.com/ollama/ollama/manifest"
 	"github.com/ollama/ollama/template"
@@ -132,6 +135,37 @@ func TestGetModelTemplateMetadata(t *testing.T) {
 		}
 	})
 
+	t.Run("prefers chat template with stronger tool round trip", func(t *testing.T) {
+		t.Setenv("OLLAMA_MODELS", t.TempDir())
+		t.Setenv("OLLAMA_GO_TEMPLATE", "")
+
+		_, digest := createBinFile(t, ggml.KV{
+			"general.architecture": "llama",
+			"tokenizer.chat_template": `{% if tools %}{{ tools }}{% endif %}
+{% for message in messages %}
+{% if message.tool_calls %}
+{% for tool_call in message.tool_calls %}{{ tool_call.function.name }}{% endfor %}
+{% endif %}
+{% if message.role == 'tool' %}tool_response {{ message.content }}{% endif %}
+{% endfor %}`,
+		}, nil)
+		writeTestModelManifest(t, "chat-template-tool-round-trip", digest, `{{ if .Tools }}tools{{ end }}
+{{ range .Messages }}
+{{ range .ToolCalls }}{{ .Function.Name }}{{ end }}
+{{ end }}`)
+
+		m, err := GetModel("chat-template-tool-round-trip")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !m.PreferChatTemplate {
+			t.Fatal("expected chat template to be preferred")
+		}
+		if got := m.CheckCapabilities(model.CapabilityTools); got != nil {
+			t.Fatalf("expected tools capability, got %v", got)
+		}
+	})
+
 	t.Run("keeps Go TEMPLATE when chat template has weaker tool support", func(t *testing.T) {
 		t.Setenv("OLLAMA_MODELS", t.TempDir())
 		t.Setenv("OLLAMA_GO_TEMPLATE", "")
@@ -249,7 +283,7 @@ func writeTestModelManifest(t *testing.T, name, digest, tmpl string) {
 	}
 
 	layers := []manifest.Layer{modelLayer, templateLayer}
-	configLayer, err := createConfigLayer(layers, model.ConfigV2{
+	configLayer, err := createConfigLayer(model.ConfigV2{
 		ModelFormat:   "gguf",
 		ModelFamily:   "llama",
 		ModelFamilies: []string{"llama"},
@@ -483,6 +517,19 @@ func TestModelCapabilities(t *testing.T) {
 				Template: chatTemplate,
 			},
 			expectedCaps: []model.Capability{model.CapabilityCompletion, model.CapabilityVision},
+		},
+		{
+			name: "nemotron3 safetensors suppresses vision and audio but keeps thinking",
+			model: Model{
+				Config: model.ConfigV2{
+					ModelFormat:  "safetensors",
+					Parser:       "nemotron-3-nano",
+					Renderer:     "nemotron-3-nano",
+					Capabilities: []string{"completion", "vision", "audio"},
+				},
+				Template: chatTemplate,
+			},
+			expectedCaps: []model.Capability{model.CapabilityCompletion, model.CapabilityTools, model.CapabilityThinking},
 		},
 		{
 			name: "gemma4 small safetensors suppresses vision and audio",
@@ -750,5 +797,58 @@ func TestPullModelManifest(t *testing.T) {
 				t.Fatal("expected at least one layer")
 			}
 		})
+	}
+}
+
+// TestPullModelDuplicateDigestVerifiesBlob pulls a manifest whose config and
+// layer share a digest. The registry redirects blob downloads via Location to
+// an "internal" path serving bytes that don't match the digest, so PullModel
+// must reject the pull with errDigestMismatch.
+func TestPullModelDuplicateDigestVerifiesBlob(t *testing.T) {
+	t.Setenv("OLLAMA_MODELS", t.TempDir())
+
+	const bogusDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+	backendURL := ""
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "/manifests/"):
+			w.Header().Set("Content-Type", "application/vnd.docker.distribution.manifest.v2+json")
+			fmt.Fprintf(w, `{
+				"schemaVersion": 2,
+				"mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+				"config": {
+					"mediaType": "application/vnd.ollama.image.config",
+					"digest": %q,
+					"size": 5
+				},
+				"layers": [{
+					"mediaType": "application/vnd.ollama.image.model",
+					"digest": %q,
+					"size": 5
+				}]
+			}`, bogusDigest, bogusDigest)
+		case strings.Contains(r.URL.Path, "/internal/blobs/"):
+			w.Write([]byte("attacker-controlled-bytes"))
+		case strings.Contains(r.URL.Path, "/blobs/"):
+			w.Header().Set("Location", backendURL+"/internal"+r.URL.Path)
+			w.WriteHeader(http.StatusOK)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+	backendURL = ts.URL
+
+	u, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := model.ParseName(u.Host + "/test/attack")
+	n.ProtocolScheme = "http"
+
+	err = PullModel(t.Context(), n.String(), &registryOptions{Insecure: true}, func(api.ProgressResponse) {})
+	if !errors.Is(err, errDigestMismatch) {
+		t.Fatalf("PullModel = %v, want errDigestMismatch (unverified blob would persist)", err)
 	}
 }

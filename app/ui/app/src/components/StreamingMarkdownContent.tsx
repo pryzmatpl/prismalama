@@ -2,6 +2,11 @@ import type { BundledLanguage } from "shiki";
 import React from "react";
 import { Streamdown, defaultRehypePlugins, defaultRemarkPlugins } from "streamdown";
 import { highlighter } from "@/lib/highlighter";
+import {
+  Streamdown,
+  defaultRehypePlugins,
+  defaultRemarkPlugins,
+} from "streamdown";
 import remarkCitationParser from "@/utils/remarkCitationParser";
 import CopyButton from "./CopyButton";
 
@@ -30,7 +35,16 @@ const extractText = (node: React.ReactNode): string => {
 };
 
 const safeRehypePlugins = [defaultRehypePlugins.katex];
-
+const CodeBlock = React.memo(
+  ({ children }: React.HTMLAttributes<HTMLPreElement>) => {
+    // Extract code and language from children
+    const codeElement = children as React.ReactElement<{
+      className?: string;
+      children: React.ReactNode;
+    }>;
+    const language =
+      codeElement.props.className?.replace(/language-/, "") || "";
+    const codeText = extractText(codeElement.props.children);
 const CodeBlock = React.memo(({ children }: React.HTMLAttributes<HTMLPreElement>) => {
   // Extract code and language from children
   const codeElement = children as React.ReactElement<{

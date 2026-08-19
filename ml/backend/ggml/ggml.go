@@ -2,7 +2,7 @@ package ggml
 
 // #cgo linux LDFLAGS: -lrt -lpthread -ldl -lstdc++ -lm
 // #cgo windows LDFLAGS: -lpthread
-// #cgo CPPFLAGS: -I${SRCDIR}/ggml/include
+// #cgo CPPFLAGS: -I${SRCDIR}/../../../llama/llama.cpp/ggml/include
 // #include <stdbool.h>
 // #include <stdlib.h>
 // #include <stdint.h>

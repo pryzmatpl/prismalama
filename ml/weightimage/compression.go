@@ -190,10 +190,10 @@ func (cw *CompressedWeights) String() string {
 }
 
 type DCTWeights struct {
-	Width    int
-	Height   int
-	DCTData  []float32
-	Quant    []float32
+	Width     int
+	Height    int
+	DCTData   []float32
+	Quant     []float32
 	Frequency []float32
 }
 
@@ -249,8 +249,8 @@ func (d *DCTWeights) dct2d(input []float32, w, h int) []float32 {
 				}
 			}
 
-			alphaU := float32(math.Sqrt(2.0/float64(w)))
-			alphaV := float32(math.Sqrt(2.0/float64(h)))
+			alphaU := float32(math.Sqrt(2.0 / float64(w)))
+			alphaV := float32(math.Sqrt(2.0 / float64(h)))
 
 			if u == 0 {
 				alphaU = float32(1.0 / float64(w))
@@ -312,8 +312,8 @@ func (d *DCTWeights) idct2d(input []float32, w, h int) []float32 {
 				}
 			}
 
-			alphaU := float32(math.Sqrt(2.0/float64(w)))
-			alphaV := float32(math.Sqrt(2.0/float64(h)))
+			alphaU := float32(math.Sqrt(2.0 / float64(w)))
+			alphaV := float32(math.Sqrt(2.0 / float64(h)))
 
 			if x == 0 {
 				alphaU = float32(1.0 / float64(w))

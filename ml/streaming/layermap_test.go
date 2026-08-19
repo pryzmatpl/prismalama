@@ -80,9 +80,9 @@ func TestBuildLayerMap_FullTensorNames(t *testing.T) {
 		"blk.1.attn_v.weight": true,
 	}
 	wantOutput := map[string]bool{
-		"token_embd.weight":   true,
-		"output_norm.weight":  true,
-		"output.weight":       true,
+		"token_embd.weight":  true,
+		"output_norm.weight": true,
+		"output.weight":      true,
 	}
 
 	assertLayerTensors(t, lm.Layers[0], "blk.0", wantBlock0)

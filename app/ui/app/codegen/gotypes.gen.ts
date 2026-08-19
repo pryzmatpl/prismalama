@@ -296,6 +296,13 @@ export class InferenceComputeResponse {
   convertValues(a: any, classs: any, asMap: boolean = false): any {
     if (!a) {
       return a;
+    inferenceComputes: InferenceCompute[];
+    defaultContextLength: number;
+
+    constructor(source: any = {}) {
+        if ('string' === typeof source) source = JSON.parse(source);
+        this.inferenceComputes = this.convertValues(source["inferenceComputes"], InferenceCompute);
+        this.defaultContextLength = source["defaultContextLength"];
     }
     if (Array.isArray(a)) {
       return (a as any[]).map((elem) => this.convertValues(elem, classs));
@@ -440,6 +447,42 @@ export class Settings {
     this.LastHomeView = source["LastHomeView"];
     this.AutoUpdateEnabled = source["AutoUpdateEnabled"];
   }
+    Expose: boolean;
+    Browser: boolean;
+    Survey: boolean;
+    Models: string;
+    Agent: boolean;
+    Tools: boolean;
+    WorkingDir: string;
+    ContextLength: number;
+    TurboEnabled: boolean;
+    WebSearchEnabled: boolean;
+    ThinkEnabled: boolean;
+    ThinkLevel: string;
+    SelectedModel: string;
+    SidebarOpen: boolean;
+    LastHomeView: string;
+    AutoUpdateEnabled: boolean;
+
+    constructor(source: any = {}) {
+        if ('string' === typeof source) source = JSON.parse(source);
+        this.Expose = source["Expose"];
+        this.Browser = source["Browser"];
+        this.Survey = source["Survey"];
+        this.Models = source["Models"];
+        this.Agent = source["Agent"];
+        this.Tools = source["Tools"];
+        this.WorkingDir = source["WorkingDir"];
+        this.ContextLength = source["ContextLength"];
+        this.TurboEnabled = source["TurboEnabled"];
+        this.WebSearchEnabled = source["WebSearchEnabled"];
+        this.ThinkEnabled = source["ThinkEnabled"];
+        this.ThinkLevel = source["ThinkLevel"];
+        this.SelectedModel = source["SelectedModel"];
+        this.SidebarOpen = source["SidebarOpen"];
+        this.LastHomeView = source["LastHomeView"];
+        this.AutoUpdateEnabled = source["AutoUpdateEnabled"];
+    }
 }
 export class SettingsResponse {
   settings: Settings;
@@ -564,6 +607,14 @@ export class ModelUpstreamResponse {
     this.stale = source["stale"];
     this.error = source["error"];
   }
+    stale: boolean;
+    error?: string;
+
+    constructor(source: any = {}) {
+        if ('string' === typeof source) source = JSON.parse(source);
+        this.stale = source["stale"];
+        this.error = source["error"];
+    }
 }
 export class Page {
   url: string;

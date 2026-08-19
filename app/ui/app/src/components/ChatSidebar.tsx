@@ -7,7 +7,7 @@ import { ChatsResponse } from "@/gotypes";
 import { useChats } from "@/hooks/useChats";
 import { useDeleteChat } from "@/hooks/useDeleteChat";
 import { useRenameChat } from "@/hooks/useRenameChat";
-
+import { CogIcon, RocketLaunchIcon } from "@heroicons/react/24/outline";
 // there's a hidden debug feature to copy a chat's data to the clipboard by
 // holding shift and clicking this many times within this many seconds
 const DEBUG_SHIFT_CLICKS_REQUIRED = 5;
@@ -260,9 +260,8 @@ export function ChatSidebar({ currentChatId }: ChatSidebarProps) {
         <Link
           href="/c/new"
           mask={{ to: "/" }}
-          className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 dark:text-neutral-100 ${
-            currentChatId === "new" ? "bg-neutral-100 dark:bg-neutral-800" : ""
-          }`}
+          className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 dark:text-neutral-100 ${currentChatId === "new" ? "bg-neutral-100 dark:bg-neutral-800" : ""
+            }`}
           draggable={false}
         >
           <svg
@@ -287,6 +286,10 @@ export function ChatSidebar({ currentChatId }: ChatSidebarProps) {
           className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 dark:text-neutral-100 cursor-pointer ${
             currentChatId === "launch" ? "bg-neutral-100 dark:bg-neutral-800" : ""
           }`}
+          className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 dark:text-neutral-100 cursor-pointer ${currentChatId === "launch"
+            ? "bg-neutral-100 dark:bg-neutral-800"
+            : ""
+            }`}
           draggable={false}
         >
           <RocketLaunchIcon className="h-5 w-5 stroke-current" />
@@ -316,12 +319,19 @@ export function ChatSidebar({ currentChatId }: ChatSidebarProps) {
                   className={`allow-context-menu flex items-center relative text-sm text-neutral-800 dark:text-neutral-400 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 ${
                     chat.id === currentChatId ? "bg-neutral-100 text-black dark:bg-neutral-800" : ""
                   }`}
+                  className={`allow-context-menu flex items-center relative text-sm text-neutral-800 dark:text-neutral-400 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 ${chat.id === currentChatId
+                    ? "bg-neutral-100 text-black dark:bg-neutral-800"
+                    : ""
+                    }`}
                   onMouseEnter={() => handleMouseEnter(chat.id)}
                   onContextMenu={(e) =>
                     handleContextMenu(
                       e,
                       chat.id,
                       chat.title || chat.userExcerpt || chat.createdAt.toLocaleString(),
+                      chat.title ||
+                      chat.userExcerpt ||
+                      chat.createdAt.toLocaleString(),
                     )
                   }
                 >

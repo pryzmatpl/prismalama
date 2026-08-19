@@ -61,6 +61,9 @@ type Linear struct {
 }
 
 func NewLinear(weight *mlx.Array, bias *mlx.Array) *Linear {
+	if bias != nil && bias.Valid() && bias.DType() != weight.DType() {
+		bias = bias.AsType(weight.DType())
+	}
 	return &Linear{Weight: weight, Bias: bias}
 }
 
@@ -82,7 +85,7 @@ type QuantizedLinear struct {
 	Scales      *mlx.Array // Scale factors for dequantization
 	QBiases     *mlx.Array // Quantization biases (nil for nvfp4)
 	Bias        *mlx.Array // Layer bias [output_dims] or nil
-	GlobalScale *mlx.Array // Per-tensor global scale for double-scale nvfp4 (nil for standard)
+	GlobalScale *mlx.Array // Per-tensor or per-row global scale for double-scale nvfp4 (nil for standard)
 	GroupSize   int
 	Bits        int
 	Mode        string
@@ -95,6 +98,9 @@ func NewQuantizedLinear(weight *mlx.Array, bias *mlx.Array, groupSize, bits int,
 	} else {
 		mlx.Eval(qw, scales)
 	}
+	if bias != nil && bias.Valid() && bias.DType() != weight.DType() {
+		bias = bias.AsType(weight.DType())
+	}
 	return &QuantizedLinear{
 		Weight:    qw,
 		Scales:    scales,
@@ -106,21 +112,30 @@ func NewQuantizedLinear(weight *mlx.Array, bias *mlx.Array, groupSize, bits int,
 	}
 }
 
+var quantizedLinearOutputScale = mlx.Compile2(
+	"QuantizedLinearOutputScale",
+	func(out, scale *mlx.Array) *mlx.Array {
+		return mlx.Mul(out, scale).AsType(out.DType())
+	},
+	mlx.Shapeless(),
+)
+
 func (ql *QuantizedLinear) Forward(x *mlx.Array) *mlx.Array {
-	var out *mlx.Array
+	out := mlx.QuantizedMatmul(x, ql.Weight, ql.Scales, ql.QBiases, true, ql.GroupSize, ql.Bits, ql.Mode)
 	if ql.GlobalScale != nil {
 		// Double-scale nvfp4 (e.g., NVIDIA ModelOpt): standard quantized_matmul
-		// followed by global_scale multiply. The global_scale is a per-tensor
-		// F32 scalar (weight_scale_2 in NVIDIA's format).
+		// followed by global_scale multiply. The global_scale is F32, per-tensor
+		// (weight_scale_2 in NVIDIA's format) or per-row.
 		// TODO: switch to a fused double-scale matmul once MLX has kernel
 		// coverage for this path.
-		out = mlx.QuantizedMatmul(x, ql.Weight, ql.Scales, ql.QBiases, true, ql.GroupSize, ql.Bits, ql.Mode)
-		out = mlx.Mul(out, ql.GlobalScale)
-	} else {
-		out = mlx.QuantizedMatmul(x, ql.Weight, ql.Scales, ql.QBiases, true, ql.GroupSize, ql.Bits, ql.Mode)
+		out = quantizedLinearOutputScale(out, ql.GlobalScale)
 	}
 	if ql.Bias != nil && ql.Bias.Valid() {
-		out = out.Add(ql.Bias)
+		bias := ql.Bias
+		if bias.DType() != out.DType() {
+			bias = bias.AsType(out.DType())
+		}
+		out = out.Add(bias)
 	}
 	return out
 }
@@ -182,11 +197,7 @@ func (qe *QuantizedEmbedding) Forward(indices *mlx.Array) *mlx.Array {
 	if qe.QBiases != nil && qe.QBiases.Valid() {
 		qbiases = qe.QBiases.TakeAxis(indices, 0)
 	}
-	out := mlx.Dequantize(weight, scales, qbiases, qe.GroupSize, qe.Bits, qe.Mode)
-	if qe.GlobalScale != nil {
-		out = mlx.Mul(out, qe.GlobalScale)
-	}
-	return out
+	return mlx.Dequantize(weight, scales, qbiases, qe.GroupSize, qe.Bits, qe.Mode, qe.GlobalScale)
 }
 
 func (qe *QuantizedEmbedding) AsLinear() LinearLayer {

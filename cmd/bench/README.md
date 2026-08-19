@@ -1,18 +1,19 @@
-## Prismalama / Ollama benchmark tool
+Ollama Benchmark Tool
+---------------------
 
 A Go-based command-line tool for benchmarking Ollama models with configurable parameters, warmup phases, TTFT tracking, VRAM monitoring, and benchstat/CSV output.
 
 ## Features
 
-- Benchmark multiple models in a single run
-- Support for both text and image prompts
-- Configurable generation parameters (temperature, max tokens, seed, etc.)
-- Warmup phase before timed epochs to stabilize measurements
-- Time-to-first-token (TTFT) tracking per epoch
-- Model metadata display (parameter size, quantization level, family)
-- VRAM and CPU memory usage tracking via running process info
-- Controlled prompt token length for reproducible benchmarks
-- Benchstat and CSV output formats
+ * Benchmark multiple models in a single run
+ * Support for both text and image prompts
+ * Configurable generation parameters (temperature, max tokens, seed, etc.)
+ * Warmup phase before timed epochs to stabilize measurements
+ * Time-to-first-token (TTFT) tracking per epoch
+ * Model metadata display (parameter size, quantization level, family)
+ * VRAM and CPU memory usage tracking via running process info
+ * Controlled prompt token length for reproducible benchmarks
+ * Benchstat and CSV output formats
 
 ## Building from Source
 
@@ -62,23 +63,23 @@ benchstat -col /name gemma.bench
 
 ## Command Line Options
 
-| Option         | Description                                      | Default                |
-| -------------- | ------------------------------------------------ | ---------------------- |
-| -model         | Comma-separated list of models to benchmark      | (required)             |
-| -epochs        | Number of iterations per model                   | 6                      |
-| -max-tokens    | Maximum tokens for model response                | 200                    |
-| -temperature   | Temperature parameter                            | 0.0                    |
-| -seed          | Random seed                                      | 0 (random)             |
-| -timeout       | Timeout in seconds                               | 300                    |
-| -p             | Prompt text                                      | (default story prompt) |
-| -image         | Image file to include in prompt                  |                        |
-| -k             | Keep-alive duration in seconds                   | 0                      |
-| -format        | Output format (benchstat, csv)                   | benchstat              |
-| -output        | Output file for results                          | "" (stdout)            |
-| -warmup        | Number of warmup requests before timing          | 1                      |
-| -prompt-tokens | Generate prompt targeting ~N tokens (0 = use -p) | 0                      |
-| -v             | Verbose mode                                     | false                  |
-| -debug         | Show debug information                           | false                  |
+| Option  	| Description | Default |
+|----------|-------------|---------|
+| -model	| Comma-separated list of models to benchmark	| (required)		|
+| -epochs	| Number of iterations per model		| 6			|
+| -max-tokens	| Maximum tokens for model response		| 200			|
+| -temperature	| Temperature parameter				| 0.0			|
+| -seed		| Random seed					| 0 (random)		|
+| -timeout	| Timeout in seconds				| 300			|
+| -p		| Prompt text					| (default story prompt)	|
+| -image	| Image file to include in prompt		| 			|
+| -k		| Keep-alive duration in seconds		| 0			|
+| -format	| Output format (benchstat, csv)		| benchstat		|
+| -output	| Output file for results			| "" (stdout)		|
+| -warmup	| Number of warmup requests before timing	| 1			|
+| -prompt-tokens	| Generate prompt targeting ~N tokens (0 = use -p)	| 0		|
+| -v		| Verbose mode					| false			|
+| -debug	| Show debug information			| false			|
 
 ## Output Formats
 
@@ -96,14 +97,12 @@ BenchmarkModel/name=gemma3/step=total 1 2861047625 ns/op
 ```
 
 Use with benchstat:
-
 ```
 ./ollama-bench -model gemma3 -epochs 6 > gemma3.bench
 benchstat -col /step gemma3.bench
 ```
 
 Compare two runs:
-
 ```
 ./ollama-bench -model gemma3 -epochs 6 > before.bench
 # ... make changes ...
@@ -129,16 +128,16 @@ gemma3,total,1,2861047625,0
 
 The tool reports the following metrics for each epoch:
 
-- **prefill**: Time spent processing the prompt (ns/token)
-- **generate**: Time spent generating the response (ns/token)
-- **ttft**: Time to first token -- latency from request start to first response content
-- **load**: Model loading time (one-time cost)
-- **total**: Total request duration
+ * **prefill**: Time spent processing the prompt (ns/token)
+ * **generate**: Time spent generating the response (ns/token)
+ * **ttft**: Time to first token -- latency from request start to first response content
+ * **load**: Model loading time (one-time cost)
+ * **total**: Total request duration
 
 Additionally, the model info comment line (displayed once per model before epochs) includes:
 
-- **Params**: Model parameter count (e.g., 4.3B)
-- **Quant**: Quantization level (e.g., Q4_K_M)
-- **Family**: Model family (e.g., gemma3)
-- **Size**: Total model memory in bytes
-- **VRAM**: GPU memory used by the loaded model (when Size > VRAM, the difference is CPU spill)
+ * **Params**: Model parameter count (e.g., 4.3B)
+ * **Quant**: Quantization level (e.g., Q4_K_M)
+ * **Family**: Model family (e.g., gemma3)
+ * **Size**: Total model memory in bytes
+ * **VRAM**: GPU memory used by the loaded model (when Size > VRAM, the difference is CPU spill)

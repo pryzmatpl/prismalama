@@ -29,14 +29,14 @@ func (s LayerState) String() string {
 // BudgetTracker manages a fixed byte budget for layer residency. It tracks which layers are
 // loaded and decides which to evict when the budget is exceeded. Thread-safe.
 type BudgetTracker struct {
-	mu         sync.Mutex
+	mu          sync.Mutex
 	budgetBytes uint64
 	usedBytes   uint64
 	states      []layerEntry
 }
 
 type layerEntry struct {
-	state    LayerState
+	state     LayerState
 	sizeBytes uint64
 	seqNo     uint64 // incremented on each load; lowest seqNo evicted first (LRU)
 }

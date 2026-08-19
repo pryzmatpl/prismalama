@@ -97,13 +97,13 @@ func nextPow2(n int) int {
 }
 
 type LayerWeights struct {
-	Name     string
-	Shape    [2]int
-	Data     []float32
-	Image    *WeightImage
-	Offset   uint64
-	Size     uint64
-	DType    string
+	Name   string
+	Shape  [2]int
+	Data   []float32
+	Image  *WeightImage
+	Offset uint64
+	Size   uint64
+	DType  string
 }
 
 func NewLayerWeights(name string, data []float32, rows, cols int) *LayerWeights {
