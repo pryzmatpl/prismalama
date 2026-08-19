@@ -106,18 +106,18 @@ Peak VRAM: **one transformer block + KV cache + activations**.
 
 ## Model implementations
 
-| Class | Architecture | Customizations |
-|-------|-------------|----------------|
-| `AirLLMLlama2` | Llama 2/3 | None (default base) |
-| `AirLLMQWen` | QWen | Custom layer names, rotary_pos_emb_list, layer_past args |
-| `AirLLMQWen2` | QWen2 | Disables BetterTransformer |
-| `AirLLMQWen35` | QWen3.5 | Disables BetterTransformer |
-| `AirLLMChatGLM` | ChatGLM/GLM4 | Custom embed/norm/head paths, rotary_pos_emb, kv_cache args |
-| `AirLLMBaichuan` | Baichuan | Custom SentencePiece tokenizer |
-| `AirLLMInternLM` | InternLM | Disables BetterTransformer |
-| `AirLLMMistral` | Mistral | Disables BetterTransformer |
-| `AirLLMMixtral` | Mixtral | Disables BetterTransformer |
-| `AirLLMLlamaMlx` | Llama (macOS) | Entirely MLX-based (no PyTorch) |
+| Class            | Architecture  | Customizations                                              |
+| ---------------- | ------------- | ----------------------------------------------------------- |
+| `AirLLMLlama2`   | Llama 2/3     | None (default base)                                         |
+| `AirLLMQWen`     | QWen          | Custom layer names, rotary_pos_emb_list, layer_past args    |
+| `AirLLMQWen2`    | QWen2         | Disables BetterTransformer                                  |
+| `AirLLMQWen35`   | QWen3.5       | Disables BetterTransformer                                  |
+| `AirLLMChatGLM`  | ChatGLM/GLM4  | Custom embed/norm/head paths, rotary_pos_emb, kv_cache args |
+| `AirLLMBaichuan` | Baichuan      | Custom SentencePiece tokenizer                              |
+| `AirLLMInternLM` | InternLM      | Disables BetterTransformer                                  |
+| `AirLLMMistral`  | Mistral       | Disables BetterTransformer                                  |
+| `AirLLMMixtral`  | Mixtral       | Disables BetterTransformer                                  |
+| `AirLLMLlamaMlx` | Llama (macOS) | Entirely MLX-based (no PyTorch)                             |
 
 ### AutoModel factory
 
@@ -132,10 +132,10 @@ Detection: reads `config.architectures[0]` and maps to the appropriate class.
 
 ## Persistence layer
 
-| Backend | File format | Platform | Marker |
-|---------|------------|----------|--------|
-| `SafetensorModelPersister` | `{layer}.safetensors` | Linux | `.safetensors.done` |
-| `MlxModelPersister` | `{layer}.mlx.npz` | macOS | `.mlx.done` |
+| Backend                    | File format           | Platform | Marker              |
+| -------------------------- | --------------------- | -------- | ------------------- |
+| `SafetensorModelPersister` | `{layer}.safetensors` | Linux    | `.safetensors.done` |
+| `MlxModelPersister`        | `{layer}.mlx.npz`     | macOS    | `.mlx.done`         |
 
 Platform auto-selected via `ModelPersister.get_model_persister()`.
 
@@ -158,18 +158,19 @@ Multi-NVMe parallel reads for workstations with 4+ drives.
 
 **File:** `src/prismalama/nvme_striping.py`
 
-| Component | Purpose |
-|-----------|---------|
-| `discover_nvme_mounts()` | Read `AIRLLM_NVME_MOUNTS` env var, validate paths |
-| `_build_shard_to_nvme_map()` | Map shard files → NVMe mounts (env, manifest, or infer) |
-| `NVMEStripingModelPersister` | Wraps SafetensorModelPersister with parallel reads |
+| Component                    | Purpose                                                  |
+| ---------------------------- | -------------------------------------------------------- |
+| `discover_nvme_mounts()`     | Read `AIRLLM_NVME_MOUNTS` env var, validate paths        |
+| `_build_shard_to_nvme_map()` | Map shard files → NVMe mounts (env, manifest, or infer)  |
+| `NVMEStripingModelPersister` | Wraps SafetensorModelPersister with parallel reads       |
 | `inject_striped_persister()` | Monkey-patch into airllm.persist before AutoModel import |
-| `_parallel_read_test()` | Benchmark concurrent read throughput |
+| `_parallel_read_test()`      | Benchmark concurrent read throughput                     |
 
 **NUMA-aware routing (HC-50):** `AIRLLM_NUMA_PROXIMITY_MAP` (JSON) maps GPU index → NVMe
 mounts sorted by NUMA closeness. Avoids cross-socket memory bandwidth on multi-socket systems.
 
 **Environment:**
+
 - `AIRLLM_NVME_MOUNTS` — colon-separated mount paths (required for striping)
 - `AIRLLM_SHARD_MOUNTS` — explicit shard → mount mappings
 - `AIRLLM_NUMA_PROXIMITY_MAP` — GPU → NVMe proximity (JSON)
@@ -182,12 +183,12 @@ Ollama-compatible HTTP server spawned by the Go `airllmrunner` on `port+1`.
 
 ### Endpoints
 
-| Route | Method | Purpose |
-|-------|--------|---------|
-| `/load` | POST | Load model (runs in daemon thread) |
-| `/completion` | POST | Stream token generation (chunked JSON) |
-| `/embedding` | POST | Dummy 768-dim embeddings |
-| `/health` | GET | Server status + progress |
+| Route         | Method | Purpose                                |
+| ------------- | ------ | -------------------------------------- |
+| `/load`       | POST   | Load model (runs in daemon thread)     |
+| `/completion` | POST   | Stream token generation (chunked JSON) |
+| `/embedding`  | POST   | Dummy 768-dim embeddings               |
+| `/health`     | GET    | Server status + progress               |
 
 ### Data models
 
@@ -207,15 +208,15 @@ Controlled by `AIRLLM_POST_INFER_CLEANUP` (default: `1`).
 
 ## Environment variables
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `AIRLLM_COMPRESSION` | `4bit` | Weight compression (`4bit`, `8bit`, `none`) |
-| `AIRLLM_DEVICE` | `cuda:0` | PyTorch device (ROCm uses same API) |
-| `AIRLLM_POST_INFER_CLEANUP` | `1` | `0` to skip post-inference GPU cache flush |
-| `AIRLLM_NVME_MOUNTS` | unset | Colon-separated NVMe mount paths for striping |
-| `AIRLLM_SHARD_MOUNTS` | unset | Shard → mount mappings |
-| `AIRLLM_NUMA_PROXIMITY_MAP` | unset | JSON GPU → NVMe proximity map |
-| `PRISMALAMA_AIRLLM_PYTHONPATH` | unset | Prepend to PYTHONPATH for dev-tree detection |
+| Variable                       | Default  | Purpose                                       |
+| ------------------------------ | -------- | --------------------------------------------- |
+| `AIRLLM_COMPRESSION`           | `4bit`   | Weight compression (`4bit`, `8bit`, `none`)   |
+| `AIRLLM_DEVICE`                | `cuda:0` | PyTorch device (ROCm uses same API)           |
+| `AIRLLM_POST_INFER_CLEANUP`    | `1`      | `0` to skip post-inference GPU cache flush    |
+| `AIRLLM_NVME_MOUNTS`           | unset    | Colon-separated NVMe mount paths for striping |
+| `AIRLLM_SHARD_MOUNTS`          | unset    | Shard → mount mappings                        |
+| `AIRLLM_NUMA_PROXIMITY_MAP`    | unset    | JSON GPU → NVMe proximity map                 |
+| `PRISMALAMA_AIRLLM_PYTHONPATH` | unset    | Prepend to PYTHONPATH for dev-tree detection  |
 
 ---
 

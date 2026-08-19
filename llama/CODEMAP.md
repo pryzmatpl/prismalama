@@ -8,13 +8,13 @@
 
 ## Files
 
-| File | Lines | Purpose |
-|------|------:|---------|
-| `llama.go` | 810 | Primary CGo wrapper — devices, model, context, batch, sampling, vision |
-| `llama_test.go` | — | Binding tests |
-| `sampling_ext.h` | 50 | C header bridge for sampling (common_sampler, grammar) |
-| `build-info.cpp` | 5 | Build metadata (FETCH_HEAD commit hash) |
-| `build-info.cpp.in` | 5 | Template for `@FETCH_HEAD@` substitution |
+| File                | Lines | Purpose                                                                |
+| ------------------- | ----: | ---------------------------------------------------------------------- |
+| `llama.go`          |   810 | Primary CGo wrapper — devices, model, context, batch, sampling, vision |
+| `llama_test.go`     |     — | Binding tests                                                          |
+| `sampling_ext.h`    |    50 | C header bridge for sampling (common_sampler, grammar)                 |
+| `build-info.cpp`    |     5 | Build metadata (FETCH_HEAD commit hash)                                |
+| `build-info.cpp.in` |     5 | Template for `@FETCH_HEAD@` substitution                               |
 
 ---
 
@@ -126,12 +126,14 @@ func (m *MtmdContext) MultimodalTokenize(text string, images [][]byte) ([]MtmdCh
 32 local patches maintained in `patches/README.md` with audit table.
 
 **Categories:**
+
 - **Model-specific (keep local):** pretokenizer, clip-unicode, solar-pro, DeepSeek regex, interleave MRoPE
 - **Multi-vendor (keep local):** GPU discovery enhancements, NVML fallback, device sorting
 - **Robustness (keep local):** harden exception registration, exit vs abort, skip large CUDA batches
 - **Safe to upstream:** argsort, batch size hint, no-alloc mode, DXGI+PDH memory detection, MLA flash attention
 
 **Sync commands:**
+
 ```bash
 make -f Makefile.sync clean apply-patches sync    # Full sync
 make -f Makefile.sync sync-audit-check            # CI guard

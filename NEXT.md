@@ -18,15 +18,15 @@ and generate all use that path. Proven 2026-08-18: `qwen3:0.6b` on ROCm /
 
 ## In-flight tickets
 
-| ID                                                              | Title                                                                                 | Owner | Status      |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ----- | ----------- |
-| [JAISIU-2156](https://pryzmat.youtrack.cloud/issue/JAISIU-2156) | Epic — Prismalama North-Star (2026–2027)                                              | agent | Submitted   |
-| [JAISIU-2295](https://pryzmat.youtrack.cloud/issue/JAISIU-2295) | Epic — Phase 1 Streaming Core                                                         | agent | In Progress |
-| [JAISIU-2296](https://pryzmat.youtrack.cloud/issue/JAISIU-2296) | P1-1: HIP `libggml-hip.so` dlopen on gfx1100 — drop FA tiles D≥576                    | agent | In Progress |
-| [JAISIU-2297](https://pryzmat.youtrack.cloud/issue/JAISIU-2297) | P1-2: Keep GGUF blocks resident when they fit `OLLAMA_STREAMING_BUDGET`               | agent | In Progress |
-| [JAISIU-2298](https://pryzmat.youtrack.cloud/issue/JAISIU-2298) | P1-3: GPU discovery fallback when `llama-server` is missing                           | agent | In Progress |
-| [JAISIU-2299](https://pryzmat.youtrack.cloud/issue/JAISIU-2299) | P1-4: `docs/STREAMING_BENCHMARK.md` on this 7900 XTX                                  | agent | In Progress |
-| [JAISIU-2300](https://pryzmat.youtrack.cloud/issue/JAISIU-2300) | P1-5: Wire streaming compute into `runner/llamarunner`                                | agent | In Progress |
+| ID                                                              | Title                                                                   | Owner | Status      |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------- | ----- | ----------- |
+| [JAISIU-2156](https://pryzmat.youtrack.cloud/issue/JAISIU-2156) | Epic — Prismalama North-Star (2026–2027)                                | agent | Submitted   |
+| [JAISIU-2295](https://pryzmat.youtrack.cloud/issue/JAISIU-2295) | Epic — Phase 1 Streaming Core                                           | agent | In Progress |
+| [JAISIU-2296](https://pryzmat.youtrack.cloud/issue/JAISIU-2296) | P1-1: HIP `libggml-hip.so` dlopen on gfx1100 — drop FA tiles D≥576      | agent | In Progress |
+| [JAISIU-2297](https://pryzmat.youtrack.cloud/issue/JAISIU-2297) | P1-2: Keep GGUF blocks resident when they fit `OLLAMA_STREAMING_BUDGET` | agent | In Progress |
+| [JAISIU-2298](https://pryzmat.youtrack.cloud/issue/JAISIU-2298) | P1-3: GPU discovery fallback when `llama-server` is missing             | agent | In Progress |
+| [JAISIU-2299](https://pryzmat.youtrack.cloud/issue/JAISIU-2299) | P1-4: `docs/STREAMING_BENCHMARK.md` on this 7900 XTX                    | agent | In Progress |
+| [JAISIU-2300](https://pryzmat.youtrack.cloud/issue/JAISIU-2300) | P1-5: Wire streaming compute into `runner/llamarunner`                  | agent | In Progress |
 
 ## Phase 1 — first actions (post Phase 0 close)
 

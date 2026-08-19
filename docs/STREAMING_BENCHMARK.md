@@ -5,15 +5,15 @@ No llama.cpp numbers are invented: this image does not ship `llama-server`.
 
 ## Host
 
-| Item | Value |
-| --- | --- |
-| GPU | AMD Radeon RX 7900 XTX (`0x744c`), gfx1100 |
-| PCI | `0000:0b:00.0` |
-| VRAM | 25 753 026 560 B (24.0 GiB) |
-| Host RAM (Prismalama log) | 110.0 GiB |
-| Serve binary | `ollama-xtx-engine` (Ubuntu, `/usr/bin/ollama`) |
-| Backend | ROCm / HIP overlay + `rocr_bdf_shim.so` |
-| Env | `OLLAMA_LAYER_STREAMING=1`, `OLLAMA_STREAMING_BUDGET=4GiB` (default), `OLLAMA_MAX_LOADED_MODELS=1`, `HIP_VISIBLE_DEVICES=0` |
+| Item                      | Value                                                                                                                       |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| GPU                       | AMD Radeon RX 7900 XTX (`0x744c`), gfx1100                                                                                  |
+| PCI                       | `0000:0b:00.0`                                                                                                              |
+| VRAM                      | 25 753 026 560 B (24.0 GiB)                                                                                                 |
+| Host RAM (Prismalama log) | 110.0 GiB                                                                                                                   |
+| Serve binary              | `ollama-xtx-engine` (Ubuntu, `/usr/bin/ollama`)                                                                             |
+| Backend                   | ROCm / HIP overlay + `rocr_bdf_shim.so`                                                                                     |
+| Env                       | `OLLAMA_LAYER_STREAMING=1`, `OLLAMA_STREAMING_BUDGET=4GiB` (default), `OLLAMA_MAX_LOADED_MODELS=1`, `HIP_VISIBLE_DEVICES=0` |
 
 `rocm-smi` (container `/opt/rocm/bin/rocm-smi`) with `qwen3:0.6b` loaded after generate:
 
@@ -27,25 +27,25 @@ After a failed >VRAM load, idle used VRAM dropped to 1 980 350 464 B; relo
 
 ## Pins
 
-| Model | On-disk size | Role |
-| --- | --- | --- |
-| `qwen3:0.6b` | 0.52 GB | Fits VRAM; keep-resident |
-| `qwen35-uncensored:latest` | 36.90 GB | Larger than 24 GiB VRAM; must stream |
+| Model                      | On-disk size | Role                                 |
+| -------------------------- | ------------ | ------------------------------------ |
+| `qwen3:0.6b`               | 0.52 GB      | Fits VRAM; keep-resident             |
+| `qwen35-uncensored:latest` | 36.90 GB     | Larger than 24 GiB VRAM; must stream |
 
 ## `qwen3:0.6b` (keep-resident)
 
 `POST /api/generate` `stream=false` `num_predict=32` `temperature=0` prompt `Write a haiku about GPUs.` (model already loaded).
 
-| Metric | Value |
-| --- | --- |
-| `prompt_eval_count` | 15 |
-| `prompt_eval_duration` | 22 438 761 ns → **668.5 tok/s** prompt |
-| `eval_count` | 32 |
-| `eval_duration` | 272 906 130 ns → **117.3 tok/s** generate |
-| `load_duration` | 382 313 469 ns (already resident) |
-| `total_duration` | 703 364 358 ns |
-| GPU offload | 29/29 layers (`ggml GPU layer offload` 100%) |
-| Streamer | `streaming inference: initialized` blocks=28 `total_weight_bytes=516688896` (~493 MiB) |
+| Metric                 | Value                                                                                  |
+| ---------------------- | -------------------------------------------------------------------------------------- |
+| `prompt_eval_count`    | 15                                                                                     |
+| `prompt_eval_duration` | 22 438 761 ns → **668.5 tok/s** prompt                                                 |
+| `eval_count`           | 32                                                                                     |
+| `eval_duration`        | 272 906 130 ns → **117.3 tok/s** generate                                              |
+| `load_duration`        | 382 313 469 ns (already resident)                                                      |
+| `total_duration`       | 703 364 358 ns                                                                         |
+| GPU offload            | 29/29 layers (`ggml GPU layer offload` 100%)                                           |
+| Streamer               | `streaming inference: initialized` blocks=28 `total_weight_bytes=516688896` (~493 MiB) |
 
 Logs since the 10:00 UTC binary swap (`docker logs --since 2026-08-18T10:00:00Z`):
 
@@ -63,17 +63,17 @@ Architecture `qwen35moe` (Qwen3.5-35B-A3B Q8_0, 36.90 GB on disk, 40 repeating l
 
 Measured 2026-08-18T11:49Z after MoE split offload:
 
-| Item | Value |
-| --- | --- |
-| GPU compute | all 40 repeating layers (GDN/attn) + output |
-| GPU routed experts | **24/41** (`moe_pin_non_expert_bytes=1585932800` ≈ 1.48 GiB) |
-| CPU routed experts | 17 repeating layers (`mul_mat_id` on host; batch < 32 so no HIP op-offload) |
-| Load | ~12 s (HTTP `load_duration`) |
-| Streamer | `keep-resident after full load` `budget_bytes=4294967296` |
-| Cold `num_predict=8` | **9.44 tok/s** (`eval_count=8`, `eval_duration=0.847 s`) |
-| Warm `num_predict=16` | **7.68 tok/s** (`eval_count=16`, `eval_duration=2.082 s`) |
-| Warm prompt | 6 tokens → **20.7 tok/s** |
-| `rocm-smi` VRAM used | 25 672 425 472 B (~24.7 GiB of 24.0 GiB advertised) |
+| Item                  | Value                                                                       |
+| --------------------- | --------------------------------------------------------------------------- |
+| GPU compute           | all 40 repeating layers (GDN/attn) + output                                 |
+| GPU routed experts    | **24/41** (`moe_pin_non_expert_bytes=1585932800` ≈ 1.48 GiB)                |
+| CPU routed experts    | 17 repeating layers (`mul_mat_id` on host; batch < 32 so no HIP op-offload) |
+| Load                  | ~12 s (HTTP `load_duration`)                                                |
+| Streamer              | `keep-resident after full load` `budget_bytes=4294967296`                   |
+| Cold `num_predict=8`  | **9.44 tok/s** (`eval_count=8`, `eval_duration=0.847 s`)                    |
+| Warm `num_predict=16` | **7.68 tok/s** (`eval_count=16`, `eval_duration=2.082 s`)                   |
+| Warm prompt           | 6 tokens → **20.7 tok/s**                                                   |
+| `rocm-smi` VRAM used  | 25 672 425 472 B (~24.7 GiB of 24.0 GiB advertised)                         |
 
 Previous same-day full-layer tail (26/41, GDN of layers 0–14 on CPU) was **~2 tok/s**. Split layout is ~4× on this host.
 
@@ -81,12 +81,12 @@ Previous same-day full-layer tail (26/41, GDN of layers 0–14 on CPU) was **~2 
 
 Go AR/chunked GDN replaced with `ggml_gated_delta_net` (llama.cpp fused kernel). Decode is coherent.
 
-| Item | Value |
-| --- | --- |
-| Cold `Say hi in one word.` 8 tok | **9.34 tok/s**, response starts `Hello` |
-| Warm same prompt 16 tok | **8.75 tok/s**, `Hello` then chat-template spill after EOS |
-| Warm `What is 2+2?` 32 tok | **5.04 tok/s**, answer `4` then template spill |
-| `qwen3:0.6b` after binary swap | **94.7 tok/s** (cold 16 tok) |
+| Item                             | Value                                                      |
+| -------------------------------- | ---------------------------------------------------------- |
+| Cold `Say hi in one word.` 8 tok | **9.34 tok/s**, response starts `Hello`                    |
+| Warm same prompt 16 tok          | **8.75 tok/s**, `Hello` then chat-template spill after EOS |
+| Warm `What is 2+2?` 32 tok       | **5.04 tok/s**, answer `4` then template spill             |
+| `qwen3:0.6b` after binary swap   | **94.7 tok/s** (cold 16 tok)                               |
 
 `scripts/xtx-generate-bench.sh` records these JSON lines. Remaining: stop on `eos` / `<|endoftext|>` so `num_predict` does not keep emitting `<|im_start|>`, and gather the 8 active experts off CPU.
 
@@ -94,11 +94,11 @@ Q8 MoE expert tensors are ~31.9 GiB of the 36.9 GB file; non-expert repeating we
 
 ### Earlier 2026-08-18T10:32Z (full-layer tail, before MoE split)
 
-| Item | Value |
-| --- | --- |
-| GPU offload | **26/41 layers** (`15..40` + output) |
-| Warm 16-token generate | **1.54–2.12 tok/s** |
-| `rocm-smi` VRAM used | 25 431 359 488 B |
+| Item                   | Value                                |
+| ---------------------- | ------------------------------------ |
+| GPU offload            | **26/41 layers** (`15..40` + output) |
+| Warm 16-token generate | **1.54–2.12 tok/s**                  |
+| `rocm-smi` VRAM used   | 25 431 359 488 B                     |
 
 ### Follow-up 2026-08-18T10:52Z (IMRoPE + GDN gate)
 

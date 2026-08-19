@@ -19,6 +19,7 @@ func DecideEngineDetailed(modelPath string) EngineDecision  // Full trace with r
 ```
 
 **Decision rules (evaluated in order):**
+
 1. Empty path → GGML
 2. `OLLAMA_USE_AIRLLM=0/false/no` → GGML (explicit opt-out)
 3. `OLLAMA_MULTI_GGUF=1` → AirLLM
@@ -40,12 +41,13 @@ Arch package default: `OLLAMA_USE_AIRLLM=0` (GGML-only unless opt-in).
 
 Standard GGUF inference via CGo llama.cpp bindings.
 
-| File | Purpose |
-|------|---------|
-| `runner.go` | Sequence-based inference loop, batch processing, KV cache |
+| File                  | Purpose                                                      |
+| --------------------- | ------------------------------------------------------------ |
+| `runner.go`           | Sequence-based inference loop, batch processing, KV cache    |
 | `streaming_policy.go` | `useMmapWithLayerStreaming()` — LoRA constraint, mmap policy |
 
 **Key types:**
+
 - `Sequence` — per-request state: inputs, sampling context, stop sequences, metrics
 - `NewSequence()` — validates input length, handles truncation, numKeep calculation
 
@@ -63,10 +65,10 @@ curl -X POST -H "Content-Type: application/json" \
 
 New-architecture runner using `runner --ollama-engine` path.
 
-| File | Purpose |
-|------|---------|
-| `runner.go` | Ollama-engine subprocess |
-| `multimodal.go` | Multimodal cache |
+| File            | Purpose                  |
+| --------------- | ------------------------ |
+| `runner.go`     | Ollama-engine subprocess |
+| `multimodal.go` | Multimodal cache         |
 
 ### `airllmrunner/` — AirLLM Python Proxy (1,188 lines)
 
@@ -77,6 +79,7 @@ Go proxy (port N) ←→ Python airllm_runner.py (port N+1)
 ```
 
 **GPU/NUMA discovery:**
+
 ```go
 func discoverGPUTopology() (*GPUTopology, error)       // rocm-smi + nvidia-smi
 func discoverNUMANodes() (map[int]NUMANodeInfo, error)  // numactl + /sys/
@@ -85,6 +88,7 @@ func buildGPUToNVMEProximityMap() (map[int][]string, error) // Score by NUMA dis
 ```
 
 **Server lifecycle:**
+
 1. `startPythonRunner()` — discover topology, build env, spawn `python3 airllm_runner.py`
 2. `waitForReady()` — poll `/health` for 30s
 3. `load()` — proxy `LoadRequest` to Python `/load` (snake_case JSON)
@@ -92,6 +96,7 @@ func buildGPUToNVMEProximityMap() (map[int][]string, error) // Score by NUMA dis
 5. `health()` — structured health with PID, consecutive errors, ReadyForInference
 
 **Environment set by runner:**
+
 - `ROCR_VISIBLE_DEVICES` / `CUDA_VISIBLE_DEVICES` — GPU visibility
 - `AIRLLM_NUMA_PROXIMITY_MAP` — GPU → NVMe proximity (HC-50)
 - `AIRLLM_MULTI_GPU` — multi-GPU flag (HC-49)
@@ -110,6 +115,7 @@ Stop sequence detection, Unicode handling.
 `cmd/runner/main.go` → `runner.Execute()` — spawned by the main server process.
 
 The server dispatches based on `DecideEngine()`:
+
 - `EngineGGML` → `llamarunner`
 - `EngineAirLLM` → `airllmrunner`
 - Ollama-engine models → `ollamarunner` (via `--ollama-engine` flag)

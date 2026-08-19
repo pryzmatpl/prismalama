@@ -4,19 +4,19 @@
 
 ## Compression formats
 
-| Format | Ratio | Method | Use case |
-|--------|-------|--------|----------|
-| **BC4** | ~4:1 | 4×4 block, 2 endpoints + 3-bit indices per pixel | Lossless-ish, fast decode |
+| Format  | Ratio    | Method                                                | Use case                            |
+| ------- | -------- | ----------------------------------------------------- | ----------------------------------- |
+| **BC4** | ~4:1     | 4×4 block, 2 endpoints + 3-bit indices per pixel      | Lossless-ish, fast decode           |
 | **DCT** | Variable | 2D discrete cosine transform + frequency quantization | Higher compression, tunable quality |
-| **F32** | 1:1 | No compression (passthrough) | Baseline |
+| **F32** | 1:1      | No compression (passthrough)                          | Baseline                            |
 
 ## Files
 
-| File | Lines | Purpose |
-|------|------:|---------|
-| `weightimage.go` | 222 | Weight↔Image conversion, PNG export, heatmap visualization |
-| `texture.go` | 350 | GPU texture backend abstraction, RGBA layout, bilinear sampling |
-| `compression.go` | 341 | BC4 block codec, DCT codec, compression dispatcher |
+| File             | Lines | Purpose                                                         |
+| ---------------- | ----: | --------------------------------------------------------------- |
+| `weightimage.go` |   222 | Weight↔Image conversion, PNG export, heatmap visualization      |
+| `texture.go`     |   350 | GPU texture backend abstraction, RGBA layout, bilinear sampling |
+| `compression.go` |   341 | BC4 block codec, DCT codec, compression dispatcher              |
 
 ## Key types
 
@@ -69,6 +69,7 @@ png := img.ToHeatmapPNG()
 ## GPU texture pipeline
 
 `VulkanWeightTextureBackend` manages compressed weight textures:
+
 1. `CreateWeightTexture()` — float32 → RGBA byte layout
 2. `LoadCompressedBlock()` — store CompressedWeights
 3. `BilinearSampler.Sample(u, v)` — interpolate at normalized coordinates
