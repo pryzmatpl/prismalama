@@ -161,6 +161,9 @@ type LayerInfo struct {
 // name is the path-style name (e.g., "tokenizer/tokenizer.json")
 type LayerCreator func(r io.Reader, mediaType, name string) (LayerInfo, error)
 
+// QuantizingTensorLayerCreator creates one or more tensor layers (weight + scales when quantizing).
+type QuantizingTensorLayerCreator func(r io.Reader, name, dtype string, shape []int32, quantize string) ([]LayerInfo, error)
+
 // ManifestWriter writes the manifest file with the source classification used
 // to produce its tensor layers.
 type ManifestWriter func(modelName string, config LayerInfo, layers []LayerInfo, class Classification) error

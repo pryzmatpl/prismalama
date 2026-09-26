@@ -204,7 +204,8 @@ func CreateImageGenModel(modelName, modelDir, quantize string, createLayer Layer
 
 	fn(fmt.Sprintf("writing manifest for %s", modelName))
 
-	if err := writeManifest(modelName, configLayer, layers); err != nil {
+	class := Classification{Kind: SourceFloat, Quantize: quantize}
+	if err := writeManifest(modelName, configLayer, layers, class); err != nil {
 		return fmt.Errorf("failed to write manifest: %w", err)
 	}
 

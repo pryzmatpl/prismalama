@@ -6,14 +6,12 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"slices"
 	"strings"
 
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ollama/ollama/api"
 	"github.com/ollama/ollama/x/internal/mlxthread"
-	"github.com/ollama/ollama/x/mlxrunner/cache"
 	"github.com/ollama/ollama/x/mlxrunner/mlx"
 	"github.com/ollama/ollama/x/mlxrunner/model"
 	"github.com/ollama/ollama/x/mlxrunner/model/base"
@@ -32,22 +30,18 @@ type Request struct {
 
 	Ctx         context.Context //nolint:containedctx // Queued requests carry caller cancellation to the runner.
 	Tokens      []int32
-	MediaItems  []mediaItem
-	Layout      any // opaque PrepareMedia layout state, stamped on every batch
 	SamplerOpts sample.Options
 }
 
 type Runner struct {
 	Model         base.Model
+	Draft         base.DraftModel
 	Tokenizer     *tokenizer.Tokenizer
 	Requests      chan Request
 	Sampler       *sample.Sampler
-	cache         *prefixCache
+	cache         kvCache
 	contextLength int
 	mlxThread     *mlxthread.Thread
-	// spec is the speculative-decoding subsystem. Nil when the model ships no
-	// draft head.
-	spec *speculation
 }
 
 func (r *Runner) Load(modelName string) error {
@@ -75,7 +69,7 @@ func (r *Runner) Load(modelName string) error {
 		return err
 	}
 
-	var draftModel base.DraftModel
+	r.Draft = nil
 	draft, err := base.NewDraft(root, m)
 	if err != nil {
 		return err
@@ -84,10 +78,7 @@ func (r *Runner) Load(modelName string) error {
 		if err := draft.LoadWeights(tensors); err != nil {
 			return err
 		}
-		draftModel = draft
-	} else if sd, ok := m.(base.SelfDraft); ok {
-		// Inline draft head: already loaded with the target; nil if none shipped.
-		draftModel = sd.SelfDraft()
+		r.Draft = draft
 	}
 
 	collected := mlx.Collect(m)
@@ -105,63 +96,14 @@ func (r *Runner) Load(modelName string) error {
 	}
 	mlx.Sweep()
 	mlx.Eval(collected...)
-	configureWiredMemory()
 
 	r.Model = m
 	r.Tokenizer = m.Tokenizer()
 	r.contextLength = m.MaxContextLength()
-	caches := m.NewCaches()
-	draftCaches := newDraftCaches(draftModel)
-	r.cache = newPrefixCache(slices.Concat(caches, draftCaches))
 	r.Sampler = sample.New(r.contextLength)
-	r.spec = newSpeculation(r, draftModel, caches, draftCaches)
 
 	mlx.EnableCompile()
-
 	return nil
-}
-
-// newDraftCaches returns nil when the model ships no draft.
-func newDraftCaches(draft base.DraftModel) []cache.Cache {
-	if draft == nil {
-		return nil
-	}
-	return draft.NewCaches()
-}
-
-func configureWiredMemory() {
-	if !mlx.GPUIsAvailable() {
-		return
-	}
-
-	active := mlx.ActiveMemory()
-	maxRecommended, err := mlx.MaxRecommendedWorkingSetSize()
-	if err != nil {
-		slog.Warn("Unable to query MLX recommended working set; using pageable memory", "error", err)
-		return
-	}
-
-	limit := min(active, maxRecommended)
-	previous, err := mlx.SetWiredLimit(limit)
-	if err != nil {
-		slog.Warn("Unable to configure MLX wired memory; using pageable memory",
-			"active", mlx.PrettyBytes(active),
-			"limit", mlx.PrettyBytes(limit),
-			"error", err)
-		return
-	}
-
-	if active > maxRecommended {
-		slog.Warn("MLX model exceeds the recommended working set; performance may be degraded",
-			"active", mlx.PrettyBytes(active),
-			"recommended", mlx.PrettyBytes(maxRecommended))
-	}
-	// Limiting residency to the loaded model's active allocations avoids
-	// reserving the remaining capacity for growing KV caches.
-	slog.Debug("Configured MLX wired memory",
-		"active", mlx.PrettyBytes(active),
-		"limit", mlx.PrettyBytes(limit),
-		"previous", mlx.PrettyBytes(previous))
 }
 
 // loadTensorsFromManifest loads all tensor blobs from the manifest into a

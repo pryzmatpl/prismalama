@@ -830,7 +830,7 @@ extern int (*mlx_fast_metal_kernel_apply_ptr)(mlx_vector_array* outputs, mlx_fas
 extern int (*mlx_fast_rms_norm_ptr)(mlx_array* res, const mlx_array x, const mlx_array weight , float eps, const mlx_stream s);
 extern int (*mlx_fast_rope_ptr)(mlx_array* res, const mlx_array x, int dims, bool traditional, mlx_optional_float base, float scale, int offset, const mlx_array freqs , const mlx_stream s);
 extern int (*mlx_fast_rope_dynamic_ptr)(mlx_array* res, const mlx_array x, int dims, bool traditional, mlx_optional_float base, float scale, const mlx_array offset, const mlx_array freqs , const mlx_stream s);
-extern int (*mlx_fast_scaled_dot_product_attention_ptr)(mlx_array* res, const mlx_array queries, const mlx_array keys, const mlx_array values, float scale, const char* mask_mode, const mlx_array mask_arr , const mlx_array sinks , const mlx_stream s);
+extern int (*mlx_fast_scaled_dot_product_attention_ptr)(mlx_array* res, const mlx_array queries, const mlx_array keys, const mlx_array values, float scale, const char* mask_mode, const mlx_array mask_arr , const mlx_array sinks , bool force_fused, const mlx_stream s);
 extern int (*mlx_fft_fft_ptr)(mlx_array* res, const mlx_array a, int n, int axis, mlx_fft_norm norm, const mlx_stream s);
 extern int (*mlx_fft_fft2_ptr)(mlx_array* res, const mlx_array a, const int* n, size_t n_num, const int* axes, size_t axes_num, mlx_fft_norm norm, const mlx_stream s);
 extern int (*mlx_fft_fftfreq_ptr)(mlx_array* res, int n, double d, const mlx_stream s);
@@ -1650,7 +1650,7 @@ int mlx_fast_rope(mlx_array* res, const mlx_array x, int dims, bool traditional,
 
 int mlx_fast_rope_dynamic(mlx_array* res, const mlx_array x, int dims, bool traditional, mlx_optional_float base, float scale, const mlx_array offset, const mlx_array freqs , const mlx_stream s);
 
-int mlx_fast_scaled_dot_product_attention(mlx_array* res, const mlx_array queries, const mlx_array keys, const mlx_array values, float scale, const char* mask_mode, const mlx_array mask_arr , const mlx_array sinks , const mlx_stream s);
+int mlx_fast_scaled_dot_product_attention(mlx_array* res, const mlx_array queries, const mlx_array keys, const mlx_array values, float scale, const char* mask_mode, const mlx_array mask_arr , const mlx_array sinks , bool force_fused, const mlx_stream s);
 
 int mlx_fft_fft(mlx_array* res, const mlx_array a, int n, int axis, mlx_fft_norm norm, const mlx_stream s);
 

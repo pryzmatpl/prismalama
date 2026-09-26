@@ -1473,7 +1473,7 @@ func ScaledDotProductAttention(q, k, v *Array, scale float32, causalMask bool) *
 	}
 	cMaskMode := C.CString(maskMode)
 	defer C.free(unsafe.Pointer(cMaskMode))
-	C.mlx_fast_scaled_dot_product_attention(&res, q.c, k.c, v.c, C.float(scale), cMaskMode, C.mlx_array{}, C.mlx_array{}, C.default_stream())
+	C.mlx_fast_scaled_dot_product_attention(&res, q.c, k.c, v.c, C.float(scale), cMaskMode, C.mlx_array{}, C.mlx_array{}, C.bool(false), C.default_stream())
 	return newArray(res)
 }
 
@@ -1492,7 +1492,7 @@ func ScaledDotProductAttentionWithSinks(q, k, v *Array, scale float32, maskMode 
 	if sinks != nil {
 		sinksH = sinks.c
 	}
-	C.mlx_fast_scaled_dot_product_attention(&res, q.c, k.c, v.c, C.float(scale), cMaskMode, maskH, sinksH, C.default_stream())
+	C.mlx_fast_scaled_dot_product_attention(&res, q.c, k.c, v.c, C.float(scale), cMaskMode, maskH, sinksH, C.bool(false), C.default_stream())
 	return newArray(res)
 }
 

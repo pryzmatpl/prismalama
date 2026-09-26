@@ -22,6 +22,7 @@ package llama
 
 extern bool llamaProgressCallback(float progress, void *user_data);
 extern void llamaLog(int level, char* text, void* user_data);
+extern int llamaBlockCallback(void *user_data, int block_idx);
 */
 import "C"
 
@@ -266,7 +267,7 @@ func (c *Context) SetBlockCallback(fn BlockCallbackFn) {
 
 	C.llama_set_block_callback(
 		c.c,
-		C.llama_block_cb(C.llamaBlockCallback),
+		(C.llama_block_cb)(C.llamaBlockCallback),
 		unsafe.Pointer(&h),
 	)
 }

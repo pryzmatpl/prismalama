@@ -35,10 +35,7 @@ package mlx
 // }
 import "C"
 
-import (
-	"fmt"
-	"runtime"
-)
+import "runtime"
 
 func init() {
 	// Replace the default exit(-1) error handler with one that captures
@@ -54,9 +51,11 @@ func Version() string {
 	return C.GoString(C.mlx_string_data(str))
 }
 
-// mlxCall locks the goroutine to its OS thread so the thread-local error state
-// is read from the same thread that executed fn.
-func mlxCall(fallback string, fn func() C.int) error {
+// mlxCheck locks the goroutine to its OS thread, clears the captured error
+// state, calls fn, and panics with the captured message if fn returns non-zero.
+// The thread lock ensures the thread-local error state is read from the same
+// thread that executed the call.
+func mlxCheck(fallback string, fn func() C.int) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
@@ -66,16 +65,7 @@ func mlxCall(fallback string, fn func() C.int) error {
 		if msg == "" {
 			msg = fallback
 		}
-		return fmt.Errorf("mlx: %s", msg)
-	}
-	return nil
-}
-
-// mlxCheck panics with the captured MLX error. Most array operations cannot
-// recover from a failed graph construction or evaluation.
-func mlxCheck(fallback string, fn func() C.int) {
-	if err := mlxCall(fallback, fn); err != nil {
-		panic(err.Error())
+		panic("mlx: " + msg)
 	}
 }
 
@@ -113,12 +103,5 @@ func Eval(outputs ...*Array) {
 func MetalIsAvailable() bool {
 	var available C._Bool
 	C.mlx_metal_is_available(&available)
-	return bool(available)
-}
-
-// CUDAIsAvailable returns true if a CUDA GPU is available.
-func CUDAIsAvailable() bool {
-	var available C._Bool
-	C.mlx_cuda_is_available(&available)
 	return bool(available)
 }

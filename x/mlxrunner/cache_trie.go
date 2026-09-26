@@ -8,15 +8,12 @@ import (
 	"github.com/ollama/ollama/x/mlxrunner/cache"
 )
 
-// trieKey encodes a token for trie matching (see prefixCache.key).
-type trieKey int64
-
-// trieNode represents a node in the compressed prefix trie for cache branching.
+// trieNode represents a node in the compressed prefix trie for KV cache branching.
 // Each node stores a compressed edge (multiple tokens) and optional paged-out
 // snapshot data per cache layer.
 type trieNode struct {
-	tokens    []trieKey // compressed edge — multiple tokens per node
-	endOffset int       // cumulative tokens from root to end of this node
+	tokens    []int32 // compressed edge — multiple tokens per node
+	endOffset int     // cumulative tokens from root to end of this node
 	parent    *trieNode
 	children  []*trieNode
 	lastUsed  time.Time        // for LRU eviction
@@ -84,27 +81,14 @@ func (n *trieNode) hasSnapshots() bool {
 	return slices.ContainsFunc(n.snapshots, func(s cache.Snapshot) bool { return s != nil })
 }
 
-// hasAllSnapshots reports whether every stateful layer has snapshot data.
-// Stateless layers have a nil cache and never snapshot, so requiring one from
-// them would report every node as incompletely paged out.
-func hasAllSnapshots(n *trieNode, caches []cache.Cache) bool {
-	if len(n.snapshots) == 0 {
-		return false
-	}
-	for i, c := range caches {
-		if c == nil {
-			continue
-		}
-		if i >= len(n.snapshots) || n.snapshots[i] == nil {
-			return false
-		}
-	}
-	return true
+// hasAllSnapshots returns true if every layer has snapshot data.
+func (n *trieNode) hasAllSnapshots() bool {
+	return len(n.snapshots) > 0 && !slices.Contains(n.snapshots, nil)
 }
 
 // findBestMatch walks the trie matching input tokens, returning the path of
 // nodes traversed and the total number of tokens matched.
-func findBestMatch(root *trieNode, tokens []trieKey) (path []*trieNode, matched int) {
+func findBestMatch(root *trieNode, tokens []int32) (path []*trieNode, matched int) {
 	if root == nil {
 		return nil, 0
 	}
@@ -161,10 +145,10 @@ func findBestMatch(root *trieNode, tokens []trieKey) (path []*trieNode, matched 
 
 // appendTokens either creates a new child node or extends the leaf in place,
 // returning the node that now holds the tokens.
-func (n *trieNode) appendTokens(root *trieNode, tokens []trieKey, endOffset int) *trieNode {
+func (n *trieNode) appendTokens(root *trieNode, tokens []int32, endOffset int) *trieNode {
 	if n == root || len(n.children) > 0 || n.hasSnapshots() {
 		child := &trieNode{
-			tokens:    make([]trieKey, len(tokens)),
+			tokens:    make([]int32, len(tokens)),
 			endOffset: endOffset,
 			parent:    n,
 			lastUsed:  n.lastUsed,
@@ -209,7 +193,7 @@ func splitNode(node *trieNode, at int, caches []cache.Cache, counter *int64) *tr
 
 	// Create new parent with the prefix of the edge.
 	newParent := &trieNode{
-		tokens:    make([]trieKey, at),
+		tokens:    make([]int32, at),
 		endOffset: node.startOffset() + at,
 		parent:    node.parent,
 		children:  []*trieNode{node},
@@ -229,7 +213,7 @@ func splitNode(node *trieNode, at int, caches []cache.Cache, counter *int64) *tr
 		parentSnaps := make([]cache.Snapshot, len(oldSnaps))
 		childSnaps := make([]cache.Snapshot, len(oldSnaps))
 		for i, snap := range oldSnaps {
-			if snap != nil && caches[i] != nil {
+			if snap != nil {
 				parentSnaps[i], childSnaps[i] = caches[i].Split(snap, newParent.endOffset)
 			}
 		}
@@ -272,10 +256,6 @@ func mergeWithChild(node *trieNode, caches []cache.Cache, counter *int64) {
 		childSnaps := child.swapSnapshots(nil, counter)
 		merged := make([]cache.Snapshot, len(caches))
 		for i := range caches {
-			if caches[i] == nil {
-				continue
-			}
-
 			var ps, cs cache.Snapshot
 			if nodeSnaps != nil {
 				ps = nodeSnaps[i]
