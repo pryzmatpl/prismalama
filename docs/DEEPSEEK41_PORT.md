@@ -4,21 +4,22 @@
 > HIP/Vulkan/CUDA GGML → Go runner → Ollama API → broker.
 > This is **not** a Strata wrap. Strata's `strata-dsv41` is a parallel engine.
 
-## Status (2026-10-25)
+## Status (2026-10-26)
 
-| Piece                                            | Status                                                                             |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| `LLM_ARCH_DEEPSEEK41` / `models/deepseek41.cpp`  | **In tree** (merge `8273a09b8`)                                                    |
-| Engram / PLE (`LLM_KV_PLE_*`, `LLM_KV_ENGRAM_*`) | **In tree**                                                                        |
-| CPU dry-build `libllama.so`                      | **OK** — contains deepseek41 + Engram symbols                                      |
-| GGUF `general.architecture`                      | **`deepseek41`** (ISTA IQ2_XXS shard1 verified)                                    |
-| `ggml-cuda/dsv4-hc.*`                            | Present                                                                            |
-| HIP dsv4-hc                                      | **Via CUDA glob** (`ggml-hip` compiles `../ggml-cuda/*.cu`) — no separate HIP file |
-| Vulkan `dsv4_hc_*.comp`                          | Present (optional RADV fallback)                                                   |
-| Live `prismalama:rocm` image                     | **Shipped** CPU deepseek41 libllama (+ pre Go binary); HIP optional-fail           |
-| Weights IQ2_XXS+Engram                           | **Verified + registered** as `deepseek-v4-flash-local`                             |
-| ISTA KV aliases                                  | **In tree** — `kv_source_layer_ids` / `index_source_layer_ids` / candidate_*       |
+| Piece                                            | Status                                                                               |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `LLM_ARCH_DEEPSEEK41` / `models/deepseek41.cpp`  | **In tree** (merge `8273a09b8`)                                                      |
+| Engram / PLE (`LLM_KV_PLE_*`, `LLM_KV_ENGRAM_*`) | **In tree**                                                                          |
+| CPU dry-build `libllama.so`                      | **OK** — contains deepseek41 + Engram symbols                                        |
+| GGUF `general.architecture`                      | **`deepseek41`** (ISTA IQ2_XXS shard1 verified)                                      |
+| `ggml-cuda/dsv4-hc.*`                            | Present                                                                              |
+| HIP dsv4-hc                                      | **Via CUDA glob** (`ggml-hip` compiles `../ggml-cuda/*.cu`) — no separate HIP file   |
+| Vulkan `dsv4_hc_*.comp`                          | Present (optional RADV fallback)                                                     |
+| Live `prismalama:rocm` image                     | **Shipped** CPU deepseek41 libllama (+ pre Go binary); HIP optional-fail             |
+| Weights IQ2_XXS+Engram                           | **Verified + registered** as `deepseek-v4-flash-local`                               |
+| ISTA KV aliases                                  | **In tree** — `kv_source_layer_ids` / `index_source_layer_ids` / candidate_*         |
 | ISTA Engram (Phase 5)                            | **In tree** — `deepseek41.engram.*`, sidecar GGUF, `LLAMA_DSV41_ENGRAM=0` to disable |
+| HIP sched (Phase 2)                              | **In tree** — `LLAMA_SCHED_COALESCE` (default on HIP), `LLAMA_SCHED_NO_WEIGHT_SPLIT` (default on HIP) |
 
 ISTA-DASLab GGUFs use `general.architecture = deepseek41` (not `deepseek4`).
 **Do not alias `deepseek41` → `deepseek4`.**
@@ -77,6 +78,7 @@ make deepseek4-port-status
 
 - **Score:** `scripts/deepseek4-bench.sh` → `/tmp/ds-perf/bench.jsonl` (warm gen tok/s from llama-server `eval_duration`, not broker queue time).
 - **ROCm defaults:** `LLAMA_ARG_MOE_CACHE_MIB=3072`, `LLAMA_ARG_FIT_TARGET=768`, `num_gpu=-1`, KV `q4_0`, flash-attn on (see `docker-compose.llm-local.rocm.yml`).
+- **HIP sched (Phase 2):** consecutive same-backend splits merged (`LLAMA_SCHED_COALESCE=0` disables). GPU weight-reuse micro-splits skipped (`LLAMA_SCHED_NO_WEIGHT_SPLIT=0` restores upstream behavior). Target tg `sched_reserve` splits ≤80 before fused MoE kernels.
 - **VRAM:** active experts + MoE SLRU + KV + dense layers must fit on-card; IQ2 expert bulk and Engram tables stay host/NVMe mmap.
 - **BC4 / weightimage:** out of scope for IQ2_XXS — do not route this model through the Go texture streamer.
 - **Broker:** thin OpenAI proxy to `:11434`; use `stream: true` without buffering the full completion before the first token.
