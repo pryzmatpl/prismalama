@@ -167,25 +167,6 @@ for (int i = 0; i < n_per_t; ++i) {
 }
 `
 
-func cStringVector(values []string) (C.mlx_vector_string, func(), bool) {
-	vec := C.mlx_vector_string_new()
-	ok := true
-	for _, s := range values {
-		cs := C.CString(s)
-		if C.mlx_vector_string_append_value(vec, cs) != 0 {
-			ok = false
-		}
-		C.free(unsafe.Pointer(cs))
-		if !ok {
-			break
-		}
-	}
-	cleanup := func() {
-		C.mlx_vector_string_free(vec)
-	}
-	return vec, cleanup, ok
-}
-
 func initGatedDeltaMetalKernel() {
 	inputs, freeInputs, ok := cStringVector([]string{"q", "k", "v", "g", "beta", "state_in", "T"})
 	if !ok {

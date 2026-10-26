@@ -10,8 +10,8 @@
 |-----|-------|
 | URL | https://github.com/piotroxp/prismallama.cpp.git |
 | Branch (developer) | `main` (refresh on every sync) |
-| Pinned commit (`Makefile.sync FETCH_HEAD`) | `35bca9f9089fb1bf9219ddf1415c8fe5e9a3d8dc` |
-| Last full audit | 2026-08-19 |
+| Pinned commit (`Makefile.sync FETCH_HEAD`) | `8273a09b8071944b573d91d7a6cbc7b023660bf6` |
+| Last full audit | 2026-10-25 (deepseek41 merge + TurboQuant export fix) |
 | Sync cadence | Phase 0: every MR; Phase 1+: weekly + on-demand |
 | Audit tool | `make -f Makefile.sync sync` (read-only) |
 

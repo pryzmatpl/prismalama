@@ -2,12 +2,12 @@
 #include "sampling.h"
 #include "sampling_ext.h"
 #include "json-schema-to-grammar.h"
+#include "json.h"
 #include "llama.h"
 #include "llama-model.h"
 #include "llama-model-loader.h"
 #include "llama-grammar.h"
 #include "mtmd.h"
-#include "nlohmann/json.hpp"
 
 struct common_sampler *common_sampler_cinit(const struct llama_model *model, struct common_sampler_cparams *params) {
     try {
@@ -53,7 +53,7 @@ int schema_to_grammar(const char *json_schema, char *grammar, size_t max_len)
 {
     try
     {
-        nlohmann::ordered_json schema = nlohmann::ordered_json::parse(json_schema);
+        common_json schema = common_json::parse(std::string(json_schema ? json_schema : ""));
         std::string grammar_str = json_schema_to_grammar(schema);
         size_t len = grammar_str.length();
         if (len >= max_len)
@@ -76,18 +76,18 @@ struct llama_vocab * llama_load_vocab_from_file(const char * fname) {
         const auto kv = LLM_KV(LLM_ARCH_UNKNOWN);
         std::vector<std::string> splits = {};
         llama_model_loader ml(
-            nullptr,
-            nullptr,
-            nullptr,
+            /*metadata*/ nullptr,
+            /*set_tensor_data*/ nullptr,
+            /*set_tensor_data_ud*/ nullptr,
             std::string(fname),
             splits,
-            nullptr, // FILE* file
-            false,  // use_mmap
-            false,  // use_direct_io
-            false,  // check_tensors
-            false,  // no_alloc
-            nullptr, // param_overrides_p
-            nullptr); // param_tensor_buft_overrides_p
+            /*file*/ nullptr,
+            /*load_mode*/ LLAMA_LOAD_MODE_NONE,
+            /*check_tensors*/ false,
+            /*no_alloc*/ false,
+            /*load_mtp*/ false,
+            /*param_overrides_p*/ nullptr,
+            /*param_tensor_buft_overrides_p*/ nullptr);
         vocab->load(ml, kv);
     } catch (const std::exception & err) {
         LLAMA_LOG_ERROR("%s: error loading model: %s\n", __func__, err.what());

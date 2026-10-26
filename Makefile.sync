@@ -2,7 +2,7 @@
 # Bump FETCH_HEAD after merging ggml-org/llama.cpp (or Ollama’s pinned llama SHA) **into** prismallama.cpp on GitHub.
 UPSTREAM=https://github.com/piotroxp/prismallama.cpp.git
 WORKDIR=llama/vendor
-FETCH_HEAD=35bca9f9089fb1bf9219ddf1415c8fe5e9a3d8dc
+FETCH_HEAD=8273a09b8071944b573d91d7a6cbc7b023660bf6
 
 .PHONY: help
 help:

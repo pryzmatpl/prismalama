@@ -207,12 +207,23 @@ if(_ollama_link_compat_sources AND DEFINED OLLAMA_LLAMA_CPP_COMPAT_DIR)
 endif()
 
 # Link temporary architecture sources (llama/compat/models/*.cpp) into the
-# llama target only (not the mtmd projector lib).
+# llama target only (not the mtmd projector lib). Skip any arch whose
+# src/models/<name>.cpp already exists in the pinned llama.cpp tree (e.g.
+# laguna after ggml-org merge) — duplicate symbols / stale hparams APIs.
 if(_ollama_link_compat_sources AND DEFINED OLLAMA_LLAMA_CPP_COMPAT_DIR)
     file(GLOB _ollama_model_sources CONFIGURE_DEPENDS
         ${OLLAMA_LLAMA_CPP_COMPAT_DIR}/models/*.cpp)
-    if(_ollama_model_sources AND TARGET llama)
-        target_sources(llama PRIVATE ${_ollama_model_sources})
+    set(_ollama_model_sources_filtered "")
+    foreach(_src IN LISTS _ollama_model_sources)
+        get_filename_component(_name "${_src}" NAME)
+        if(EXISTS "${llama_cpp_SOURCE_DIR}/src/models/${_name}")
+            message(STATUS "llama/compat/models: skip ${_name} (present in llama.cpp)")
+        else()
+            list(APPEND _ollama_model_sources_filtered "${_src}")
+        endif()
+    endforeach()
+    if(_ollama_model_sources_filtered AND TARGET llama)
+        target_sources(llama PRIVATE ${_ollama_model_sources_filtered})
         target_include_directories(llama PRIVATE
             ${OLLAMA_LLAMA_CPP_COMPAT_DIR}/models
             ${llama_cpp_SOURCE_DIR}/src)

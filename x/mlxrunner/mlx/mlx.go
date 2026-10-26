@@ -105,3 +105,8 @@ func MetalIsAvailable() bool {
 	C.mlx_metal_is_available(&available)
 	return bool(available)
 }
+
+// CUDAIsAvailable is false outside CUDA-enabled MLX builds (ROCm/CPU hosts).
+func CUDAIsAvailable() bool {
+	return false
+}
