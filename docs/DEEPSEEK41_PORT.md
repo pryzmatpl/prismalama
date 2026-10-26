@@ -71,3 +71,12 @@ make deepseek4-port-status
 ```bash
 make deepseek4-port-status
 ```
+
+## Performance / potato contract (JAISIU-2156)
+
+- **Score:** `scripts/deepseek4-bench.sh` → `/tmp/ds-perf/bench.jsonl` (warm gen tok/s from llama-server `eval_duration`, not broker queue time).
+- **ROCm defaults:** `LLAMA_ARG_MOE_CACHE_MIB=3072`, `LLAMA_ARG_FIT_TARGET=768`, `num_gpu=-1`, KV `q4_0`, flash-attn on (see `docker-compose.llm-local.rocm.yml`).
+- **VRAM:** active experts + MoE SLRU + KV + dense layers must fit on-card; IQ2 expert bulk and Engram tables stay host/NVMe mmap.
+- **BC4 / weightimage:** out of scope for IQ2_XXS — do not route this model through the Go texture streamer.
+- **Broker:** thin OpenAI proxy to `:11434`; use `stream: true` without buffering the full completion before the first token.
+- **Ready check:** `curl /api/tags` + `ollama ps` shows ~23 GiB GPU resident; avoid health-checking with a full generate (evicts warm state).
