@@ -8,6 +8,7 @@ Open models can be used with Claude Code through Ollama's Anthropic-compatible A
 [Claude Code](https://code.claude.com/docs/en/overview) is an agentic coding tool that reads your codebase, edits files, and runs commands.
 
 Ollama connects Claude Code to local and cloud models through its Anthropic-compatible API.
+
 ## Get started
 
 Launch Claude Code with Ollama:
@@ -263,7 +264,8 @@ See the [plugin README](https://github.com/anthropics/claude-plugins-official/tr
 Claude Code connects to Ollama using the Anthropic-compatible API.
 
 1. Set the environment variables:
-<p className="manual-step-title">2. Set the environment variables</p>
+   <p className="manual-step-title">2. Set the environment variables</p>
+
 ```shell
 export ANTHROPIC_AUTH_TOKEN=ollama
 export ANTHROPIC_API_KEY=""
@@ -284,4 +286,7 @@ ANTHROPIC_AUTH_TOKEN=ollama ANTHROPIC_BASE_URL=http://localhost:11434 ANTHROPIC_
 
 **Note:** Claude Code requires a large context window. We recommend at least 64k tokens. See the [context length documentation](/context-length) for how to adjust context length in Ollama.
 ANTHROPIC_AUTH_TOKEN=ollama ANTHROPIC_BASE_URL=http://localhost:11434 ANTHROPIC_API_KEY="" claude --model kimi-k2.7-code:cloud
+
+```
+
 ```

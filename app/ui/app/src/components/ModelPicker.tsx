@@ -1,22 +1,15 @@
-import {
-  useState,
-  useRef,
-  useEffect,
-  forwardRef,
-  type JSX,
-  useImperativeHandle,
-} from "react";
-import { Model } from "@/gotypes";
-import { useSelectedModel } from "@/hooks/useSelectedModel";
-import { useCloudStatus } from "@/hooks/useCloudStatus";
-import { useQueryClient } from "@tanstack/react-query";
-import { getModelUpstreamInfo } from "@/api";
 import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
 import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { useState, useRef, useEffect, forwardRef, type JSX, useImperativeHandle } from "react";
 import { useState, useRef, useEffect, forwardRef, type JSX, useImperativeHandle } from "react";
 import { getModelUpstreamInfo } from "@/api";
+import { getModelUpstreamInfo } from "@/api";
+import { Model } from "@/gotypes";
 import { Model } from "@/gotypes";
 import { useCloudStatus } from "@/hooks/useCloudStatus";
+import { useCloudStatus } from "@/hooks/useCloudStatus";
+import { useSelectedModel } from "@/hooks/useSelectedModel";
 import { useSelectedModel } from "@/hooks/useSelectedModel";
 
 const stalenessCheckCache = new Map<string, number>();
@@ -37,10 +30,7 @@ export const ModelPicker = forwardRef<
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const { selectedModel, setSettings, models, loading } = useSelectedModel(chatId, searchQuery);
-  const { selectedModel, setSettings, models, loading } = useSelectedModel(
-    chatId,
-    searchQuery,
-  );
+  const { selectedModel, setSettings, models, loading } = useSelectedModel(chatId, searchQuery);
   const { cloudDisabled } = useCloudStatus();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -315,13 +305,12 @@ export const ModelList = forwardRef(function ModelList(
                     strokeWidth={1.75}
                   />
                 )}
-                {model.digest === undefined &&
-                  (cloudDisabled || !model.isCloud()) && (
-                    <ArrowDownTrayIcon
-                      className="h-4 w-4 text-neutral-500 dark:text-neutral-400"
-                      strokeWidth={1.75}
-                    />
-                  )}
+                {model.digest === undefined && (cloudDisabled || !model.isCloud()) && (
+                  <ArrowDownTrayIcon
+                    className="h-4 w-4 text-neutral-500 dark:text-neutral-400"
+                    strokeWidth={1.75}
+                  />
+                )}
               </button>
             </div>
           );

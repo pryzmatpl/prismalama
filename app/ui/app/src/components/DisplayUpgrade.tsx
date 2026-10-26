@@ -1,5 +1,5 @@
-import type { ErrorEvent } from "@/gotypes";
 import { Display, type DisplayAction } from "@/components/ui/display";
+import type { ErrorEvent } from "@/gotypes";
 
 interface DisplayUpgradeProps {
   error: ErrorEvent | null;

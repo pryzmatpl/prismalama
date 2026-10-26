@@ -6,18 +6,18 @@
 
 ## Status (2026-10-25)
 
-| Piece | Status |
-|-------|--------|
-| `LLM_ARCH_DEEPSEEK41` / `models/deepseek41.cpp` | **In tree** (merge `8273a09b8`) |
-| Engram / PLE (`LLM_KV_PLE_*`, `LLM_KV_ENGRAM_*`) | **In tree** |
-| CPU dry-build `libllama.so` | **OK** — contains deepseek41 + Engram symbols |
-| GGUF `general.architecture` | **`deepseek41`** (ISTA IQ2_XXS shard1 verified) |
-| `ggml-cuda/dsv4-hc.*` | Present |
-| HIP dsv4-hc | **Via CUDA glob** (`ggml-hip` compiles `../ggml-cuda/*.cu`) — no separate HIP file |
-| Vulkan `dsv4_hc_*.comp` | Present (optional RADV fallback) |
-| Live `prismalama:rocm` image | **Shipped** CPU deepseek41 libllama (+ pre Go binary); HIP optional-fail |
-| Weights IQ2_XXS+Engram | **Verified + registered** as `deepseek-v4-flash-local` |
-| ISTA KV aliases | **In tree** — `kv_source_layer_ids` / `index_source_layer_ids` / candidate_* |
+| Piece                                            | Status                                                                             |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `LLM_ARCH_DEEPSEEK41` / `models/deepseek41.cpp`  | **In tree** (merge `8273a09b8`)                                                    |
+| Engram / PLE (`LLM_KV_PLE_*`, `LLM_KV_ENGRAM_*`) | **In tree**                                                                        |
+| CPU dry-build `libllama.so`                      | **OK** — contains deepseek41 + Engram symbols                                      |
+| GGUF `general.architecture`                      | **`deepseek41`** (ISTA IQ2_XXS shard1 verified)                                    |
+| `ggml-cuda/dsv4-hc.*`                            | Present                                                                            |
+| HIP dsv4-hc                                      | **Via CUDA glob** (`ggml-hip` compiles `../ggml-cuda/*.cu`) — no separate HIP file |
+| Vulkan `dsv4_hc_*.comp`                          | Present (optional RADV fallback)                                                   |
+| Live `prismalama:rocm` image                     | **Shipped** CPU deepseek41 libllama (+ pre Go binary); HIP optional-fail           |
+| Weights IQ2_XXS+Engram                           | **Verified + registered** as `deepseek-v4-flash-local`                             |
+| ISTA KV aliases                                  | **In tree** — `kv_source_layer_ids` / `index_source_layer_ids` / candidate_*       |
 
 ISTA-DASLab GGUFs use `general.architecture = deepseek41` (not `deepseek4`).
 **Do not alias `deepseek41` → `deepseek4`.**

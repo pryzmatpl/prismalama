@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import type { ErrorEvent } from "@/gotypes";
 import { Display, type DisplayAction } from "@/components/ui/display";
+import type { ErrorEvent } from "@/gotypes";
 import { useUser } from "@/hooks/useUser";
 
 interface DisplayLoginProps {

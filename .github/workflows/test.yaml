@@ -13,9 +13,9 @@ concurrency:
 on:
   pull_request:
     paths:
-      - '**/*'
-      - '!docs/**'
-      - '!README.md'
+      - "**/*"
+      - "!docs/**"
+      - "!README.md"
 
 jobs:
   changes:
@@ -84,21 +84,21 @@ jobs:
           - preset: CPU
             superbuild_target: ollama-local
             superbuild_dir: build/local-superbuild
-            superbuild_args: ''
+            superbuild_args: ""
             expected_payload: lib/ollama/llama-server
             install-go: true
           - preset: CUDA
             container: nvidia/cuda:13.0.0-devel-ubuntu22.04
             superbuild_target: ollama-llama-server-cuda_v13
             superbuild_dir: build/local-superbuild-cuda_v13
-            superbuild_args: '-DOLLAMA_LLAMA_BACKENDS=cuda_v13 -DCMAKE_CUDA_ARCHITECTURES=87'
+            superbuild_args: "-DOLLAMA_LLAMA_BACKENDS=cuda_v13 -DCMAKE_CUDA_ARCHITECTURES=87"
             expected_payload: lib/ollama/cuda_v13/libggml-cuda.so
           - preset: ROCm
             container: rocm/dev-ubuntu-22.04:7.2.1
             extra-packages: rocm-libs
             superbuild_target: ollama-llama-server-rocm_v7_2
             superbuild_dir: build/local-superbuild-rocm_v7_2
-            superbuild_args: '-DOLLAMA_LLAMA_BACKENDS=rocm_v7_2 -DAMDGPU_TARGETS=gfx1010 -DCMAKE_PREFIX_PATH=/opt/rocm'
+            superbuild_args: "-DOLLAMA_LLAMA_BACKENDS=rocm_v7_2 -DAMDGPU_TARGETS=gfx1010 -DCMAKE_PREFIX_PATH=/opt/rocm"
             expected_payload: lib/ollama/rocm_v7_2/libggml-hip.so
           - preset: Vulkan
             container: ubuntu:22.04
@@ -108,14 +108,14 @@ jobs:
               vulkan-sdk spirv-headers cmake ccache g++ make
             superbuild_target: ollama-llama-server-vulkan
             superbuild_dir: build/local-superbuild-vulkan
-            superbuild_args: '-DOLLAMA_LLAMA_BACKENDS=vulkan'
+            superbuild_args: "-DOLLAMA_LLAMA_BACKENDS=vulkan"
             expected_payload: lib/ollama/vulkan/libggml-vulkan.so
-          - preset: 'MLX CUDA 13'
+          - preset: "MLX CUDA 13"
             container: nvidia/cuda:13.0.0-devel-ubuntu22.04
             extra-packages: libcudnn9-dev-cuda-13 libopenblas-dev liblapack-dev liblapacke-dev git curl
             superbuild_target: ollama-mlx-cuda_v13
             superbuild_dir: build/local-superbuild-mlx-cuda_v13
-            superbuild_args: '-DOLLAMA_MLX_BACKENDS=cuda_v13 -DCMAKE_CUDA_ARCHITECTURES=87 -DMLX_CUDA_ARCHITECTURES=80-virtual -DBLAS_INCLUDE_DIRS=/usr/include/x86_64-linux-gnu -DLAPACK_INCLUDE_DIRS=/usr/include/x86_64-linux-gnu'
+            superbuild_args: "-DOLLAMA_MLX_BACKENDS=cuda_v13 -DCMAKE_CUDA_ARCHITECTURES=87 -DMLX_CUDA_ARCHITECTURES=80-virtual -DBLAS_INCLUDE_DIRS=/usr/include/x86_64-linux-gnu -DLAPACK_INCLUDE_DIRS=/usr/include/x86_64-linux-gnu"
             expected_payload: lib/ollama/mlx_cuda_v13/libmlx.so
             install-go: true
     runs-on: linux
@@ -178,13 +178,13 @@ jobs:
           - preset: CPU
             superbuild_target: ollama-local
             superbuild_dir: build\local-superbuild
-            superbuild_args: ''
+            superbuild_args: ""
             expected_payload: lib\ollama\llama-server.exe
           - preset: CUDA
             install: https://developer.download.nvidia.com/compute/cuda/13.0.0/local_installers/cuda_13.0.0_windows.exe
             superbuild_target: ollama-llama-server-cuda_v13
             superbuild_dir: build\local-superbuild-cuda_v13
-            superbuild_args: '-DOLLAMA_LLAMA_BACKENDS=cuda_v13 -DCMAKE_CUDA_ARCHITECTURES=80'
+            superbuild_args: "-DOLLAMA_LLAMA_BACKENDS=cuda_v13 -DCMAKE_CUDA_ARCHITECTURES=80"
             expected_payload: lib\ollama\cuda_v13\ggml-cuda.dll
             cuda-components:
               - '"cudart"'
@@ -194,26 +194,26 @@ jobs:
               - '"crt"'
               - '"nvvm"'
               - '"nvptxcompiler"'
-            cuda-version: '13.0'
+            cuda-version: "13.0"
           - preset: ROCm
             install: https://download.amd.com/developer/eula/rocm-hub/AMD-Software-PRO-Edition-26.Q1-Win11-For-HIP.exe
-            rocm-version: '7.1'
+            rocm-version: "7.1"
             superbuild_target: ollama-llama-server-rocm_v7_1
             superbuild_dir: build\local-superbuild-rocm_v7_1
-            superbuild_args: '-DOLLAMA_LLAMA_BACKENDS=rocm_v7_1 -DAMDGPU_TARGETS=gfx1010'
+            superbuild_args: "-DOLLAMA_LLAMA_BACKENDS=rocm_v7_1 -DAMDGPU_TARGETS=gfx1010"
             expected_payload: lib\ollama\rocm_v7_1\ggml-hip.dll
           - preset: Vulkan
             install: https://sdk.lunarg.com/sdk/download/1.4.321.1/windows/vulkansdk-windows-X64-1.4.321.1.exe
             superbuild_target: ollama-llama-server-vulkan
             superbuild_dir: build\local-superbuild-vulkan
-            superbuild_args: '-DOLLAMA_LLAMA_BACKENDS=vulkan'
+            superbuild_args: "-DOLLAMA_LLAMA_BACKENDS=vulkan"
             expected_payload: lib\ollama\vulkan\ggml-vulkan.dll
-          - preset: 'MLX CUDA 13'
+          - preset: "MLX CUDA 13"
             install: https://developer.download.nvidia.com/compute/cuda/13.0.0/local_installers/cuda_13.0.0_windows.exe
             cudnn-install: https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/windows-x86_64/cudnn-windows-x86_64-9.18.1.3_cuda13-archive.zip
             superbuild_target: ollama-mlx-cuda_v13
             superbuild_dir: build\local-superbuild-mlx-cuda_v13
-            superbuild_args: '-DOLLAMA_MLX_BACKENDS=cuda_v13 -DCMAKE_CUDA_ARCHITECTURES=80 -DMLX_CUDA_ARCHITECTURES=80-virtual'
+            superbuild_args: "-DOLLAMA_MLX_BACKENDS=cuda_v13 -DCMAKE_CUDA_ARCHITECTURES=80 -DMLX_CUDA_ARCHITECTURES=80-virtual"
             expected_payload: lib\ollama\mlx_cuda_v13\mlx.dll
             install-go: true
             cuda-components:
@@ -228,7 +228,7 @@ jobs:
               - '"crt"'
               - '"nvvm"'
               - '"nvptxcompiler"'
-            cuda-version: '13.0'
+            cuda-version: "13.0"
     runs-on: windows
     steps:
       - run: |
@@ -320,7 +320,7 @@ jobs:
       - if: matrix.superbuild_target == 'ollama-local' || matrix.install-go
         uses: actions/setup-go@v5
         with:
-          go-version-file: 'go.mod'
+          go-version-file: "go.mod"
       - uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}\.ccache
@@ -369,12 +369,12 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     env:
-      CGO_ENABLED: '1'
+      CGO_ENABLED: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version-file: 'go.mod'
+          go-version-file: "go.mod"
           cache-dependency-path: |
             go.sum
             LLAMA_CPP_VERSION
@@ -382,7 +382,7 @@ jobs:
             MLX_C_VERSION
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
       - name: Install UI dependencies
         working-directory: ./app/ui/app
         run: npm ci

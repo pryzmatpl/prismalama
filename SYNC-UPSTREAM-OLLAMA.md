@@ -60,28 +60,29 @@ These are the files where fork-only code interacts with upstream changes. Each n
 
 **Critical files (Prismalama-owned, upstream also changed):**
 
-| File | Prismalama adds | Risk |
-|------|----------------|------|
-| `runner/runner.go` | AirLLM dispatch, `isAirLLMModel()` | Upstream refactored runner subprocess |
-| `runner/llamarunner/runner.go` | Streaming policy, mmap layer streaming | Upstream added new sequence features |
-| `runner/ollamarunner/runner.go` | Ollama-engine streaming hooks | Upstream active development |
-| `llm/server.go` | `ollama_engine_server.go` hooks, mmap policy | Upstream scheduler changes |
-| `ml/backend.go` | `StreamingBackend` / `StreamingComputeBackend` interfaces | Upstream added new backend methods |
-| `ml/backend/ggml/ggml.go` | `ggml_streaming.go` (LoadStreaming) | Upstream GGML API changes |
-| `ml/device.go` | GPU layer streaming budget | Upstream device management |
-| `llama/llama.go` | CGo bindings (sampling, vision, grammar) | Upstream added new bindings |
-| `llama/sampling_ext.h` / `.cpp` | Sampling bridge | Upstream refactored sampling |
-| `server/sched.go` | Scheduler streaming hooks | Upstream scheduler overhaul |
-| `server/routes.go` | Prismalama capabilities route | Upstream route additions |
-| `envconfig/config.go` | `OLLAMA_LAYER_STREAMING`, `OLLAMA_STREAMING_BUDGET` | Upstream new env vars |
-| `go.mod` / `go.sum` | Fork module path stays `github.com/ollama/ollama` | Accept upstream, re-add fork deps |
-| `model/models/qwen3next/` | DeltaNet, GDN fused op | Upstream may add their own qwen3next |
-| `CMakeLists.txt` | GGML build flags, local cmake | Upstream build system changes |
-| `Makefile.sync` | FETCH_HEAD pin, audit targets | Fork-only — keep ours |
+| File                            | Prismalama adds                                           | Risk                                  |
+| ------------------------------- | --------------------------------------------------------- | ------------------------------------- |
+| `runner/runner.go`              | AirLLM dispatch, `isAirLLMModel()`                        | Upstream refactored runner subprocess |
+| `runner/llamarunner/runner.go`  | Streaming policy, mmap layer streaming                    | Upstream added new sequence features  |
+| `runner/ollamarunner/runner.go` | Ollama-engine streaming hooks                             | Upstream active development           |
+| `llm/server.go`                 | `ollama_engine_server.go` hooks, mmap policy              | Upstream scheduler changes            |
+| `ml/backend.go`                 | `StreamingBackend` / `StreamingComputeBackend` interfaces | Upstream added new backend methods    |
+| `ml/backend/ggml/ggml.go`       | `ggml_streaming.go` (LoadStreaming)                       | Upstream GGML API changes             |
+| `ml/device.go`                  | GPU layer streaming budget                                | Upstream device management            |
+| `llama/llama.go`                | CGo bindings (sampling, vision, grammar)                  | Upstream added new bindings           |
+| `llama/sampling_ext.h` / `.cpp` | Sampling bridge                                           | Upstream refactored sampling          |
+| `server/sched.go`               | Scheduler streaming hooks                                 | Upstream scheduler overhaul           |
+| `server/routes.go`              | Prismalama capabilities route                             | Upstream route additions              |
+| `envconfig/config.go`           | `OLLAMA_LAYER_STREAMING`, `OLLAMA_STREAMING_BUDGET`       | Upstream new env vars                 |
+| `go.mod` / `go.sum`             | Fork module path stays `github.com/ollama/ollama`         | Accept upstream, re-add fork deps     |
+| `model/models/qwen3next/`       | DeltaNet, GDN fused op                                    | Upstream may add their own qwen3next  |
+| `CMakeLists.txt`                | GGML build flags, local cmake                             | Upstream build system changes         |
+| `Makefile.sync`                 | FETCH_HEAD pin, audit targets                             | Fork-only — keep ours                 |
 
 **Prismalama-only files (no upstream equivalent — safe):**
 
 These should survive the merge without conflict:
+
 - `runner/dispatch.go` — engine dispatch
 - `runner/airllmrunner/` — entire AirLLM proxy
 - `ml/streaming/` — entire streaming infrastructure
@@ -202,6 +203,7 @@ make ship-check-fast
 ### Step 9: Fix build failures
 
 Upstream may have:
+
 - Added new `Backend` interface methods → implement in `ml/backend/ggml/ggml.go`
 - Changed `runner.Execute()` signature → update `airllmrunner` and `llamarunner`
 - Added new model architectures → register in `model/models/models.go`
@@ -250,6 +252,7 @@ git reset --hard origin/develop   # if already committed
 ## Scheduling
 
 This sync should be done:
+
 - **Before** starting new Prismalama features that touch runner/server/ml
 - **After** a stable upstream release (check ollama tags: `git tag -l 'v*' --sort=-v:refname | head -5`)
 - **Frequency:** every 4–8 weeks, or when upstream adds features Prismalama needs

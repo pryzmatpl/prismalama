@@ -349,7 +349,7 @@ make ship-check                                        # Full ship gate
 
 | Document                                                                 | Purpose                                                                           |
 | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
-| [`docs/DEEPSEEK41_PORT.md`](docs/DEEPSEEK41_PORT.md)                     | DeepSeek-V4.1-Flash (`deepseek41`+Engram) port vs pin; HIP HC gap; make targets |
+| [`docs/DEEPSEEK41_PORT.md`](docs/DEEPSEEK41_PORT.md)                     | DeepSeek-V4.1-Flash (`deepseek41`+Engram) port vs pin; HIP HC gap; make targets   |
 | [`docs/DEVELOPER.md`](docs/DEVELOPER.md)                                 | **Primary reference**: layout, env vars, runners, tests, ship gate, upstream sync |
 | [`docs/PRISMALAMA_PRINCIPLE.md`](docs/PRISMALAMA_PRINCIPLE.md)           | **North star**: GGML vs AirLLM, why two engines                                   |
 | [`docs/RUNTIME_DISPATCH.md`](docs/RUNTIME_DISPATCH.md)                   | Which engine runs, logs, GPU usage differences                                    |

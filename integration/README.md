@@ -20,7 +20,7 @@ Scope wiring and model selections live in `integration/reg_fast_test.go`, `integ
 
 The integration tests have 2 modes of operating.
 
-1. By default, on Unix systems, they will start the server on a random port, run the tests, and then shutdown the server.  On Windows you must ALWAYS run the server on OLLAMA_HOST for the tests to work.
+1. By default, on Unix systems, they will start the server on a random port, run the tests, and then shutdown the server. On Windows you must ALWAYS run the server on OLLAMA_HOST for the tests to work.
 2. If `OLLAMA_TEST_EXISTING` is set to a non-empty string, the tests will run against an existing running server, which can be remote based on your `OLLAMA_HOST` environment variable
 
 Set `OLLAMA_TEST_LOG_SERVER=1` to print the managed server log after each test
@@ -28,8 +28,7 @@ run, even when the tests pass. This only applies when the integration test
 harness starts the server.
 
 > [!IMPORTANT]
-> Before running the tests locally without the "test existing" setting, compile ollama from the top of the source tree  `go build .` in addition to GPU support with cmake if applicable on your platform.  The integration tests expect to find an ollama binary at the top of the tree.
-
+> Before running the tests locally without the "test existing" setting, compile ollama from the top of the source tree `go build .` in addition to GPU support with cmake if applicable on your platform. The integration tests expect to find an ollama binary at the top of the tree.
 
 ## Testing a New Model
 

@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { getChat } from "@/api";
 import Chat from "@/components/Chat";
 import { ChatSidebar } from "@/components/ChatSidebar";
 import LaunchCommands from "@/components/LaunchCommands";
 import { SidebarLayout } from "@/components/layout/layout";
 import { useChat } from "@/hooks/useChats";
-import { useEffect, useRef } from "react";
 import { useSettings } from "@/hooks/useSettings";
 
 const launchSidebarRequestedKey = "ollama.launchSidebarRequested";

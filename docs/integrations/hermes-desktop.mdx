@@ -16,9 +16,9 @@ Ollama handles the setup flow automatically:
 
 1. **Install** - If Hermes Desktop isn't installed, Ollama prompts to install it
 1. **Install** - If Hermes isn't installed, Ollama prompts to install the Hermes command-line agent. On first desktop launch, Hermes builds its packaged desktop app.
-2. **Model** - Pick a model from the selector
-3. **Configure** - Ollama configures Hermes Desktop to use your selected Ollama model
-4. **Launch** - Ollama opens Hermes Desktop
+1. **Model** - Pick a model from the selector
+1. **Configure** - Ollama configures Hermes Desktop to use your selected Ollama model
+1. **Launch** - Ollama opens Hermes Desktop
 
 ## Run directly with a model
 
@@ -27,6 +27,7 @@ ollama launch hermes-desktop --model <model>
 ```
 
 Run `ollama launch hermes-desktop` again to switch models later.
+
 ## Install Hermes Desktop directly
 
 On macOS and Windows, the Hermes Desktop installer is the recommended upstream installation path. It installs the desktop app and Hermes Agent together. If you prefer the command line, `ollama launch hermes-desktop` remains the explicit Ollama-managed path and uses the same Hermes configuration, sessions, skills, and memory as the CLI.

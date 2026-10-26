@@ -10,13 +10,10 @@ import {
   ArrowDownTrayIcon,
 } from "@heroicons/react/20/solid";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
-import { Settings as SettingsType } from "@/gotypes";
-import { useNavigate } from "@tanstack/react-router";
-import { useUser } from "@/hooks/useUser";
-import { useCloudStatus } from "@/hooks/useCloudStatus";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getSettings,
   type CloudStatusResponse,
@@ -32,7 +29,10 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
 import { Settings as SettingsType } from "@/gotypes";
+import { Settings as SettingsType } from "@/gotypes";
 import { useCloudStatus } from "@/hooks/useCloudStatus";
+import { useCloudStatus } from "@/hooks/useCloudStatus";
+import { useUser } from "@/hooks/useUser";
 import { useUser } from "@/hooks/useUser";
 function AnimatedDots() {
   return (
@@ -67,11 +67,7 @@ export default function Settings() {
   const [pollingInterval, setPollingInterval] = useState<number | null>(null);
   const navigate = useNavigate();
   const { cloudDisabled, cloudStatus, isLoading: cloudStatusLoading } = useCloudStatus();
-  const {
-    cloudDisabled,
-    cloudStatus,
-    isLoading: cloudStatusLoading,
-  } = useCloudStatus();
+  const { cloudDisabled, cloudStatus, isLoading: cloudStatusLoading } = useCloudStatus();
   const {
     data: settingsData,
     isLoading: loading,
@@ -106,11 +102,8 @@ export default function Settings() {
 
       const previous = queryClient.getQueryData<CloudStatusResponse | null>(["cloudStatus"]);
       const envForcesDisabled = previous?.source === "env" || previous?.source === "both";
-      const previous = queryClient.getQueryData<CloudStatusResponse | null>([
-        "cloudStatus",
-      ]);
-      const envForcesDisabled =
-        previous?.source === "env" || previous?.source === "both";
+      const previous = queryClient.getQueryData<CloudStatusResponse | null>(["cloudStatus"]);
+      const envForcesDisabled = previous?.source === "env" || previous?.source === "both";
       queryClient.setQueryData<CloudStatusResponse | null>(
         ["cloudStatus"],
         previous
@@ -133,10 +126,7 @@ export default function Settings() {
     },
     onSuccess: (status) => {
       queryClient.setQueryData<CloudStatusResponse | null>(["cloudStatus"], status);
-      queryClient.setQueryData<CloudStatusResponse | null>(
-        ["cloudStatus"],
-        status,
-      );
+      queryClient.setQueryData<CloudStatusResponse | null>(["cloudStatus"], status);
       queryClient.invalidateQueries({ queryKey: ["models"] });
       queryClient.invalidateQueries({ queryKey: ["cloudStatus"] });
 
@@ -227,8 +217,7 @@ export default function Settings() {
   };
 
   const cloudOverriddenByEnv = cloudStatus?.source === "env" || cloudStatus?.source === "both";
-  const cloudOverriddenByEnv =
-    cloudStatus?.source === "env" || cloudStatus?.source === "both";
+  const cloudOverriddenByEnv = cloudStatus?.source === "env" || cloudStatus?.source === "both";
   const cloudToggleDisabled =
     cloudStatusLoading || updateCloudMutation.isPending || cloudOverriddenByEnv;
 

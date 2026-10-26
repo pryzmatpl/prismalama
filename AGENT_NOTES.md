@@ -65,4 +65,3 @@ Has: Dockerfile
 
 - `README.md` — this project's documentation
 - `Dockerfile` — container build
-
