@@ -18,6 +18,7 @@
 | Live `prismalama:rocm` image                     | **Shipped** CPU deepseek41 libllama (+ pre Go binary); HIP optional-fail           |
 | Weights IQ2_XXS+Engram                           | **Verified + registered** as `deepseek-v4-flash-local`                             |
 | ISTA KV aliases                                  | **In tree** — `kv_source_layer_ids` / `index_source_layer_ids` / candidate_*       |
+| ISTA Engram (Phase 5)                            | **In tree** — `deepseek41.engram.*`, sidecar GGUF, `LLAMA_DSV41_ENGRAM=0` to disable |
 
 ISTA-DASLab GGUFs use `general.architecture = deepseek41` (not `deepseek4`).
 **Do not alias `deepseek41` → `deepseek4`.**
